@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiRequest } from "../context/AuthContext";
-import { useAuth } from "../context/AuthContext";
 import { Trophy, Mail, BookOpen, TrendingUp, ChevronRight, Bell, Plus } from "lucide-react";
 
 const statusColors = {
@@ -12,7 +11,6 @@ const statusColors = {
 };
 
 export default function Dashboard() {
-  const { user } = useAuth();
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [tracked, setTracked] = useState([]);
@@ -64,9 +62,10 @@ export default function Dashboard() {
         <div className="relative z-10 p-8">
           <span className="text-xs tracking-[0.2em] uppercase font-bold text-orange-400">Recruitment Dashboard</span>
           <h1 className="text-3xl font-bold text-white mt-1" style={{ fontFamily: "Barlow Condensed, sans-serif", textTransform: "uppercase" }}>
-            Welcome back, {user?.name?.split(" ")[0] || "Athlete"}
+            Your Scholarship Tracker
           </h1>
           <p className="text-white/60 mt-1">England Under-18 | Basketball Scholarship Tracker</p>
+
           <div className="flex gap-3 mt-5">
             <button
               data-testid="dashboard-find-colleges-btn"

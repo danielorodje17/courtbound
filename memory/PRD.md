@@ -92,6 +92,11 @@ An 18-year-old student basketball player from UK (England Under-18) wants to tra
 
 ---
 
+## Update: April 2026 - v1.1
+- Removed login/authentication — single-user mode (no login screen)
+- Added NCAA Eligibility Checker (/ncaa) — AI-powered, UK-specific, covers academics/amateurism/deadlines
+- "ENGLAND U18" badge added to top nav
+
 ## Prioritised Backlog
 
 ### P0 (Critical - core functionality)

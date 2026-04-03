@@ -1,11 +1,9 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { apiRequest } from "../context/AuthContext";
-import { useAuth } from "../context/AuthContext";
 import { Wand2, Copy, Save, ArrowLeft, ChevronDown } from "lucide-react";
 
 export default function ComposePage() {
-  const { user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const preloaded = location.state;
@@ -37,7 +35,7 @@ export default function ComposePage() {
         college_name: selectedCollege.name,
         coach_name: selectedCoach?.name || "Coach",
         division: selectedCollege.division || "Division I",
-        user_name: user?.name || "Player",
+        user_name: "England U18 Player",
         user_position: position,
         user_stats: stats,
         message_type: messageType
@@ -45,7 +43,7 @@ export default function ComposePage() {
       setDraft(data.draft);
       if (!subject) {
         const subjectMap = {
-          initial_outreach: `Basketball Scholarship Inquiry - ${user?.name || "UK Player"} | England Under-18`,
+          initial_outreach: `Basketball Scholarship Inquiry - England U18 Player | England Under-18`,
           follow_up: `Follow-Up: Basketball Scholarship Inquiry - ${selectedCollege.name}`,
           thank_you: `Thank You - ${selectedCollege.name} Basketball`
         };

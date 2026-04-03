@@ -1,18 +1,16 @@
 from dotenv import load_dotenv
 load_dotenv()
 
-from fastapi import FastAPI, APIRouter, Request, HTTPException, Depends
+from fastapi import FastAPI, APIRouter, Request, HTTPException
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
-from pydantic import BaseModel, Field, BeforeValidator
-from typing import Annotated, List, Optional
+from pydantic import BaseModel, BeforeValidator
+from typing import Annotated, Optional
 import os
 import logging
-import bcrypt
-import jwt
-from datetime import datetime, timezone, timedelta
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 # ─── DB ────────────────────────────────────────────────────────────────────────
@@ -20,91 +18,32 @@ mongo_url = os.environ["MONGO_URL"]
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ["DB_NAME"]]
 
+# Single-user mode: fixed owner ID
+OWNER_ID = "courtbound_owner"
+
 # ─── App & Router ──────────────────────────────────────────────────────────────
 app = FastAPI(title="CourtBound API")
 api_router = APIRouter(prefix="/api")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[os.environ.get("FRONTEND_URL", "http://localhost:3000"), "http://localhost:3000"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ─── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ─── PyObjectId Helper ─────────────────────────────────────────────────────────
-def coerce_object_id(v):
-    if isinstance(v, ObjectId):
-        return str(v)
-    return v
-
-PyObjectId = Annotated[str, BeforeValidator(coerce_object_id)]
-
-# ─── Auth Helpers ──────────────────────────────────────────────────────────────
-JWT_ALGORITHM = "HS256"
-
-def get_jwt_secret() -> str:
-    return os.environ["JWT_SECRET"]
-
-def hash_password(password: str) -> str:
-    salt = bcrypt.gensalt()
-    return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
-
-def verify_password(plain: str, hashed: str) -> bool:
-    return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
-
-def create_access_token(user_id: str, email: str) -> str:
-    payload = {"sub": user_id, "email": email, "exp": datetime.now(timezone.utc) + timedelta(minutes=60), "type": "access"}
-    return jwt.encode(payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
-
-def create_refresh_token(user_id: str) -> str:
-    payload = {"sub": user_id, "exp": datetime.now(timezone.utc) + timedelta(days=7), "type": "refresh"}
-    return jwt.encode(payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
-
-async def get_current_user(request: Request):
-    token = request.cookies.get("access_token")
-    if not token:
-        auth_header = request.headers.get("Authorization", "")
-        if auth_header.startswith("Bearer "):
-            token = auth_header[7:]
-    if not token:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    try:
-        payload = jwt.decode(token, get_jwt_secret(), algorithms=[JWT_ALGORITHM])
-        if payload.get("type") != "access":
-            raise HTTPException(status_code=401, detail="Invalid token type")
-        user = await db.users.find_one({"_id": ObjectId(payload["sub"])})
-        if not user:
-            raise HTTPException(status_code=401, detail="User not found")
-        user["_id"] = str(user["_id"])
-        user.pop("password_hash", None)
-        return user
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expired")
-    except jwt.InvalidTokenError:
-        raise HTTPException(status_code=401, detail="Invalid token")
-
 # ─── Models ────────────────────────────────────────────────────────────────────
-class RegisterRequest(BaseModel):
-    name: str
-    email: str
-    password: str
-
-class LoginRequest(BaseModel):
-    email: str
-    password: str
-
 class CollegeTrackedCreate(BaseModel):
     college_id: str
     notes: Optional[str] = ""
 
 class EmailLogCreate(BaseModel):
     college_id: str
-    direction: str  # "sent" or "received"
+    direction: str
     subject: str
     body: str
     coach_name: Optional[str] = ""
@@ -114,59 +53,40 @@ class AIMessageRequest(BaseModel):
     college_name: str
     coach_name: str
     division: str
-    user_name: str
+    user_name: str = "Player"
     user_position: str = "point guard"
     user_stats: Optional[str] = ""
-    message_type: str = "initial_outreach"  # initial_outreach, follow_up, thank_you
+    message_type: str = "initial_outreach"
 
 class AIStrategyRequest(BaseModel):
     college_name: str
     coach_name: str
     last_contact_date: Optional[str] = ""
-    response_status: str = "no_response"  # no_response, replied, interested
+    response_status: str = "no_response"
 
-# ─── Startup: seed admin + indexes ────────────────────────────────────────────
+class NCAACHeckRequest(BaseModel):
+    # Academic
+    gcse_grades: Optional[str] = ""
+    a_level_grades: Optional[str] = ""
+    predicted_grades: Optional[str] = ""
+    core_subjects_completed: bool = True
+    # Athletic
+    competitive_level: str = "national"  # local, regional, national, international
+    years_played: int = 5
+    has_club_team: bool = True
+    paid_to_play: bool = False
+    # Amateurism
+    received_award_money: bool = False
+    played_on_pro_contract: bool = False
+    agent_representation: bool = False
+    social_media_monetised: bool = False
+
+# ─── Startup ──────────────────────────────────────────────────────────────────
 @app.on_event("startup")
 async def startup():
-    await db.users.create_index("email", unique=True)
-    await db.login_attempts.create_index("identifier")
-    
-    admin_email = os.environ.get("ADMIN_EMAIL", "admin@courtbound.com")
-    admin_password = os.environ.get("ADMIN_PASSWORD", "admin123")
-    existing = await db.users.find_one({"email": admin_email})
-    if existing is None:
-        await db.users.insert_one({
-            "email": admin_email,
-            "password_hash": hash_password(admin_password),
-            "name": "Admin",
-            "role": "admin",
-            "created_at": datetime.now(timezone.utc).isoformat()
-        })
-    elif not verify_password(admin_password, existing["password_hash"]):
-        await db.users.update_one({"email": admin_email}, {"$set": {"password_hash": hash_password(admin_password)}})
-
-    # Seed colleges
     count = await db.colleges.count_documents({})
     if count == 0:
         await seed_colleges()
-
-    # Write test credentials
-    cred_path = Path("/app/memory/test_credentials.md")
-    cred_path.parent.mkdir(parents=True, exist_ok=True)
-    cred_path.write_text(f"""# Test Credentials
-
-## Admin Account
-- Email: {admin_email}
-- Password: {admin_password}
-- Role: admin
-
-## Auth Endpoints
-- POST /api/auth/register
-- POST /api/auth/login
-- POST /api/auth/logout
-- GET  /api/auth/me
-- POST /api/auth/refresh
-""")
 
 async def seed_colleges():
     colleges = [
@@ -201,85 +121,18 @@ async def seed_colleges():
     await db.colleges.insert_many(colleges)
     logger.info(f"Seeded {len(colleges)} colleges")
 
-# ─── Auth Endpoints ────────────────────────────────────────────────────────────
-@api_router.post("/auth/register")
-async def register(data: RegisterRequest, response: __import__('fastapi').Response):
-    email = data.email.lower().strip()
-    existing = await db.users.find_one({"email": email})
-    if existing:
-        raise HTTPException(status_code=400, detail="Email already registered")
-    user_doc = {
-        "email": email,
-        "name": data.name,
-        "password_hash": hash_password(data.password),
-        "role": "user",
-        "created_at": datetime.now(timezone.utc).isoformat()
-    }
-    result = await db.users.insert_one(user_doc)
-    user_id = str(result.inserted_id)
-    access_token = create_access_token(user_id, email)
-    refresh_token = create_refresh_token(user_id)
-    response.set_cookie("access_token", access_token, httponly=True, secure=False, samesite="lax", max_age=3600)
-    response.set_cookie("refresh_token", refresh_token, httponly=True, secure=False, samesite="lax", max_age=604800)
-    return {"id": user_id, "email": email, "name": data.name, "role": "user", "access_token": access_token}
-
-@api_router.post("/auth/login")
-async def login(data: LoginRequest, request: Request, response: __import__('fastapi').Response):
-    email = data.email.lower().strip()
-    ip = request.client.host
-    identifier = f"{ip}:{email}"
-    attempt_doc = await db.login_attempts.find_one({"identifier": identifier})
-    if attempt_doc and attempt_doc.get("attempts", 0) >= 5:
-        last = datetime.fromisoformat(attempt_doc["last_attempt"])
-        if (datetime.now(timezone.utc) - last.replace(tzinfo=timezone.utc)).total_seconds() < 900:
-            raise HTTPException(status_code=429, detail="Too many failed attempts. Try again in 15 minutes.")
-    user = await db.users.find_one({"email": email})
-    if not user or not verify_password(data.password, user["password_hash"]):
-        await db.login_attempts.update_one(
-            {"identifier": identifier},
-            {"$inc": {"attempts": 1}, "$set": {"last_attempt": datetime.now(timezone.utc).isoformat()}},
-            upsert=True
-        )
-        raise HTTPException(status_code=401, detail="Invalid email or password")
-    await db.login_attempts.delete_one({"identifier": identifier})
-    user_id = str(user["_id"])
-    access_token = create_access_token(user_id, email)
-    refresh_token = create_refresh_token(user_id)
-    response.set_cookie("access_token", access_token, httponly=True, secure=False, samesite="lax", max_age=3600)
-    response.set_cookie("refresh_token", refresh_token, httponly=True, secure=False, samesite="lax", max_age=604800)
-    return {"id": user_id, "email": email, "name": user.get("name", ""), "role": user.get("role", "user"), "access_token": access_token}
-
-@api_router.post("/auth/logout")
-async def logout(response: __import__('fastapi').Response):
-    response.delete_cookie("access_token")
-    response.delete_cookie("refresh_token")
-    return {"message": "Logged out"}
-
-@api_router.get("/auth/me")
-async def me(current_user=Depends(get_current_user)):
-    return current_user
-
-# ─── Colleges Endpoints ────────────────────────────────────────────────────────
+# ─── Colleges ──────────────────────────────────────────────────────────────────
 @api_router.get("/colleges")
-async def get_colleges(
-    search: Optional[str] = None,
-    division: Optional[str] = None,
-    foreign_friendly: Optional[bool] = None,
-    state: Optional[str] = None
-):
+async def get_colleges(search: Optional[str] = None, division: Optional[str] = None, foreign_friendly: Optional[bool] = None, state: Optional[str] = None):
     query = {}
     if search:
-        query["$or"] = [
-            {"name": {"$regex": search, "$options": "i"}},
-            {"location": {"$regex": search, "$options": "i"}}
-        ]
+        query["$or"] = [{"name": {"$regex": search, "$options": "i"}}, {"location": {"$regex": search, "$options": "i"}}]
     if division:
         query["division"] = division
     if foreign_friendly is not None:
         query["foreign_friendly"] = foreign_friendly
     if state:
         query["state"] = {"$regex": state, "$options": "i"}
-    
     colleges = await db.colleges.find(query, {"_id": 1, "name": 1, "location": 1, "state": 1, "division": 1, "conference": 1, "foreign_friendly": 1, "ranking": 1, "acceptance_rate": 1, "coaches": 1, "image_url": 1, "scholarship_info": 1, "notable_alumni": 1, "website": 1}).sort("ranking", 1).to_list(200)
     for c in colleges:
         c["id"] = str(c.pop("_id"))
@@ -296,10 +149,10 @@ async def get_college(college_id: str):
     college["id"] = str(college.pop("_id"))
     return college
 
-# ─── Tracked Colleges ──────────────────────────────────────────────────────────
+# ─── Tracked Colleges (no auth) ───────────────────────────────────────────────
 @api_router.get("/my-colleges")
-async def get_my_colleges(current_user=Depends(get_current_user)):
-    tracked = await db.tracked_colleges.find({"user_id": current_user["_id"]}).to_list(200)
+async def get_my_colleges():
+    tracked = await db.tracked_colleges.find({"user_id": OWNER_ID}).to_list(200)
     result = []
     for t in tracked:
         try:
@@ -314,38 +167,32 @@ async def get_my_colleges(current_user=Depends(get_current_user)):
     return result
 
 @api_router.post("/my-colleges")
-async def track_college(data: CollegeTrackedCreate, current_user=Depends(get_current_user)):
-    existing = await db.tracked_colleges.find_one({"user_id": current_user["_id"], "college_id": data.college_id})
+async def track_college(data: CollegeTrackedCreate):
+    existing = await db.tracked_colleges.find_one({"user_id": OWNER_ID, "college_id": data.college_id})
     if existing:
         raise HTTPException(status_code=400, detail="Already tracking this college")
-    doc = {
-        "user_id": current_user["_id"],
-        "college_id": data.college_id,
-        "notes": data.notes,
-        "status": "interested",
-        "created_at": datetime.now(timezone.utc).isoformat()
-    }
+    doc = {"user_id": OWNER_ID, "college_id": data.college_id, "notes": data.notes, "status": "interested", "created_at": datetime.now(timezone.utc).isoformat()}
     result = await db.tracked_colleges.insert_one(doc)
     doc.pop("_id", None)
     return {"id": str(result.inserted_id), **doc}
 
 @api_router.delete("/my-colleges/{college_id}")
-async def untrack_college(college_id: str, current_user=Depends(get_current_user)):
-    await db.tracked_colleges.delete_one({"user_id": current_user["_id"], "college_id": college_id})
+async def untrack_college(college_id: str):
+    await db.tracked_colleges.delete_one({"user_id": OWNER_ID, "college_id": college_id})
     return {"message": "Removed from tracking"}
 
 @api_router.patch("/my-colleges/{college_id}/status")
-async def update_tracked_status(college_id: str, body: dict, current_user=Depends(get_current_user)):
+async def update_tracked_status(college_id: str, body: dict):
     await db.tracked_colleges.update_one(
-        {"user_id": current_user["_id"], "college_id": college_id},
+        {"user_id": OWNER_ID, "college_id": college_id},
         {"$set": {"status": body.get("status", "interested"), "notes": body.get("notes", "")}}
     )
     return {"message": "Updated"}
 
-# ─── Email Log Endpoints ───────────────────────────────────────────────────────
+# ─── Emails (no auth) ─────────────────────────────────────────────────────────
 @api_router.get("/emails")
-async def get_emails(college_id: Optional[str] = None, current_user=Depends(get_current_user)):
-    query = {"user_id": current_user["_id"]}
+async def get_emails(college_id: Optional[str] = None):
+    query = {"user_id": OWNER_ID}
     if college_id:
         query["college_id"] = college_id
     emails = await db.emails.find(query).sort("created_at", -1).to_list(500)
@@ -354,57 +201,39 @@ async def get_emails(college_id: Optional[str] = None, current_user=Depends(get_
     return emails
 
 @api_router.post("/emails")
-async def log_email(data: EmailLogCreate, current_user=Depends(get_current_user)):
-    doc = {
-        "user_id": current_user["_id"],
-        "college_id": data.college_id,
-        "direction": data.direction,
-        "subject": data.subject,
-        "body": data.body,
-        "coach_name": data.coach_name,
-        "coach_email": data.coach_email,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "read": False
-    }
+async def log_email(data: EmailLogCreate):
+    doc = {"user_id": OWNER_ID, "college_id": data.college_id, "direction": data.direction, "subject": data.subject, "body": data.body, "coach_name": data.coach_name, "coach_email": data.coach_email, "created_at": datetime.now(timezone.utc).isoformat()}
     result = await db.emails.insert_one(doc)
     doc["id"] = str(result.inserted_id)
     doc.pop("_id", None)
     return doc
 
 @api_router.delete("/emails/{email_id}")
-async def delete_email(email_id: str, current_user=Depends(get_current_user)):
-    await db.emails.delete_one({"_id": ObjectId(email_id), "user_id": current_user["_id"]})
+async def delete_email(email_id: str):
+    await db.emails.delete_one({"_id": ObjectId(email_id), "user_id": OWNER_ID})
     return {"message": "Deleted"}
 
 # ─── Dashboard Stats ───────────────────────────────────────────────────────────
 @api_router.get("/dashboard/stats")
-async def get_stats(current_user=Depends(get_current_user)):
-    user_id = current_user["_id"]
-    tracked = await db.tracked_colleges.count_documents({"user_id": user_id})
-    emails_sent = await db.emails.count_documents({"user_id": user_id, "direction": "sent"})
-    emails_received = await db.emails.count_documents({"user_id": user_id, "direction": "received"})
-    recent_emails = await db.emails.find({"user_id": user_id}).sort("created_at", -1).to_list(5)
+async def get_stats():
+    tracked = await db.tracked_colleges.count_documents({"user_id": OWNER_ID})
+    emails_sent = await db.emails.count_documents({"user_id": OWNER_ID, "direction": "sent"})
+    emails_received = await db.emails.count_documents({"user_id": OWNER_ID, "direction": "received"})
+    recent_emails = await db.emails.find({"user_id": OWNER_ID}).sort("created_at", -1).to_list(5)
     for e in recent_emails:
         e["id"] = str(e.pop("_id"))
-    return {
-        "tracked_colleges": tracked,
-        "emails_sent": emails_sent,
-        "emails_received": emails_received,
-        "recent_emails": recent_emails
-    }
+    return {"tracked_colleges": tracked, "emails_sent": emails_sent, "emails_received": emails_received, "recent_emails": recent_emails}
 
 # ─── AI Message Composer ───────────────────────────────────────────────────────
 @api_router.post("/ai/draft-message")
-async def draft_message(data: AIMessageRequest, current_user=Depends(get_current_user)):
+async def draft_message(data: AIMessageRequest):
     from emergentintegrations.llm.chat import LlmChat, UserMessage
     api_key = os.environ.get("EMERGENT_LLM_KEY")
-    
     message_prompts = {
         "initial_outreach": f"Draft a professional initial outreach email from a UK basketball player seeking a scholarship at {data.college_name}.",
         "follow_up": f"Draft a follow-up email for a UK basketball player who already contacted {data.college_name} but hasn't heard back.",
         "thank_you": f"Draft a thank you email after a call or meeting with {data.college_name} coaches."
     }
-    
     prompt = f"""You are an expert college basketball recruitment advisor helping an 18-year-old UK basketball player (England Under-18 national team) get a US college scholarship.
 
 {message_prompts.get(data.message_type, message_prompts["initial_outreach"])}
@@ -412,7 +241,7 @@ async def draft_message(data: AIMessageRequest, current_user=Depends(get_current
 Details:
 - Player Name: {data.user_name}
 - Position: {data.user_position}
-- Stats/Highlights: {data.user_stats or 'England Under-18 player, strong defensive player'}
+- Stats/Highlights: {data.user_stats or 'England Under-18 player, strong all-round player'}
 - Target College: {data.college_name}
 - Division: {data.division}
 - Coach Name: {data.coach_name}
@@ -428,22 +257,14 @@ Write a compelling, personal, and professional email. Include:
 7. Professional sign-off
 
 Keep it concise (200-300 words). Make it feel authentic and personal, not generic."""
-
-    chat = LlmChat(
-        api_key=api_key,
-        session_id=str(uuid.uuid4()),
-        system_message="You are an expert college basketball recruitment advisor."
-    ).with_model("openai", "gpt-4.1-mini")
-    
-    user_msg = UserMessage(text=prompt)
-    response = await chat.send_message(user_msg)
+    chat = LlmChat(api_key=api_key, session_id=str(uuid.uuid4()), system_message="You are an expert college basketball recruitment advisor.").with_model("openai", "gpt-4.1-mini")
+    response = await chat.send_message(UserMessage(text=prompt))
     return {"draft": response, "message_type": data.message_type}
 
 @api_router.post("/ai/strategy")
-async def get_strategy(data: AIStrategyRequest, current_user=Depends(get_current_user)):
+async def get_strategy(data: AIStrategyRequest):
     from emergentintegrations.llm.chat import LlmChat, UserMessage
     api_key = os.environ.get("EMERGENT_LLM_KEY")
-    
     prompt = f"""You are an expert college basketball recruitment strategist helping an 18-year-old UK player (England Under-18) get a US college scholarship.
 
 Provide specific, actionable recruitment strategy advice for:
@@ -461,16 +282,52 @@ Give:
 6. Tips specific to UK/international players approaching US coaches
 
 Format as clear numbered action items. Be specific and practical."""
-
-    chat = LlmChat(
-        api_key=api_key,
-        session_id=str(uuid.uuid4()),
-        system_message="You are an expert college basketball recruitment strategist."
-    ).with_model("openai", "gpt-4.1-mini")
-    
-    user_msg = UserMessage(text=prompt)
-    response = await chat.send_message(user_msg)
+    chat = LlmChat(api_key=api_key, session_id=str(uuid.uuid4()), system_message="You are an expert college basketball recruitment strategist.").with_model("openai", "gpt-4.1-mini")
+    response = await chat.send_message(UserMessage(text=prompt))
     return {"strategy": response, "college": data.college_name}
+
+# ─── NCAA Eligibility Checker ─────────────────────────────────────────────────
+@api_router.post("/ai/ncaa-check")
+async def ncaa_eligibility_check(data: NCAACHeckRequest):
+    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    api_key = os.environ.get("EMERGENT_LLM_KEY")
+
+    prompt = f"""You are an NCAA eligibility expert specifically helping a UK/international basketball player understand their eligibility status for US college basketball.
+
+Analyse the following profile for an 18-year-old UK basketball player (England Under-18 national team) and provide a detailed NCAA eligibility assessment:
+
+ACADEMIC PROFILE:
+- GCSE Grades: {data.gcse_grades or 'Not specified'}
+- A-Level / Predicted Grades: {data.a_level_grades or data.predicted_grades or 'Not specified'}
+- Core academic subjects completed: {data.core_subjects_completed}
+
+ATHLETIC PROFILE:
+- Competitive level: {data.competitive_level}
+- Years playing organised basketball: {data.years_played}
+- Club team participation: {data.has_club_team}
+- Ever paid to play: {data.paid_to_play}
+
+AMATEURISM STATUS:
+- Received award money for sport: {data.received_award_money}
+- Played on a professional contract: {data.played_on_pro_contract}
+- Has had agent representation: {data.agent_representation}
+- Monetised social media related to sport: {data.social_media_monetised}
+
+Please provide:
+1. **OVERALL ELIGIBILITY STATUS** - Likely Eligible / Needs Review / At Risk (with confidence level)
+2. **ACADEMIC ELIGIBILITY** - How UK qualifications (GCSEs, A-Levels) convert for NCAA requirements, what's needed
+3. **AMATEURISM STATUS** - Any red flags or concerns based on answers above
+4. **NCAA ELIGIBILITY CENTER** - Exact steps to register at eligibilitycenter.org, what documents to submit
+5. **DIVISION RECOMMENDATIONS** - Which NCAA Division (I, II, III) best suits this profile
+6. **NAIA OPTION** - Whether NAIA schools could be a great alternative (often more accessible for UK players)
+7. **IMMEDIATE ACTION ITEMS** - Numbered list of what to do right now, in priority order
+8. **TIMELINE** - Key deadlines and when to start the eligibility process
+
+Be specific about UK qualifications. Mention that UK GCSEs/A-Levels are generally well-received by the NCAA Eligibility Center. Be encouraging but honest about any risks."""
+
+    chat = LlmChat(api_key=api_key, session_id=str(uuid.uuid4()), system_message="You are an NCAA eligibility expert for international student athletes.").with_model("openai", "gpt-4.1-mini")
+    response = await chat.send_message(UserMessage(text=prompt))
+    return {"assessment": response}
 
 # ─── Root ──────────────────────────────────────────────────────────────────────
 @api_router.get("/")
