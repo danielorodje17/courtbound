@@ -1,0 +1,111 @@
+{
+  "theme": "light",
+  "archetype": "Archetype 4: Swiss & High-Contrast (Light Mode) with Athletic Twist",
+  "brand_name": "CourtBound",
+  "typography": {
+    "heading_font": "Barlow Condensed",
+    "body_font": "Manrope",
+    "hierarchy": {
+      "h1": "text-5xl sm:text-6xl tracking-tight font-bold uppercase",
+      "h2": "text-3xl sm:text-4xl tracking-tight font-semibold uppercase",
+      "h3": "text-xl sm:text-2xl font-semibold",
+      "h4": "text-lg sm:text-xl font-medium",
+      "body": "text-base leading-relaxed text-slate-700",
+      "small": "text-sm text-slate-500",
+      "overline": "text-xs tracking-[0.2em] uppercase font-bold text-orange-600"
+    },
+    "notes": "Use 'Barlow Condensed' for all major headings to evoke a sports/athletic feel. 'Manrope' for all body text, UI elements, and data tables for maximum legibility. Never use Inter."
+  },
+  "colors": {
+    "background": {
+      "primary": "#FFFFFF",
+      "secondary": "#F8FAFC",
+      "tertiary": "#F1F5F9",
+      "overlay": "bg-white/70 backdrop-blur-xl"
+    },
+    "text": {
+      "primary": "#0F172A",
+      "secondary": "#475569",
+      "muted": "#94A3B8",
+      "inverse": "#FFFFFF"
+    },
+    "accent": {
+      "primary": "#FF5722",
+      "primary_hover": "#E64A19",
+      "primary_light": "#FFF7ED",
+      "secondary": "#0A2540"
+    },
+    "status": {
+      "success": "#10B981",
+      "success_bg": "#D1FAE5",
+      "warning": "#F59E0B",
+      "warning_bg": "#FEF3C7",
+      "error": "#EF4444",
+      "error_bg": "#FEE2E2"
+    }
+  },
+  "spacing_and_layout": {
+    "container_padding": "p-6 md:p-8 lg:p-12",
+    "gap_standard": "gap-6",
+    "gap_large": "gap-12",
+    "border_radius": "rounded-lg",
+    "grid_modes": {
+      "dashboard": "grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6",
+      "bento_marketing": "grid-cols-1 md:grid-cols-8 lg:grid-cols-12 gap-8"
+    },
+    "surface_strategy": "Cards should have a flat solid background (bg-white), a 1px subtle border (border-slate-200), and NO shadow by default. On hover, add a slight lift (-translate-y-1) and a subtle shadow (shadow-lg)."
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-orange-500 text-white hover:bg-orange-600 font-bold uppercase tracking-wider rounded-lg px-6 py-3 transition-transform hover:-translate-y-0.5",
+      "secondary": "bg-slate-100 text-slate-900 hover:bg-slate-200 font-bold uppercase tracking-wider rounded-lg px-6 py-3 border border-slate-200",
+      "outline": "border-2 border-slate-200 text-slate-700 hover:border-orange-500 hover:text-orange-500 font-bold uppercase tracking-wider rounded-lg px-6 py-3"
+    },
+    "inputs": "bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 p-3 text-slate-900",
+    "cards": "bg-white border border-slate-200 rounded-lg p-6 hover:shadow-md transition-all duration-200",
+    "badges": "px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide",
+    "navigation": "Sticky top header with glassmorphism (bg-white/80 backdrop-blur-xl border-b border-slate-200). Must include visible links on desktop."
+  },
+  "media": {
+    "images": [
+      {
+        "id": "hero_basketball_players",
+        "url": "https://images.unsplash.com/photo-1638569774366-e221b95e3512?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjV8MHwxfHNlYXJjaHwzfHxiYXNrZXRiYWxsJTIwY29sbGVnZSUyMHBsYXllcnxlbnwwfHx8fDE3NzUyNDU5MTd8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Group of young basketball players playing a game. Use for login page background or marketing hero section.",
+        "usage": "overlay with bg-white/40 or bg-slate-900/60 depending on text contrast needs. Given light mode, if text is dark, use bg-white/60 over it."
+      },
+      {
+        "id": "empty_court_background",
+        "url": "https://images.unsplash.com/photo-1768554630751-6448593749eb?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDR8MHwxfHNlYXJjaHwyfHxlbXB0eSUyMGluZG9vciUyMGJhc2tldGJhbGwlMjBjb3VydHxlbnwwfHx8fDE3NzUyNDU5MjF8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Empty indoor basketball court. Use for dashboard welcome banners or strategy page headers.",
+        "usage": "Use as a card background with a heavy white gradient overlay (from-white to-white/20) to keep text readable."
+      },
+      {
+        "id": "abstract_light_pattern",
+        "url": "https://images.unsplash.com/photo-1769541607705-3b3c5095679b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHwyfHx3aGl0ZSUyMG1pbmltYWwlMjBhYnN0cmFjdCUyMGxpZ2h0JTIwcGF0dGVybnxlbnwwfHx8fDE3NzUyNDU5MzF8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Abstract white geometric background.",
+        "usage": "Use for section backgrounds where a plain white feels too empty, especially around the AI Message Composer or Communication Log."
+      }
+    ]
+  },
+  "iconography": {
+    "library": "@phosphor-icons/react",
+    "style": "duotone or regular weights. Maintain a precise, technical look to match the high-contrast aesthetic."
+  },
+  "animations": {
+    "hover": "Fast and snappy transitions (duration-150 ease-out).",
+    "page_load": "Staggered fade-up for grid items. Use framer-motion with stiff spring animations to reflect athletic energy."
+  },
+  "specific_page_guidelines": {
+    "login_page": "Split screen layout. Left side: Login form with minimalist inputs and sharp orange primary button. Right side: The 'hero_basketball_players' image covering the full height, no text over it.",
+    "dashboard": "Bento 'Control Room' Grid (grid-cols-4). Use solid flat cards with 1px border. Top section should have an overarching 'Season Goals' or 'Recruitment Status' summary.",
+    "college_directory": "Dense list or bento grid. Use badges for 'Division I/II/III' and 'Foreign-Friendly'. Provide strong visual hierarchy for college names vs locations.",
+    "ai_message_composer": "Clean, distraction-free writing interface. The AI suggestions panel should be distinct (maybe with a subtle orange or blue tint background) to separate it from the user's draft area.",
+    "communication_log": "Table layout with clear status badges (Sent, Replied, Draft). Left-align all textual data.",
+    "strategy_follow_up": "Use timeline views or step-by-step vertical layouts. Highlight AI actionable insights with the accent color (orange)."
+  },
+  "accessibility_and_testing": {
+    "contrast": "Ensure text over any image has sufficient contrast or uses backdrop blur/overlay.",
+    "testing_attributes": "All interactive elements MUST have 'data-testid' attributes (e.g., data-testid='login-submit-button', data-testid='college-filter-select')."
+  }
+}
