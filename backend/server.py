@@ -1,89 +1,484 @@
-from fastapi import FastAPI, APIRouter
 from dotenv import load_dotenv
+load_dotenv()
+
+from fastapi import FastAPI, APIRouter, Request, HTTPException, Depends
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
+from bson import ObjectId
+from pydantic import BaseModel, Field, BeforeValidator
+from typing import Annotated, List, Optional
 import os
 import logging
-from pathlib import Path
-from pydantic import BaseModel, Field, ConfigDict
-from typing import List
+import bcrypt
+import jwt
+from datetime import datetime, timezone, timedelta
 import uuid
-from datetime import datetime, timezone
+from pathlib import Path
 
-
-ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
-
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
+# ─── DB ────────────────────────────────────────────────────────────────────────
+mongo_url = os.environ["MONGO_URL"]
 client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+db = client[os.environ["DB_NAME"]]
 
-# Create the main app without a prefix
-app = FastAPI()
-
-# Create a router with the /api prefix
+# ─── App & Router ──────────────────────────────────────────────────────────────
+app = FastAPI(title="CourtBound API")
 api_router = APIRouter(prefix="/api")
-
-
-# Define Models
-class StatusCheck(BaseModel):
-    model_config = ConfigDict(extra="ignore")  # Ignore MongoDB's _id field
-    
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-class StatusCheckCreate(BaseModel):
-    client_name: str
-
-# Add your routes to the router instead of directly to app
-@api_router.get("/")
-async def root():
-    return {"message": "Hello World"}
-
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    status_dict = input.model_dump()
-    status_obj = StatusCheck(**status_dict)
-    
-    # Convert to dict and serialize datetime to ISO string for MongoDB
-    doc = status_obj.model_dump()
-    doc['timestamp'] = doc['timestamp'].isoformat()
-    
-    _ = await db.status_checks.insert_one(doc)
-    return status_obj
-
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks():
-    # Exclude MongoDB's _id field from the query results
-    status_checks = await db.status_checks.find({}, {"_id": 0}).to_list(1000)
-    
-    # Convert ISO string timestamps back to datetime objects
-    for check in status_checks:
-        if isinstance(check['timestamp'], str):
-            check['timestamp'] = datetime.fromisoformat(check['timestamp'])
-    
-    return status_checks
-
-# Include the router in the main app
-app.include_router(api_router)
 
 app.add_middleware(
     CORSMiddleware,
+    allow_origins=[os.environ.get("FRONTEND_URL", "http://localhost:3000"), "http://localhost:3000"],
     allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+# ─── Logging ───────────────────────────────────────────────────────────────────
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# ─── PyObjectId Helper ─────────────────────────────────────────────────────────
+def coerce_object_id(v):
+    if isinstance(v, ObjectId):
+        return str(v)
+    return v
+
+PyObjectId = Annotated[str, BeforeValidator(coerce_object_id)]
+
+# ─── Auth Helpers ──────────────────────────────────────────────────────────────
+JWT_ALGORITHM = "HS256"
+
+def get_jwt_secret() -> str:
+    return os.environ["JWT_SECRET"]
+
+def hash_password(password: str) -> str:
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
+
+def verify_password(plain: str, hashed: str) -> bool:
+    return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
+
+def create_access_token(user_id: str, email: str) -> str:
+    payload = {"sub": user_id, "email": email, "exp": datetime.now(timezone.utc) + timedelta(minutes=60), "type": "access"}
+    return jwt.encode(payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
+
+def create_refresh_token(user_id: str) -> str:
+    payload = {"sub": user_id, "exp": datetime.now(timezone.utc) + timedelta(days=7), "type": "refresh"}
+    return jwt.encode(payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
+
+async def get_current_user(request: Request):
+    token = request.cookies.get("access_token")
+    if not token:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    try:
+        payload = jwt.decode(token, get_jwt_secret(), algorithms=[JWT_ALGORITHM])
+        if payload.get("type") != "access":
+            raise HTTPException(status_code=401, detail="Invalid token type")
+        user = await db.users.find_one({"_id": ObjectId(payload["sub"])})
+        if not user:
+            raise HTTPException(status_code=401, detail="User not found")
+        user["_id"] = str(user["_id"])
+        user.pop("password_hash", None)
+        return user
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+# ─── Models ────────────────────────────────────────────────────────────────────
+class RegisterRequest(BaseModel):
+    name: str
+    email: str
+    password: str
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+class CollegeTrackedCreate(BaseModel):
+    college_id: str
+    notes: Optional[str] = ""
+
+class EmailLogCreate(BaseModel):
+    college_id: str
+    direction: str  # "sent" or "received"
+    subject: str
+    body: str
+    coach_name: Optional[str] = ""
+    coach_email: Optional[str] = ""
+
+class AIMessageRequest(BaseModel):
+    college_name: str
+    coach_name: str
+    division: str
+    user_name: str
+    user_position: str = "point guard"
+    user_stats: Optional[str] = ""
+    message_type: str = "initial_outreach"  # initial_outreach, follow_up, thank_you
+
+class AIStrategyRequest(BaseModel):
+    college_name: str
+    coach_name: str
+    last_contact_date: Optional[str] = ""
+    response_status: str = "no_response"  # no_response, replied, interested
+
+# ─── Startup: seed admin + indexes ────────────────────────────────────────────
+@app.on_event("startup")
+async def startup():
+    await db.users.create_index("email", unique=True)
+    await db.login_attempts.create_index("identifier")
+    
+    admin_email = os.environ.get("ADMIN_EMAIL", "admin@courtbound.com")
+    admin_password = os.environ.get("ADMIN_PASSWORD", "admin123")
+    existing = await db.users.find_one({"email": admin_email})
+    if existing is None:
+        await db.users.insert_one({
+            "email": admin_email,
+            "password_hash": hash_password(admin_password),
+            "name": "Admin",
+            "role": "admin",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        })
+    elif not verify_password(admin_password, existing["password_hash"]):
+        await db.users.update_one({"email": admin_email}, {"$set": {"password_hash": hash_password(admin_password)}})
+
+    # Seed colleges
+    count = await db.colleges.count_documents({})
+    if count == 0:
+        await seed_colleges()
+
+    # Write test credentials
+    cred_path = Path("/app/memory/test_credentials.md")
+    cred_path.parent.mkdir(parents=True, exist_ok=True)
+    cred_path.write_text(f"""# Test Credentials
+
+## Admin Account
+- Email: {admin_email}
+- Password: {admin_password}
+- Role: admin
+
+## Auth Endpoints
+- POST /api/auth/register
+- POST /api/auth/login
+- POST /api/auth/logout
+- GET  /api/auth/me
+- POST /api/auth/refresh
+""")
+
+async def seed_colleges():
+    colleges = [
+        {"name": "Duke University", "location": "Durham, NC", "state": "North Carolina", "division": "Division I", "conference": "ACC", "foreign_friendly": True, "scholarship_info": "Full athletic scholarships available. Strong international student support.", "acceptance_rate": "6%", "notable_alumni": "Zion Williamson, Grant Hill", "ranking": 1, "website": "https://goduke.com", "image_url": "https://images.unsplash.com/photo-1562774053-701939374585?w=400", "coaches": [{"name": "Jon Scheyer", "title": "Head Coach", "email": "jscheyer@duke.edu", "phone": "+1-919-613-7500"}]},
+        {"name": "University of Kentucky", "location": "Lexington, KY", "state": "Kentucky", "division": "Division I", "conference": "SEC", "foreign_friendly": True, "scholarship_info": "Full scholarships. International student office provides dedicated support.", "acceptance_rate": "95%", "notable_alumni": "Anthony Davis, John Wall", "ranking": 2, "website": "https://ukathletics.com", "image_url": "https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=400", "coaches": [{"name": "John Calipari", "title": "Head Coach", "email": "jcalipari@uky.edu", "phone": "+1-859-257-3838"}]},
+        {"name": "University of Kansas", "location": "Lawrence, KS", "state": "Kansas", "division": "Division I", "conference": "Big 12", "foreign_friendly": True, "scholarship_info": "Full athletic scholarships. History of recruiting international talent.", "acceptance_rate": "88%", "notable_alumni": "Andrew Wiggins, Joel Embiid", "ranking": 3, "website": "https://kuathletics.com", "image_url": "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400", "coaches": [{"name": "Bill Self", "title": "Head Coach", "email": "bself@ku.edu", "phone": "+1-785-864-3151"}]},
+        {"name": "Gonzaga University", "location": "Spokane, WA", "state": "Washington", "division": "Division I", "conference": "WCC", "foreign_friendly": True, "scholarship_info": "Very international-friendly. Multiple foreign players each year.", "acceptance_rate": "71%", "notable_alumni": "Adam Morrison, Kelly Olynyk", "ranking": 4, "website": "https://gozags.com", "image_url": "https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=400", "coaches": [{"name": "Mark Few", "title": "Head Coach", "email": "mfew@gonzaga.edu", "phone": "+1-509-313-4220"}]},
+        {"name": "University of North Carolina", "location": "Chapel Hill, NC", "state": "North Carolina", "division": "Division I", "conference": "ACC", "foreign_friendly": True, "scholarship_info": "Full scholarships available. Strong academic support for international students.", "acceptance_rate": "24%", "notable_alumni": "Michael Jordan, Vince Carter", "ranking": 5, "website": "https://goheels.com", "image_url": "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400", "coaches": [{"name": "Hubert Davis", "title": "Head Coach", "email": "hdavis@unc.edu", "phone": "+1-919-962-2117"}]},
+        {"name": "Villanova University", "location": "Villanova, PA", "state": "Pennsylvania", "division": "Division I", "conference": "Big East", "foreign_friendly": True, "scholarship_info": "Scholarships available. Dedicated international student resources.", "acceptance_rate": "26%", "notable_alumni": "Kris Jenkins, Mikal Bridges", "ranking": 6, "website": "https://villanova.com", "image_url": "https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=400", "coaches": [{"name": "Kyle Neptune", "title": "Head Coach", "email": "kneptune@villanova.edu", "phone": "+1-610-519-4120"}]},
+        {"name": "Michigan State University", "location": "East Lansing, MI", "state": "Michigan", "division": "Division I", "conference": "Big Ten", "foreign_friendly": True, "scholarship_info": "Full scholarships. International friendly environment.", "acceptance_rate": "76%", "notable_alumni": "Magic Johnson, Draymond Green", "ranking": 7, "website": "https://msuspartans.com", "image_url": "https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=400", "coaches": [{"name": "Tom Izzo", "title": "Head Coach", "email": "izzo@msu.edu", "phone": "+1-517-355-1623"}]},
+        {"name": "Arizona University", "location": "Tucson, AZ", "state": "Arizona", "division": "Division I", "conference": "Pac-12", "foreign_friendly": True, "scholarship_info": "Strong scholarship program for international athletes.", "acceptance_rate": "85%", "notable_alumni": "Deandre Ayton, Jason Terry", "ranking": 8, "website": "https://arizonawildcats.com", "image_url": "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400", "coaches": [{"name": "Tommy Lloyd", "title": "Head Coach", "email": "tlloyd@arizona.edu", "phone": "+1-520-621-4102"}]},
+        {"name": "Connecticut University (UConn)", "location": "Storrs, CT", "state": "Connecticut", "division": "Division I", "conference": "Big East", "foreign_friendly": True, "scholarship_info": "Actively recruits international players. Full scholarships available.", "acceptance_rate": "56%", "notable_alumni": "Ray Allen, Kemba Walker", "ranking": 9, "website": "https://uconnhuskies.com", "image_url": "https://images.unsplash.com/photo-1562774053-701939374585?w=400", "coaches": [{"name": "Dan Hurley", "title": "Head Coach", "email": "dhurley@uconn.edu", "phone": "+1-860-486-2723"}]},
+        {"name": "Purdue University", "location": "West Lafayette, IN", "state": "Indiana", "division": "Division I", "conference": "Big Ten", "foreign_friendly": True, "scholarship_info": "Full athletic scholarships. Strong STEM-focused international support.", "acceptance_rate": "67%", "notable_alumni": "E'Twaun Moore, Robbie Hummel", "ranking": 10, "website": "https://purduesports.com", "image_url": "https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=400", "coaches": [{"name": "Matt Painter", "title": "Head Coach", "email": "mpainter@purdue.edu", "phone": "+1-765-494-3220"}]},
+        {"name": "Creighton University", "location": "Omaha, NE", "state": "Nebraska", "division": "Division I", "conference": "Big East", "foreign_friendly": True, "scholarship_info": "Welcomes international players. Strong Jesuit educational environment.", "acceptance_rate": "76%", "notable_alumni": "Kyle Korver, Doug McDermott", "ranking": 11, "website": "https://gocreighton.com", "image_url": "https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=400", "coaches": [{"name": "Greg McDermott", "title": "Head Coach", "email": "gmcdermott@creighton.edu", "phone": "+1-402-280-2720"}]},
+        {"name": "Baylor University", "location": "Waco, TX", "state": "Texas", "division": "Division I", "conference": "Big 12", "foreign_friendly": False, "scholarship_info": "Full scholarships. Limited international scholarship history.", "acceptance_rate": "38%", "notable_alumni": "Brittney Griner, Scott Drew", "ranking": 12, "website": "https://baylorbears.com", "image_url": "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400", "coaches": [{"name": "Scott Drew", "title": "Head Coach", "email": "sdrew@baylor.edu", "phone": "+1-254-710-3030"}]},
+        {"name": "UCLA", "location": "Los Angeles, CA", "state": "California", "division": "Division I", "conference": "Pac-12", "foreign_friendly": True, "scholarship_info": "Strong international student support. Academic excellence.", "acceptance_rate": "12%", "notable_alumni": "Kareem Abdul-Jabbar, Bill Walton", "ranking": 13, "website": "https://uclabruins.com", "image_url": "https://images.unsplash.com/photo-1562774053-701939374585?w=400", "coaches": [{"name": "Mick Cronin", "title": "Head Coach", "email": "mcronin@ucla.edu", "phone": "+1-310-825-8699"}]},
+        {"name": "Ohio State University", "location": "Columbus, OH", "state": "Ohio", "division": "Division I", "conference": "Big Ten", "foreign_friendly": True, "scholarship_info": "Full scholarships available. Strong big-school resources.", "acceptance_rate": "54%", "notable_alumni": "Evan Turner, Mike Conley Jr.", "ranking": 14, "website": "https://ohiostatebuckeyes.com", "image_url": "https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=400", "coaches": [{"name": "Jake Diebler", "title": "Head Coach", "email": "jdiebler@osu.edu", "phone": "+1-614-292-1033"}]},
+        {"name": "Indiana University", "location": "Bloomington, IN", "state": "Indiana", "division": "Division I", "conference": "Big Ten", "foreign_friendly": False, "scholarship_info": "Full athletic scholarships. Traditional basketball powerhouse.", "acceptance_rate": "82%", "notable_alumni": "Isiah Thomas, Victor Oladipo", "ranking": 15, "website": "https://iuhoosiers.com", "image_url": "https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=400", "coaches": [{"name": "Mike Woodson", "title": "Head Coach", "email": "mwoodson@indiana.edu", "phone": "+1-812-855-2138"}]},
+        {"name": "St. John's University", "location": "Queens, NY", "state": "New York", "division": "Division I", "conference": "Big East", "foreign_friendly": True, "scholarship_info": "Strong NYC recruiting. Very welcoming to international students.", "acceptance_rate": "63%", "notable_alumni": "Chris Mullin, Mark Jackson", "ranking": 16, "website": "https://redstormsports.com", "image_url": "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400", "coaches": [{"name": "Rick Pitino", "title": "Head Coach", "email": "rpitino@stjohns.edu", "phone": "+1-718-990-6367"}]},
+        {"name": "Louisville University", "location": "Louisville, KY", "state": "Kentucky", "division": "Division I", "conference": "ACC", "foreign_friendly": True, "scholarship_info": "Full scholarships. Actively recruits internationally.", "acceptance_rate": "68%", "notable_alumni": "Donovan Mitchell, Darrell Griffith", "ranking": 17, "website": "https://gocards.com", "image_url": "https://images.unsplash.com/photo-1562774053-701939374585?w=400", "coaches": [{"name": "Pat Kelsey", "title": "Head Coach", "email": "pkelsey@louisville.edu", "phone": "+1-502-852-5732"}]},
+        {"name": "Tennessee University", "location": "Knoxville, TN", "state": "Tennessee", "division": "Division I", "conference": "SEC", "foreign_friendly": False, "scholarship_info": "Full scholarships. Some international players historically.", "acceptance_rate": "67%", "notable_alumni": "Grant Williams, Jordan Bone", "ranking": 18, "website": "https://utsports.com", "image_url": "https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=400", "coaches": [{"name": "Rick Barnes", "title": "Head Coach", "email": "rbarnes@utk.edu", "phone": "+1-865-974-1212"}]},
+        {"name": "Xavier University", "location": "Cincinnati, OH", "state": "Ohio", "division": "Division I", "conference": "Big East", "foreign_friendly": True, "scholarship_info": "Jesuit values support international students. Strong scholarship program.", "acceptance_rate": "69%", "notable_alumni": "Channing Frye, Jordan Crawford", "ranking": 19, "website": "https://goxavier.com", "image_url": "https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=400", "coaches": [{"name": "Sean Miller", "title": "Head Coach", "email": "smiller@xavier.edu", "phone": "+1-513-745-3413"}]},
+        {"name": "Marquette University", "location": "Milwaukee, WI", "state": "Wisconsin", "division": "Division I", "conference": "Big East", "foreign_friendly": True, "scholarship_info": "History of international players. Catholic university with strong support.", "acceptance_rate": "84%", "notable_alumni": "Dwyane Wade, Doc Rivers", "ranking": 20, "website": "https://gomarquette.com", "image_url": "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400", "coaches": [{"name": "Shaka Smart", "title": "Head Coach", "email": "ssmart@marquette.edu", "phone": "+1-414-288-7447"}]},
+        {"name": "Butler University", "location": "Indianapolis, IN", "state": "Indiana", "division": "Division I", "conference": "Big East", "foreign_friendly": True, "scholarship_info": "Mid-major with excellent academics. International students welcome.", "acceptance_rate": "77%", "notable_alumni": "Shelvin Mack, Gordon Hayward", "ranking": 21, "website": "https://butlersports.com", "image_url": "https://images.unsplash.com/photo-1562774053-701939374585?w=400", "coaches": [{"name": "Thad Matta", "title": "Head Coach", "email": "tmatta@butler.edu", "phone": "+1-317-940-9375"}]},
+        {"name": "San Diego State University", "location": "San Diego, CA", "state": "California", "division": "Division I", "conference": "Mountain West", "foreign_friendly": True, "scholarship_info": "Strong mid-major program. California sunshine and diverse student body.", "acceptance_rate": "37%", "notable_alumni": "Kawhi Leonard, Steve Fisher", "ranking": 22, "website": "https://goaztecs.com", "image_url": "https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=400", "coaches": [{"name": "Brian Dutcher", "title": "Head Coach", "email": "bdutcher@sdsu.edu", "phone": "+1-619-594-5200"}]},
+        {"name": "Colorado State University", "location": "Fort Collins, CO", "state": "Colorado", "division": "Division I", "conference": "Mountain West", "foreign_friendly": True, "scholarship_info": "Open to international athletes. Great mountain setting.", "acceptance_rate": "84%", "notable_alumni": "Manny Adur, Niek Maarse", "ranking": 23, "website": "https://csurams.com", "image_url": "https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=400", "coaches": [{"name": "Niko Medved", "title": "Head Coach", "email": "nmedved@colostate.edu", "phone": "+1-970-491-5065"}]},
+        {"name": "Drexel University", "location": "Philadelphia, PA", "state": "Pennsylvania", "division": "Division I", "conference": "CAA", "foreign_friendly": True, "scholarship_info": "Strong co-op program. Excellent for academic + athletic balance.", "acceptance_rate": "76%", "notable_alumni": "Michael Anderson, Daryl Strawberry", "ranking": 24, "website": "https://drexeldragons.com", "image_url": "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400", "coaches": [{"name": "Zach Spiker", "title": "Head Coach", "email": "zspiker@drexel.edu", "phone": "+1-215-895-2000"}]},
+        {"name": "Belmont University", "location": "Nashville, TN", "state": "Tennessee", "division": "Division I", "conference": "Missouri Valley", "foreign_friendly": True, "scholarship_info": "Smaller school, more personal attention. International students supported.", "acceptance_rate": "79%", "notable_alumni": "Taylor Morgan, Dylan Windler", "ranking": 25, "website": "https://belmontbruins.com", "image_url": "https://images.unsplash.com/photo-1562774053-701939374585?w=400", "coaches": [{"name": "Casey Alexander", "title": "Head Coach", "email": "calexander@belmont.edu", "phone": "+1-615-460-5500"}]},
+    ]
+    for c in colleges:
+        c["created_at"] = datetime.now(timezone.utc).isoformat()
+    await db.colleges.insert_many(colleges)
+    logger.info(f"Seeded {len(colleges)} colleges")
+
+# ─── Auth Endpoints ────────────────────────────────────────────────────────────
+@api_router.post("/auth/register")
+async def register(data: RegisterRequest, response: __import__('fastapi').Response):
+    email = data.email.lower().strip()
+    existing = await db.users.find_one({"email": email})
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    user_doc = {
+        "email": email,
+        "name": data.name,
+        "password_hash": hash_password(data.password),
+        "role": "user",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    result = await db.users.insert_one(user_doc)
+    user_id = str(result.inserted_id)
+    access_token = create_access_token(user_id, email)
+    refresh_token = create_refresh_token(user_id)
+    response.set_cookie("access_token", access_token, httponly=True, secure=False, samesite="lax", max_age=3600)
+    response.set_cookie("refresh_token", refresh_token, httponly=True, secure=False, samesite="lax", max_age=604800)
+    return {"id": user_id, "email": email, "name": data.name, "role": "user", "access_token": access_token}
+
+@api_router.post("/auth/login")
+async def login(data: LoginRequest, request: Request, response: __import__('fastapi').Response):
+    email = data.email.lower().strip()
+    ip = request.client.host
+    identifier = f"{ip}:{email}"
+    attempt_doc = await db.login_attempts.find_one({"identifier": identifier})
+    if attempt_doc and attempt_doc.get("attempts", 0) >= 5:
+        last = datetime.fromisoformat(attempt_doc["last_attempt"])
+        if (datetime.now(timezone.utc) - last.replace(tzinfo=timezone.utc)).total_seconds() < 900:
+            raise HTTPException(status_code=429, detail="Too many failed attempts. Try again in 15 minutes.")
+    user = await db.users.find_one({"email": email})
+    if not user or not verify_password(data.password, user["password_hash"]):
+        await db.login_attempts.update_one(
+            {"identifier": identifier},
+            {"$inc": {"attempts": 1}, "$set": {"last_attempt": datetime.now(timezone.utc).isoformat()}},
+            upsert=True
+        )
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    await db.login_attempts.delete_one({"identifier": identifier})
+    user_id = str(user["_id"])
+    access_token = create_access_token(user_id, email)
+    refresh_token = create_refresh_token(user_id)
+    response.set_cookie("access_token", access_token, httponly=True, secure=False, samesite="lax", max_age=3600)
+    response.set_cookie("refresh_token", refresh_token, httponly=True, secure=False, samesite="lax", max_age=604800)
+    return {"id": user_id, "email": email, "name": user.get("name", ""), "role": user.get("role", "user"), "access_token": access_token}
+
+@api_router.post("/auth/logout")
+async def logout(response: __import__('fastapi').Response):
+    response.delete_cookie("access_token")
+    response.delete_cookie("refresh_token")
+    return {"message": "Logged out"}
+
+@api_router.get("/auth/me")
+async def me(current_user=Depends(get_current_user)):
+    return current_user
+
+# ─── Colleges Endpoints ────────────────────────────────────────────────────────
+@api_router.get("/colleges")
+async def get_colleges(
+    search: Optional[str] = None,
+    division: Optional[str] = None,
+    foreign_friendly: Optional[bool] = None,
+    state: Optional[str] = None
+):
+    query = {}
+    if search:
+        query["$or"] = [
+            {"name": {"$regex": search, "$options": "i"}},
+            {"location": {"$regex": search, "$options": "i"}}
+        ]
+    if division:
+        query["division"] = division
+    if foreign_friendly is not None:
+        query["foreign_friendly"] = foreign_friendly
+    if state:
+        query["state"] = {"$regex": state, "$options": "i"}
+    
+    colleges = await db.colleges.find(query, {"_id": 1, "name": 1, "location": 1, "state": 1, "division": 1, "conference": 1, "foreign_friendly": 1, "ranking": 1, "acceptance_rate": 1, "coaches": 1, "image_url": 1, "scholarship_info": 1, "notable_alumni": 1, "website": 1}).sort("ranking", 1).to_list(200)
+    for c in colleges:
+        c["id"] = str(c.pop("_id"))
+    return colleges
+
+@api_router.get("/colleges/{college_id}")
+async def get_college(college_id: str):
+    try:
+        college = await db.colleges.find_one({"_id": ObjectId(college_id)})
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid college ID")
+    if not college:
+        raise HTTPException(status_code=404, detail="College not found")
+    college["id"] = str(college.pop("_id"))
+    return college
+
+# ─── Tracked Colleges ──────────────────────────────────────────────────────────
+@api_router.get("/my-colleges")
+async def get_my_colleges(current_user=Depends(get_current_user)):
+    tracked = await db.tracked_colleges.find({"user_id": current_user["_id"]}).to_list(200)
+    result = []
+    for t in tracked:
+        try:
+            college = await db.colleges.find_one({"_id": ObjectId(t["college_id"])})
+            if college:
+                college["id"] = str(college.pop("_id"))
+                t["id"] = str(t.pop("_id"))
+                t["college"] = college
+                result.append(t)
+        except Exception:
+            pass
+    return result
+
+@api_router.post("/my-colleges")
+async def track_college(data: CollegeTrackedCreate, current_user=Depends(get_current_user)):
+    existing = await db.tracked_colleges.find_one({"user_id": current_user["_id"], "college_id": data.college_id})
+    if existing:
+        raise HTTPException(status_code=400, detail="Already tracking this college")
+    doc = {
+        "user_id": current_user["_id"],
+        "college_id": data.college_id,
+        "notes": data.notes,
+        "status": "interested",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    result = await db.tracked_colleges.insert_one(doc)
+    doc.pop("_id", None)
+    return {"id": str(result.inserted_id), **doc}
+
+@api_router.delete("/my-colleges/{college_id}")
+async def untrack_college(college_id: str, current_user=Depends(get_current_user)):
+    await db.tracked_colleges.delete_one({"user_id": current_user["_id"], "college_id": college_id})
+    return {"message": "Removed from tracking"}
+
+@api_router.patch("/my-colleges/{college_id}/status")
+async def update_tracked_status(college_id: str, body: dict, current_user=Depends(get_current_user)):
+    await db.tracked_colleges.update_one(
+        {"user_id": current_user["_id"], "college_id": college_id},
+        {"$set": {"status": body.get("status", "interested"), "notes": body.get("notes", "")}}
+    )
+    return {"message": "Updated"}
+
+# ─── Email Log Endpoints ───────────────────────────────────────────────────────
+@api_router.get("/emails")
+async def get_emails(college_id: Optional[str] = None, current_user=Depends(get_current_user)):
+    query = {"user_id": current_user["_id"]}
+    if college_id:
+        query["college_id"] = college_id
+    emails = await db.emails.find(query).sort("created_at", -1).to_list(500)
+    for e in emails:
+        e["id"] = str(e.pop("_id"))
+    return emails
+
+@api_router.post("/emails")
+async def log_email(data: EmailLogCreate, current_user=Depends(get_current_user)):
+    doc = {
+        "user_id": current_user["_id"],
+        "college_id": data.college_id,
+        "direction": data.direction,
+        "subject": data.subject,
+        "body": data.body,
+        "coach_name": data.coach_name,
+        "coach_email": data.coach_email,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "read": False
+    }
+    result = await db.emails.insert_one(doc)
+    doc["id"] = str(result.inserted_id)
+    doc.pop("_id", None)
+    return doc
+
+@api_router.delete("/emails/{email_id}")
+async def delete_email(email_id: str, current_user=Depends(get_current_user)):
+    await db.emails.delete_one({"_id": ObjectId(email_id), "user_id": current_user["_id"]})
+    return {"message": "Deleted"}
+
+# ─── Dashboard Stats ───────────────────────────────────────────────────────────
+@api_router.get("/dashboard/stats")
+async def get_stats(current_user=Depends(get_current_user)):
+    user_id = current_user["_id"]
+    tracked = await db.tracked_colleges.count_documents({"user_id": user_id})
+    emails_sent = await db.emails.count_documents({"user_id": user_id, "direction": "sent"})
+    emails_received = await db.emails.count_documents({"user_id": user_id, "direction": "received"})
+    recent_emails = await db.emails.find({"user_id": user_id}).sort("created_at", -1).to_list(5)
+    for e in recent_emails:
+        e["id"] = str(e.pop("_id"))
+    return {
+        "tracked_colleges": tracked,
+        "emails_sent": emails_sent,
+        "emails_received": emails_received,
+        "recent_emails": recent_emails
+    }
+
+# ─── AI Message Composer ───────────────────────────────────────────────────────
+@api_router.post("/ai/draft-message")
+async def draft_message(data: AIMessageRequest, current_user=Depends(get_current_user)):
+    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    api_key = os.environ.get("EMERGENT_LLM_KEY")
+    
+    message_prompts = {
+        "initial_outreach": f"Draft a professional initial outreach email from a UK basketball player seeking a scholarship at {data.college_name}.",
+        "follow_up": f"Draft a follow-up email for a UK basketball player who already contacted {data.college_name} but hasn't heard back.",
+        "thank_you": f"Draft a thank you email after a call or meeting with {data.college_name} coaches."
+    }
+    
+    prompt = f"""You are an expert college basketball recruitment advisor helping an 18-year-old UK basketball player (England Under-18 national team) get a US college scholarship.
+
+{message_prompts.get(data.message_type, message_prompts["initial_outreach"])}
+
+Details:
+- Player Name: {data.user_name}
+- Position: {data.user_position}
+- Stats/Highlights: {data.user_stats or 'England Under-18 player, strong defensive player'}
+- Target College: {data.college_name}
+- Division: {data.division}
+- Coach Name: {data.coach_name}
+- Message Type: {data.message_type}
+
+Write a compelling, personal, and professional email. Include:
+1. Strong opening that catches attention
+2. Brief introduction mentioning England U18 status
+3. Why this specific college/program appeals to them
+4. Key athletic highlights
+5. Academic commitment mention
+6. Clear call to action
+7. Professional sign-off
+
+Keep it concise (200-300 words). Make it feel authentic and personal, not generic."""
+
+    chat = LlmChat(
+        api_key=api_key,
+        session_id=str(uuid.uuid4()),
+        system_message="You are an expert college basketball recruitment advisor."
+    ).with_model("openai", "gpt-4.1-mini")
+    
+    user_msg = UserMessage(text=prompt)
+    response = await chat.send_message(user_msg)
+    return {"draft": response, "message_type": data.message_type}
+
+@api_router.post("/ai/strategy")
+async def get_strategy(data: AIStrategyRequest, current_user=Depends(get_current_user)):
+    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    api_key = os.environ.get("EMERGENT_LLM_KEY")
+    
+    prompt = f"""You are an expert college basketball recruitment strategist helping an 18-year-old UK player (England Under-18) get a US college scholarship.
+
+Provide specific, actionable recruitment strategy advice for:
+- College: {data.college_name}
+- Coach: {data.coach_name}
+- Last Contact: {data.last_contact_date or 'Not yet contacted'}
+- Response Status: {data.response_status}
+
+Give:
+1. Immediate next action (what to do TODAY)
+2. Follow-up timeline (specific dates/intervals)
+3. Content suggestions (what to include in next communication)
+4. Alternative approaches if no response
+5. Red flags to avoid
+6. Tips specific to UK/international players approaching US coaches
+
+Format as clear numbered action items. Be specific and practical."""
+
+    chat = LlmChat(
+        api_key=api_key,
+        session_id=str(uuid.uuid4()),
+        system_message="You are an expert college basketball recruitment strategist."
+    ).with_model("openai", "gpt-4.1-mini")
+    
+    user_msg = UserMessage(text=prompt)
+    response = await chat.send_message(user_msg)
+    return {"strategy": response, "college": data.college_name}
+
+# ─── Root ──────────────────────────────────────────────────────────────────────
+@api_router.get("/")
+async def root():
+    return {"message": "CourtBound API v1.0"}
+
+app.include_router(api_router)
+
 @app.on_event("shutdown")
-async def shutdown_db_client():
+async def shutdown():
     client.close()
