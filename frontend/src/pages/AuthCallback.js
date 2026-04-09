@@ -1,15 +1,16 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { apiRequest, useAuth } from "../context/AuthContext";
+import { apiRequest, setToken, useAuth } from "../context/AuthContext";
 
 export default function AuthCallback() {
   const navigate = useNavigate();
   const { checkAuth } = useAuth();
 
   useEffect(() => {
-    const hash = window.location.hash;
-    const params = new URLSearchParams(hash.replace("#", "?"));
-    const sessionId = params.get("session_id");
+    // Session_id may arrive in the URL hash or as a query param
+    const hashParams = new URLSearchParams(window.location.hash.replace("#", ""));
+    const searchParams = new URLSearchParams(window.location.search);
+    const sessionId = hashParams.get("session_id") || searchParams.get("session_id");
 
     if (!sessionId) {
       navigate("/login");
@@ -17,7 +18,11 @@ export default function AuthCallback() {
     }
 
     apiRequest("post", "/auth/session", { session_id: sessionId })
-      .then(async () => {
+      .then(async ({ data }) => {
+        // Store the token in localStorage so all subsequent requests use it
+        if (data.session_token) {
+          setToken(data.session_token);
+        }
         await checkAuth();
         navigate("/dashboard");
       })

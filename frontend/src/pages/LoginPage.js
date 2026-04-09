@@ -21,7 +21,7 @@ export default function LoginPage() {
       {/* Background */}
       <div className="absolute inset-0 overflow-hidden">
         <img
-          src="https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=1600&q=80"
+          src="https://images.unsplash.com/photo-1546519638405-a2f9b51da64f?w=1600&q=80"
           alt=""
           className="w-full h-full object-cover opacity-10"
         />

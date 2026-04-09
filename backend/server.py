@@ -113,7 +113,7 @@ async def exchange_session(body: dict, response: Response):
         key="session_token", value=session_token,
         httponly=True, secure=True, samesite="none", path="/", max_age=7*24*60*60,
     )
-    return {"user_id": user_id, "email": email, "name": name, "picture": picture}
+    return {"user_id": user_id, "email": email, "name": name, "picture": picture, "session_token": session_token}
 
 @api_router.get("/auth/me")
 async def auth_me(current_user: UserModel = Depends(get_current_user)):
