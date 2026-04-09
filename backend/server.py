@@ -1,15 +1,17 @@
 from dotenv import load_dotenv
 load_dotenv()
 
-from fastapi import FastAPI, APIRouter, Request, HTTPException
+from fastapi import FastAPI, APIRouter, Request, HTTPException, UploadFile, File
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
 from pydantic import BaseModel, BeforeValidator
-from typing import Annotated, Optional
+from typing import Annotated, Optional, List
 import os
 import logging
 import uuid
+import csv
+import io
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -253,18 +255,26 @@ async def get_college(college_id: str):
 # ─── Tracked Colleges (no auth) ───────────────────────────────────────────────
 @api_router.get("/my-colleges")
 async def get_my_colleges():
-    tracked = await db.tracked_colleges.find({"user_id": OWNER_ID}).to_list(200)
-    result = []
+    tracked = await db.tracked_colleges.find({"user_id": OWNER_ID}).to_list(500)
+    if not tracked:
+        return []
+    # Bulk fetch all colleges in one query
+    college_ids = []
     for t in tracked:
         try:
-            college = await db.colleges.find_one({"_id": ObjectId(t["college_id"])})
-            if college:
-                college["id"] = str(college.pop("_id"))
-                t["id"] = str(t.pop("_id"))
-                t["college"] = college
-                result.append(t)
+            college_ids.append(ObjectId(t["college_id"]))
         except Exception:
             pass
+    colleges_cursor = await db.colleges.find({"_id": {"$in": college_ids}}).to_list(500)
+    colleges_map = {str(c["_id"]): c for c in colleges_cursor}
+    result = []
+    for t in tracked:
+        college = colleges_map.get(t["college_id"])
+        if college:
+            college["id"] = str(college.pop("_id"))
+            t["id"] = str(t.pop("_id"))
+            t["college"] = college
+            result.append(t)
     return result
 
 @api_router.post("/my-colleges")
@@ -347,7 +357,149 @@ async def bulk_import_emails(data: BulkEmailImport):
     return {"inserted": len(result.inserted_ids), "message": f"Logged email for {len(result.inserted_ids)} colleges"}
 
 
-# ─── Dashboard Stats ───────────────────────────────────────────────────────────
+def _clean(val: str) -> str:
+    if not val:
+        return ""
+    v = val.strip()
+    import re
+    v = re.sub(r'[^\x20-\x7E\u00C0-\u024F]', '', v)
+    return v.strip()
+
+def _map_type_to_direction(t: str) -> str:
+    t = t.lower()
+    if "received" in t or "reply" in t or "response" in t or "incoming" in t:
+        return "received"
+    return "sent"
+
+@api_router.post("/emails/import-csv")
+async def import_csv(file: UploadFile = File(...)):
+    """
+    Import communications from CSV.
+    Expected columns: College Name, Date (YYYY-MM-DD), Type, Coach Name, Coach Email,
+    Assistant Coach Name, Assistant Coach Email, Subject, Notes,
+    Follow Up Needed (yes/no), Follow Up Date (YYYY-MM-DD)
+    """
+    content = await file.read()
+    try:
+        text = content.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = content.decode("latin-1")
+
+    reader = csv.DictReader(io.StringIO(text))
+    rows = [{k.strip(): v for k, v in row.items()} for row in reader]
+
+    if not rows:
+        raise HTTPException(status_code=400, detail="CSV is empty or unreadable")
+
+    colleges_added = 0
+    emails_added = 0
+    duplicates_skipped = 0
+    ts = datetime.now(timezone.utc).isoformat()
+    img_cycle = [
+        "https://images.unsplash.com/photo-1562774053-701939374585?w=400",
+        "https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=400",
+        "https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=400",
+        "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400",
+    ]
+
+    for i, row in enumerate(rows):
+        college_name = _clean(row.get("College Name", ""))
+        if not college_name:
+            continue
+
+        date_str = _clean(row.get("Date (YYYY-MM-DD)", ""))
+        comm_type = _clean(row.get("Type", "Email Sent"))
+        coach_name = _clean(row.get("Coach Name", ""))
+        coach_email = _clean(row.get("Coach Email", ""))
+        asst_coach_name = _clean(row.get("Assistant Coach Name", ""))
+        asst_coach_email = _clean(row.get("Assistant Coach Email", ""))
+        subject = _clean(row.get("Subject", ""))
+        notes = _clean(row.get("Notes", ""))
+        follow_up_needed = _clean(row.get("Follow Up Needed (yes/no)", "no")).lower() == "yes"
+        follow_up_date = _clean(row.get("Follow Up Date (YYYY-MM-DD)", ""))
+
+        try:
+            dt = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc).isoformat()
+        except ValueError:
+            dt = ts
+
+        direction = _map_type_to_direction(comm_type)
+
+        # Match college by name (fuzzy: strip suffixes like "(D-I)", "– Tigers" etc.)
+        name_base = college_name.split("(")[0].split("–")[0].split("-")[0].strip()
+        existing_college = await db.colleges.find_one(
+            {"name": {"$regex": f"^{name_base}", "$options": "i"}}
+        )
+
+        if existing_college:
+            college_id = str(existing_college["_id"])
+            # Enrich coaches if CSV has better data
+            current_names = [c.get("name", "").lower() for c in existing_college.get("coaches", [])]
+            new_coaches = []
+            if coach_name and "not listed" not in coach_name.lower() and coach_name.lower() not in current_names:
+                new_coaches.append({"name": coach_name, "title": "Head Coach", "email": coach_email, "phone": ""})
+            if asst_coach_name and asst_coach_name.lower() not in current_names:
+                new_coaches.append({"name": asst_coach_name, "title": "Assistant Coach", "email": asst_coach_email, "phone": ""})
+            if new_coaches:
+                await db.colleges.update_one({"_id": existing_college["_id"]}, {"$push": {"coaches": {"$each": new_coaches}}})
+        else:
+            coaches = []
+            if coach_name and "not listed" not in coach_name.lower():
+                coaches.append({"name": coach_name, "title": "Head Coach", "email": coach_email, "phone": ""})
+            if asst_coach_name:
+                coaches.append({"name": asst_coach_name, "title": "Assistant Coach", "email": asst_coach_email, "phone": ""})
+            result = await db.colleges.insert_one({
+                "name": college_name, "location": "", "state": "", "division": "Unknown",
+                "conference": "", "foreign_friendly": True,
+                "scholarship_info": "Contacted — details to be confirmed.",
+                "acceptance_rate": "N/A", "notable_alumni": "", "ranking": 900 + i,
+                "website": "", "image_url": img_cycle[i % 4], "coaches": coaches,
+                "created_at": ts, "from_csv": True,
+            })
+            college_id = str(result.inserted_id)
+            colleges_added += 1
+
+        # Auto-track with status "contacted"
+        tracked = await db.tracked_colleges.find_one({"user_id": OWNER_ID, "college_id": college_id})
+        follow_note = f" | Follow up by: {follow_up_date}" if follow_up_needed and follow_up_date else ""
+        if not tracked:
+            await db.tracked_colleges.insert_one({
+                "user_id": OWNER_ID, "college_id": college_id,
+                "notes": (notes or "") + follow_note, "status": "contacted",
+                "follow_up_needed": follow_up_needed, "follow_up_date": follow_up_date,
+                "created_at": ts,
+            })
+        else:
+            if tracked.get("status") == "interested":
+                await db.tracked_colleges.update_one(
+                    {"user_id": OWNER_ID, "college_id": college_id},
+                    {"$set": {"status": "contacted", "follow_up_needed": follow_up_needed, "follow_up_date": follow_up_date}}
+                )
+
+        # Log email — skip exact duplicates (same college + subject + date)
+        dup = await db.emails.find_one({"user_id": OWNER_ID, "college_id": college_id, "subject": subject, "created_at": dt})
+        if not dup:
+            await db.emails.insert_one({
+                "user_id": OWNER_ID, "college_id": college_id,
+                "direction": direction, "subject": subject, "body": notes,
+                "coach_name": coach_name if "not listed" not in coach_name.lower() else "",
+                "coach_email": coach_email,
+                "follow_up_needed": follow_up_needed, "follow_up_date": follow_up_date,
+                "created_at": dt,
+            })
+            emails_added += 1
+        else:
+            duplicates_skipped += 1
+
+    return {
+        "colleges_added": colleges_added,
+        "emails_added": emails_added,
+        "duplicates_skipped": duplicates_skipped,
+        "total_rows": len(rows),
+        "message": f"Import complete: {emails_added} emails logged, {colleges_added} new colleges added."
+    }
+
+
 @api_router.get("/dashboard/stats")
 async def get_stats():
     tracked = await db.tracked_colleges.count_documents({"user_id": OWNER_ID})

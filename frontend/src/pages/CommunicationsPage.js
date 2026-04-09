@@ -1,7 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { apiRequest } from "../context/AuthContext";
-import { Mail, Plus, Trash2, ChevronDown, ArrowUpRight, ArrowDownLeft, Search, Send, CheckSquare, Square, X } from "lucide-react";
+import { Mail, Plus, Trash2, ChevronDown, ArrowUpRight, ArrowDownLeft, Search, Send, CheckSquare, Square, X, Upload, FileText, CheckCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
+
+const API = process.env.REACT_APP_BACKEND_URL + "/api";
 
 export default function CommunicationsPage() {
   const navigate = useNavigate();
@@ -13,6 +16,13 @@ export default function CommunicationsPage() {
   const [filterDir, setFilterDir] = useState("");
   const [search, setSearch] = useState("");
   const [expandedEmail, setExpandedEmail] = useState(null);
+
+  // CSV import state
+  const [showCSV, setShowCSV] = useState(false);
+  const [csvFile, setCsvFile] = useState(null);
+  const [csvImporting, setCsvImporting] = useState(false);
+  const [csvResult, setCsvResult] = useState(null);
+  const fileInputRef = useRef(null);
 
   // Bulk import state
   const [showBulk, setShowBulk] = useState(false);
@@ -46,6 +56,24 @@ export default function CommunicationsPage() {
   const deleteEmail = async (id) => {
     await apiRequest("delete", `/emails/${id}`);
     setEmails(prev => prev.filter(e => e.id !== id));
+  };
+
+  const submitCSV = async () => {
+    if (!csvFile) return;
+    setCsvImporting(true);
+    setCsvResult(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", csvFile);
+      const { data } = await axios.post(`${API}/emails/import-csv`, formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+      setCsvResult({ success: true, ...data });
+      fetchAll();
+    } catch (err) {
+      setCsvResult({ success: false, message: err.response?.data?.detail || "Import failed. Check your CSV format." });
+    }
+    setCsvImporting(false);
   };
 
   const submitBulk = async (e) => {
@@ -139,21 +167,125 @@ export default function CommunicationsPage() {
         </div>
         <div className="flex gap-2 flex-wrap">
           <button
+            data-testid="csv-import-btn"
+            onClick={() => { setShowCSV(true); setShowBulk(false); setShowSingle(false); }}
+            className="bg-blue-600 text-white font-bold uppercase tracking-wider rounded-lg px-5 py-2.5 text-sm hover:bg-blue-700 transition-all flex items-center gap-2"
+          >
+            <Upload className="w-4 h-4" /> Import CSV
+          </button>
+          <button
             data-testid="bulk-import-btn"
-            onClick={() => { setShowBulk(true); setShowSingle(false); }}
+            onClick={() => { setShowBulk(true); setShowSingle(false); setShowCSV(false); }}
             className="bg-slate-900 text-white font-bold uppercase tracking-wider rounded-lg px-5 py-2.5 text-sm hover:bg-slate-800 transition-all flex items-center gap-2"
           >
             <Send className="w-4 h-4" /> Bulk Import
           </button>
           <button
             data-testid="add-single-email-btn"
-            onClick={() => { setShowSingle(true); setShowBulk(false); }}
+            onClick={() => { setShowSingle(true); setShowBulk(false); setShowCSV(false); }}
             className="bg-orange-500 text-white font-bold uppercase tracking-wider rounded-lg px-5 py-2.5 text-sm hover:bg-orange-600 transition-all flex items-center gap-2"
           >
             <Plus className="w-4 h-4" /> Log Single
           </button>
         </div>
       </div>
+
+      {/* ── CSV IMPORT PANEL ──────────────────────────────────────────────────── */}
+      {showCSV && (
+        <div className="bg-blue-50 border-2 border-blue-300 rounded-xl p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="font-bold text-slate-900 text-lg" style={{ fontFamily: "Barlow Condensed, sans-serif", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                Import from CSV
+              </h2>
+              <p className="text-slate-500 text-sm mt-0.5">
+                Upload your communications CSV. Colleges not in the app will be added automatically. Exact dates are preserved.
+              </p>
+            </div>
+            <button onClick={() => { setShowCSV(false); setCsvResult(null); setCsvFile(null); }} className="text-slate-400 hover:text-slate-600 p-1">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Expected format */}
+          <div className="bg-white border border-blue-200 rounded-lg p-3 mb-4 text-xs text-slate-600">
+            <p className="font-semibold text-slate-700 mb-1 flex items-center gap-1"><FileText className="w-3.5 h-3.5" /> Expected CSV columns:</p>
+            <p className="font-mono text-slate-500 leading-relaxed">College Name · Date (YYYY-MM-DD) · Type · Coach Name · Coach Email · Assistant Coach Name · Assistant Coach Email · Subject · Notes · Follow Up Needed (yes/no) · Follow Up Date (YYYY-MM-DD)</p>
+          </div>
+
+          {/* Drop zone */}
+          <div
+            data-testid="csv-dropzone"
+            onClick={() => fileInputRef.current?.click()}
+            className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all ${csvFile ? "border-blue-400 bg-blue-50" : "border-slate-300 hover:border-blue-400 hover:bg-blue-50/50"}`}
+          >
+            <Upload className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+            {csvFile ? (
+              <div>
+                <p className="font-semibold text-blue-700 text-sm">{csvFile.name}</p>
+                <p className="text-xs text-slate-400 mt-0.5">{(csvFile.size / 1024).toFixed(1)} KB · Click to change</p>
+              </div>
+            ) : (
+              <div>
+                <p className="text-slate-600 text-sm font-medium">Click to select your CSV file</p>
+                <p className="text-xs text-slate-400 mt-0.5">or drag and drop</p>
+              </div>
+            )}
+            <input
+              ref={fileInputRef}
+              data-testid="csv-file-input"
+              type="file"
+              accept=".csv"
+              className="hidden"
+              onChange={e => { setCsvFile(e.target.files[0] || null); setCsvResult(null); }}
+            />
+          </div>
+
+          {/* Result */}
+          {csvResult && (
+            <div data-testid="csv-import-result" className={`mt-4 p-4 rounded-lg border ${csvResult.success ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
+              {csvResult.success ? (
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-green-700 font-bold text-sm">
+                    <CheckCircle className="w-4 h-4" /> {csvResult.message}
+                  </div>
+                  <div className="grid grid-cols-3 gap-3 mt-3">
+                    <div className="bg-white rounded-lg p-3 text-center border border-green-100">
+                      <p className="text-2xl font-bold text-green-600">{csvResult.emails_added}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">Emails Logged</p>
+                    </div>
+                    <div className="bg-white rounded-lg p-3 text-center border border-green-100">
+                      <p className="text-2xl font-bold text-blue-600">{csvResult.colleges_added}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">New Colleges Added</p>
+                    </div>
+                    <div className="bg-white rounded-lg p-3 text-center border border-green-100">
+                      <p className="text-2xl font-bold text-slate-400">{csvResult.duplicates_skipped}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">Duplicates Skipped</p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-red-700 text-sm font-medium">{csvResult.message}</p>
+              )}
+            </div>
+          )}
+
+          <div className="flex gap-2 mt-4">
+            <button type="button" onClick={() => { setShowCSV(false); setCsvResult(null); setCsvFile(null); }} className="px-4 py-2.5 text-sm border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50">
+              {csvResult?.success ? "Close" : "Cancel"}
+            </button>
+            <button
+              data-testid="csv-import-submit-btn"
+              onClick={submitCSV}
+              disabled={!csvFile || csvImporting}
+              className="flex-1 bg-blue-600 text-white font-bold uppercase tracking-wider rounded-lg py-2.5 text-sm hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              <Upload className="w-4 h-4" />
+              {csvImporting ? "Importing..." : "Import CSV"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── BULK IMPORT PANEL ─────────────────────────────────────────────────── */}
       {showBulk && (
