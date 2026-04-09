@@ -57,7 +57,7 @@ export default function CollegesPage() {
     }
   };
 
-  const divisions = ["Division I", "Division II", "Division III"];
+  const divisions = ["Division I", "Division II", "NAIA", "JUCO"];
 
   return (
     <div style={{ fontFamily: "Manrope, sans-serif" }}>
@@ -132,8 +132,14 @@ export default function CollegesPage() {
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent" />
                 <div className="absolute top-3 right-3 flex gap-1.5">
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${college.division === "Division I" ? "bg-orange-500 text-white" : "bg-slate-700 text-white"}`}>
-                    {college.division?.replace("Division ", "Div ")}
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${
+                    college.division === "Division I" ? "bg-orange-500 text-white" :
+                    college.division === "Division II" ? "bg-blue-500 text-white" :
+                    college.division === "NAIA" ? "bg-purple-500 text-white" :
+                    college.division === "JUCO" ? "bg-green-600 text-white" :
+                    "bg-slate-700 text-white"
+                  }`}>
+                    {college.division?.replace("Division ", "D")}
                   </span>
                   {college.foreign_friendly && (
                     <span className="px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide bg-green-500 text-white">
