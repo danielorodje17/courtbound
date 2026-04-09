@@ -41,15 +41,18 @@ export default function ComposePage() {
         college_name: selectedCollege.name,
         coach_name: selectedCoach?.name || "Coach",
         division: selectedCollege.division || "Division I",
-        user_name: "England U18 Player",
+        user_name: playerProfile.full_name || "England U18 Player",
         user_position: position,
         user_stats: stats,
+        user_email: playerProfile.email || "",
+        user_phone: playerProfile.phone || "",
         message_type: messageType
       });
       setDraft(data.draft);
       if (!subject) {
+        const playerName = playerProfile.full_name || "England U18 Player";
         const subjectMap = {
-          initial_outreach: `Basketball Scholarship Inquiry - England U18 Player | England Under-18`,
+          initial_outreach: `Basketball Scholarship Inquiry - ${playerName} | England Under-18`,
           follow_up: `Follow-Up: Basketball Scholarship Inquiry - ${selectedCollege.name}`,
           thank_you: `Thank You - ${selectedCollege.name} Basketball`
         };
