@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 load_dotenv()
 
-from fastapi import FastAPI, APIRouter, Request, HTTPException, UploadFile, File
+from fastapi import FastAPI, APIRouter, Request, HTTPException, UploadFile, File, Depends, Response, Cookie, Header
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
@@ -12,6 +12,7 @@ import logging
 import uuid
 import csv
 import io
+import httpx
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
@@ -20,16 +21,53 @@ mongo_url = os.environ["MONGO_URL"]
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ["DB_NAME"]]
 
-# Single-user mode: fixed owner ID
+# Single-user mode: fixed owner ID (kept for CSV import backward compatibility)
 OWNER_ID = "courtbound_owner"
+
+# ─── Auth Models & Dependency ─────────────────────────────────────────────────
+class UserModel(BaseModel):
+    user_id: str
+    email: str
+    name: str
+    picture: Optional[str] = ""
+
+async def get_current_user(
+    session_token: Optional[str] = Cookie(default=None),
+    authorization: Optional[str] = Header(default=None),
+) -> UserModel:
+    token = session_token
+    if not token and authorization:
+        token = authorization.replace("Bearer ", "").strip()
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    session = await db.user_sessions.find_one({"session_token": token}, {"_id": 0})
+    if not session:
+        raise HTTPException(status_code=401, detail="Invalid session")
+    expires_at = session["expires_at"]
+    if isinstance(expires_at, str):
+        expires_at = datetime.fromisoformat(expires_at)
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=401, detail="Session expired")
+    user = await db.users.find_one({"user_id": session["user_id"]}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+    return UserModel(**user)
+
+
+# ─── Auth Endpoints ─── (registered after api_router below)
+
 
 # ─── App & Router ──────────────────────────────────────────────────────────────
 app = FastAPI(title="CourtBound API")
 api_router = APIRouter(prefix="/api")
 
+FRONTEND_ORIGIN = os.environ.get("FRONTEND_URL", "https://b-ball-pathway.preview.emergentagent.com")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[FRONTEND_ORIGIN, "http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -37,6 +75,61 @@ app.add_middleware(
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# ─── Auth Endpoints ───────────────────────────────────────────────────────────
+@api_router.post("/auth/session")
+async def exchange_session(body: dict, response: Response):
+    session_id = body.get("session_id")
+    if not session_id:
+        raise HTTPException(status_code=400, detail="session_id required")
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
+            headers={"X-Session-ID": session_id},
+        )
+    if resp.status_code != 200:
+        raise HTTPException(status_code=401, detail="Invalid session from auth provider")
+    data = resp.json()
+    email = data["email"]
+    name = data["name"]
+    picture = data.get("picture", "")
+    session_token = data["session_token"]
+    existing = await db.users.find_one({"email": email}, {"_id": 0})
+    if existing:
+        user_id = existing["user_id"]
+        await db.users.update_one({"email": email}, {"$set": {"name": name, "picture": picture}})
+    else:
+        user_id = f"user_{uuid.uuid4().hex[:12]}"
+        await db.users.insert_one({
+            "user_id": user_id, "email": email, "name": name, "picture": picture,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+    expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+    await db.user_sessions.insert_one({
+        "user_id": user_id, "session_token": session_token,
+        "expires_at": expires_at, "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    response.set_cookie(
+        key="session_token", value=session_token,
+        httponly=True, secure=True, samesite="none", path="/", max_age=7*24*60*60,
+    )
+    return {"user_id": user_id, "email": email, "name": name, "picture": picture}
+
+@api_router.get("/auth/me")
+async def auth_me(current_user: UserModel = Depends(get_current_user)):
+    return current_user
+
+@api_router.post("/auth/logout")
+async def auth_logout(
+    response: Response,
+    session_token: Optional[str] = Cookie(default=None),
+    authorization: Optional[str] = Header(default=None),
+):
+    token = session_token or (authorization.replace("Bearer ", "").strip() if authorization else None)
+    if token:
+        await db.user_sessions.delete_one({"session_token": token})
+    response.delete_cookie(key="session_token", path="/", samesite="none", secure=True)
+    return {"message": "Logged out"}
 
 # ─── Models ────────────────────────────────────────────────────────────────────
 class CollegeTrackedCreate(BaseModel):
@@ -319,8 +412,8 @@ async def get_college(college_id: str):
 
 # ─── Tracked Colleges (no auth) ───────────────────────────────────────────────
 @api_router.get("/my-colleges")
-async def get_my_colleges():
-    tracked = await db.tracked_colleges.find({"user_id": OWNER_ID}).to_list(500)
+async def get_my_colleges(current_user: UserModel = Depends(get_current_user)):
+    tracked = await db.tracked_colleges.find({"user_id": current_user.user_id}).to_list(500)
     if not tracked:
         return []
     # Bulk fetch all colleges in one query
@@ -343,22 +436,22 @@ async def get_my_colleges():
     return result
 
 @api_router.post("/my-colleges")
-async def track_college(data: CollegeTrackedCreate):
-    existing = await db.tracked_colleges.find_one({"user_id": OWNER_ID, "college_id": data.college_id})
+async def track_college(data: CollegeTrackedCreate, current_user: UserModel = Depends(get_current_user)):
+    existing = await db.tracked_colleges.find_one({"user_id": current_user.user_id, "college_id": data.college_id})
     if existing:
         raise HTTPException(status_code=400, detail="Already tracking this college")
-    doc = {"user_id": OWNER_ID, "college_id": data.college_id, "notes": data.notes, "status": "interested", "created_at": datetime.now(timezone.utc).isoformat()}
+    doc = {"user_id": current_user.user_id, "college_id": data.college_id, "notes": data.notes, "status": "interested", "created_at": datetime.now(timezone.utc).isoformat()}
     result = await db.tracked_colleges.insert_one(doc)
     doc.pop("_id", None)
     return {"id": str(result.inserted_id), **doc}
 
 @api_router.delete("/my-colleges/{college_id}")
-async def untrack_college(college_id: str):
-    await db.tracked_colleges.delete_one({"user_id": OWNER_ID, "college_id": college_id})
+async def untrack_college(college_id: str, current_user: UserModel = Depends(get_current_user)):
+    await db.tracked_colleges.delete_one({"user_id": current_user.user_id, "college_id": college_id})
     return {"message": "Removed from tracking"}
 
 @api_router.patch("/my-colleges/{college_id}/status")
-async def update_tracked_status(college_id: str, body: dict):
+async def update_tracked_status(college_id: str, body: dict, current_user: UserModel = Depends(get_current_user)):
     update_fields = {
         "status": body.get("status", "interested"),
         "notes": body.get("notes", ""),
@@ -367,18 +460,18 @@ async def update_tracked_status(college_id: str, body: dict):
         if key in body:
             update_fields[key] = body[key]
     await db.tracked_colleges.update_one(
-        {"user_id": OWNER_ID, "college_id": college_id},
+        {"user_id": current_user.user_id, "college_id": college_id},
         {"$set": update_fields}
     )
     return {"message": "Updated"}
 
 
 @api_router.get("/dashboard/alerts")
-async def get_dashboard_alerts():
+async def get_dashboard_alerts(current_user: UserModel = Depends(get_current_user)):
     today = datetime.now(timezone.utc).date().isoformat()
     seven_days = (datetime.now(timezone.utc).date() + timedelta(days=7)).isoformat()
     thirty_days = (datetime.now(timezone.utc).date() + timedelta(days=30)).isoformat()
-    tracked = await db.tracked_colleges.find({"user_id": OWNER_ID}).to_list(500)
+    tracked = await db.tracked_colleges.find({"user_id": current_user.user_id}).to_list(500)
     if not tracked:
         return {"overdue_followups": [], "upcoming_followups": [], "upcoming_deadlines": []}
     college_ids_obj = []
@@ -414,8 +507,8 @@ async def get_dashboard_alerts():
 
 # ─── Emails (no auth) ─────────────────────────────────────────────────────────
 @api_router.get("/emails")
-async def get_emails(college_id: Optional[str] = None):
-    query = {"user_id": OWNER_ID}
+async def get_emails(current_user: UserModel = Depends(get_current_user), college_id: Optional[str] = None):
+    query = {"user_id": current_user.user_id}
     if college_id:
         query["college_id"] = college_id
     emails = await db.emails.find(query).sort("created_at", -1).to_list(500)
@@ -424,24 +517,23 @@ async def get_emails(college_id: Optional[str] = None):
     return emails
 
 @api_router.post("/emails")
-async def log_email(data: EmailLogCreate):
-    doc = {"user_id": OWNER_ID, "college_id": data.college_id, "direction": data.direction, "subject": data.subject, "body": data.body, "coach_name": data.coach_name, "coach_email": data.coach_email, "created_at": datetime.now(timezone.utc).isoformat()}
+async def log_email(data: EmailLogCreate, current_user: UserModel = Depends(get_current_user)):
+    doc = {"user_id": current_user.user_id, "college_id": data.college_id, "direction": data.direction, "subject": data.subject, "body": data.body, "coach_name": data.coach_name, "coach_email": data.coach_email, "created_at": datetime.now(timezone.utc).isoformat()}
     result = await db.emails.insert_one(doc)
     doc["id"] = str(result.inserted_id)
     doc.pop("_id", None)
     return doc
 
 @api_router.delete("/emails/{email_id}")
-async def delete_email(email_id: str):
-    await db.emails.delete_one({"_id": ObjectId(email_id), "user_id": OWNER_ID})
+async def delete_email(email_id: str, current_user: UserModel = Depends(get_current_user)):
+    await db.emails.delete_one({"_id": ObjectId(email_id), "user_id": current_user.user_id})
     return {"message": "Deleted"}
 
 @api_router.post("/emails/bulk")
-async def bulk_import_emails(data: BulkEmailImport):
+async def bulk_import_emails(data: BulkEmailImport, current_user: UserModel = Depends(get_current_user)):
     """Import the same email sent to multiple colleges at once."""
     if not data.college_ids:
         raise HTTPException(status_code=400, detail="No colleges selected")
-    # resolve coach names per college
     docs = []
     sent_date = data.sent_date or datetime.now(timezone.utc).isoformat()
     for college_id in data.college_ids:
@@ -453,7 +545,7 @@ async def bulk_import_emails(data: BulkEmailImport):
             continue
         coach = (college.get("coaches") or [{}])[0]
         doc = {
-            "user_id": OWNER_ID,
+            "user_id": current_user.user_id,
             "college_id": college_id,
             "direction": data.direction,
             "subject": data.subject,
@@ -484,7 +576,7 @@ def _map_type_to_direction(t: str) -> str:
     return "sent"
 
 @api_router.post("/emails/import-csv")
-async def import_csv(file: UploadFile = File(...)):
+async def import_csv(current_user: UserModel = Depends(get_current_user), file: UploadFile = File(...)):
     """
     Import communications from CSV.
     Expected columns: College Name, Date (YYYY-MM-DD), Type, Coach Name, Coach Email,
@@ -572,11 +664,11 @@ async def import_csv(file: UploadFile = File(...)):
             colleges_added += 1
 
         # Auto-track with status "contacted"
-        tracked = await db.tracked_colleges.find_one({"user_id": OWNER_ID, "college_id": college_id})
+        tracked = await db.tracked_colleges.find_one({"user_id": current_user.user_id, "college_id": college_id})
         follow_note = f" | Follow up by: {follow_up_date}" if follow_up_needed and follow_up_date else ""
         if not tracked:
             await db.tracked_colleges.insert_one({
-                "user_id": OWNER_ID, "college_id": college_id,
+                "user_id": current_user.user_id, "college_id": college_id,
                 "notes": (notes or "") + follow_note, "status": "contacted",
                 "follow_up_needed": follow_up_needed, "follow_up_date": follow_up_date,
                 "created_at": ts,
@@ -584,15 +676,15 @@ async def import_csv(file: UploadFile = File(...)):
         else:
             if tracked.get("status") == "interested":
                 await db.tracked_colleges.update_one(
-                    {"user_id": OWNER_ID, "college_id": college_id},
+                    {"user_id": current_user.user_id, "college_id": college_id},
                     {"$set": {"status": "contacted", "follow_up_needed": follow_up_needed, "follow_up_date": follow_up_date}}
                 )
 
         # Log email — skip exact duplicates (same college + subject + date)
-        dup = await db.emails.find_one({"user_id": OWNER_ID, "college_id": college_id, "subject": subject, "created_at": dt})
+        dup = await db.emails.find_one({"user_id": current_user.user_id, "college_id": college_id, "subject": subject, "created_at": dt})
         if not dup:
             await db.emails.insert_one({
-                "user_id": OWNER_ID, "college_id": college_id,
+                "user_id": current_user.user_id, "college_id": college_id,
                 "direction": direction, "subject": subject, "body": notes,
                 "coach_name": coach_name if "not listed" not in coach_name.lower() else "",
                 "coach_email": coach_email,
@@ -613,11 +705,11 @@ async def import_csv(file: UploadFile = File(...)):
 
 
 @api_router.get("/dashboard/stats")
-async def get_stats():
-    tracked = await db.tracked_colleges.count_documents({"user_id": OWNER_ID})
-    emails_sent = await db.emails.count_documents({"user_id": OWNER_ID, "direction": "sent"})
-    emails_received = await db.emails.count_documents({"user_id": OWNER_ID, "direction": "received"})
-    recent_emails = await db.emails.find({"user_id": OWNER_ID}).sort("created_at", -1).to_list(5)
+async def get_stats(current_user: UserModel = Depends(get_current_user)):
+    tracked = await db.tracked_colleges.count_documents({"user_id": current_user.user_id})
+    emails_sent = await db.emails.count_documents({"user_id": current_user.user_id, "direction": "sent"})
+    emails_received = await db.emails.count_documents({"user_id": current_user.user_id, "direction": "received"})
+    recent_emails = await db.emails.find({"user_id": current_user.user_id}).sort("created_at", -1).to_list(5)
     for e in recent_emails:
         e["id"] = str(e.pop("_id"))
     return {"tracked_colleges": tracked, "emails_sent": emails_sent, "emails_received": emails_received, "recent_emails": recent_emails}
@@ -730,10 +822,10 @@ Be specific about UK qualifications. Mention that UK GCSEs/A-Levels are generall
     return {"assessment": response}
 
 @api_router.post("/emails/log-reply")
-async def log_reply(data: ReplyLogRequest):
+async def log_reply(data: ReplyLogRequest, current_user: UserModel = Depends(get_current_user)):
     received_at = data.received_date or datetime.now(timezone.utc).isoformat()
     doc = {
-        "user_id": OWNER_ID, "college_id": data.college_id,
+        "user_id": current_user.user_id, "college_id": data.college_id,
         "direction": "received",
         "subject": data.subject or f"Reply from coach",
         "body": data.body, "coach_name": data.coach_name,
@@ -742,17 +834,16 @@ async def log_reply(data: ReplyLogRequest):
     result = await db.emails.insert_one(doc)
     doc["id"] = str(result.inserted_id)
     doc.pop("_id", None)
-    # Auto-update tracked college status to "replied"
     await db.tracked_colleges.update_one(
-        {"user_id": OWNER_ID, "college_id": data.college_id, "status": {"$in": ["interested", "contacted"]}},
+        {"user_id": current_user.user_id, "college_id": data.college_id, "status": {"$in": ["interested", "contacted"]}},
         {"$set": {"status": "replied", "updated_at": datetime.now(timezone.utc).isoformat()}}
     )
     return doc
 
 
 @api_router.get("/responses/summary")
-async def get_response_summary():
-    tracked = await db.tracked_colleges.find({"user_id": OWNER_ID}).to_list(500)
+async def get_response_summary(current_user: UserModel = Depends(get_current_user)):
+    tracked = await db.tracked_colleges.find({"user_id": current_user.user_id}).to_list(500)
     if not tracked:
         return []
     college_ids_str = [t["college_id"] for t in tracked]
@@ -766,7 +857,7 @@ async def get_response_summary():
     colleges_map = {str(c["_id"]): c for c in colleges_cursor}
     # Aggregate email stats per college
     pipeline = [
-        {"$match": {"user_id": OWNER_ID, "college_id": {"$in": college_ids_str}}},
+        {"$match": {"user_id": current_user.user_id, "college_id": {"$in": college_ids_str}}},
         {"$group": {
             "_id": {"college_id": "$college_id", "direction": "$direction"},
             "count": {"$sum": 1}, "last_date": {"$max": "$created_at"},
@@ -836,20 +927,20 @@ Be specific for UK/international players. Encouraging but realistic."""
 
 # ─── Player Profile ───────────────────────────────────────────────────────────
 @api_router.get("/profile")
-async def get_profile():
-    doc = await db.profiles.find_one({"user_id": OWNER_ID})
+async def get_profile(current_user: UserModel = Depends(get_current_user)):
+    doc = await db.profiles.find_one({"user_id": current_user.user_id}, {"_id": 0})
     if not doc:
         return {}
-    doc.pop("_id", None)
     doc.pop("user_id", None)
     return doc
 
 @api_router.put("/profile")
-async def save_profile(data: PlayerProfile):
-    payload = data.dict()
-    payload["user_id"] = OWNER_ID
+async def save_profile(data: PlayerProfile, current_user: UserModel = Depends(get_current_user)):
+    # Only update fields that have a value — prevents accidentally wiping existing data
+    payload = {k: v for k, v in data.dict().items() if v is not None and v != ""}
+    payload["user_id"] = current_user.user_id
     payload["updated_at"] = datetime.now(timezone.utc).isoformat()
-    await db.profiles.update_one({"user_id": OWNER_ID}, {"$set": payload}, upsert=True)
+    await db.profiles.update_one({"user_id": current_user.user_id}, {"$set": payload}, upsert=True)
     return {"message": "Profile saved"}
 
 # ─── Root ──────────────────────────────────────────────────────────────────────
