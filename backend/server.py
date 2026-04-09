@@ -12,7 +12,7 @@ import logging
 import uuid
 import csv
 import io
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 # ─── DB ────────────────────────────────────────────────────────────────────────
@@ -357,11 +357,58 @@ async def untrack_college(college_id: str):
 
 @api_router.patch("/my-colleges/{college_id}/status")
 async def update_tracked_status(college_id: str, body: dict):
+    update_fields = {
+        "status": body.get("status", "interested"),
+        "notes": body.get("notes", ""),
+    }
+    for key in ("follow_up_date", "application_deadline", "signing_day"):
+        if key in body:
+            update_fields[key] = body[key]
     await db.tracked_colleges.update_one(
         {"user_id": OWNER_ID, "college_id": college_id},
-        {"$set": {"status": body.get("status", "interested"), "notes": body.get("notes", "")}}
+        {"$set": update_fields}
     )
     return {"message": "Updated"}
+
+
+@api_router.get("/dashboard/alerts")
+async def get_dashboard_alerts():
+    today = datetime.now(timezone.utc).date().isoformat()
+    seven_days = (datetime.now(timezone.utc).date() + timedelta(days=7)).isoformat()
+    thirty_days = (datetime.now(timezone.utc).date() + timedelta(days=30)).isoformat()
+    tracked = await db.tracked_colleges.find({"user_id": OWNER_ID}).to_list(500)
+    if not tracked:
+        return {"overdue_followups": [], "upcoming_followups": [], "upcoming_deadlines": []}
+    college_ids_obj = []
+    for t in tracked:
+        try:
+            college_ids_obj.append(ObjectId(t["college_id"]))
+        except Exception:
+            pass
+    colleges_cursor = await db.colleges.find({"_id": {"$in": college_ids_obj}}).to_list(500)
+    colleges_map = {str(c["_id"]): c for c in colleges_cursor}
+    overdue_followups, upcoming_followups, upcoming_deadlines = [], [], []
+    for t in tracked:
+        college = colleges_map.get(t["college_id"])
+        if not college:
+            continue
+        name = college.get("name", "")
+        cid = t["college_id"]
+        fu = t.get("follow_up_date", "")
+        if fu:
+            if fu < today:
+                overdue_followups.append({"college_id": cid, "name": name, "date": fu, "status": t.get("status")})
+            elif fu <= seven_days:
+                upcoming_followups.append({"college_id": cid, "name": name, "date": fu, "status": t.get("status")})
+        for dkey, dtype in [("application_deadline", "Application"), ("signing_day", "Signing Day")]:
+            dl = t.get(dkey, "")
+            if dl and today <= dl <= thirty_days:
+                upcoming_deadlines.append({"college_id": cid, "name": name, "deadline": dl, "type": dtype})
+    return {
+        "overdue_followups": sorted(overdue_followups, key=lambda x: x["date"]),
+        "upcoming_followups": sorted(upcoming_followups, key=lambda x: x["date"]),
+        "upcoming_deadlines": sorted(upcoming_deadlines, key=lambda x: x["deadline"]),
+    }
 
 # ─── Emails (no auth) ─────────────────────────────────────────────────────────
 @api_router.get("/emails")

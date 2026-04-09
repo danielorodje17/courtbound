@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiRequest } from "../context/AuthContext";
-import { Search, Filter, Star, MapPin, Users, Globe, Plus, Check } from "lucide-react";
+import { Search, MapPin, Users, Globe, Plus, Check, Flag } from "lucide-react";
 
 export default function CollegesPage() {
   const navigate = useNavigate();
   const [colleges, setColleges] = useState([]);
+  const [allColleges, setAllColleges] = useState([]);
   const [tracked, setTracked] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -14,29 +15,33 @@ export default function CollegesPage() {
   const [state, setState] = useState("");
 
   useEffect(() => {
-    fetchColleges();
+    fetchAllColleges();
     fetchTracked();
   }, []);
 
   useEffect(() => {
-    const timeout = setTimeout(fetchColleges, 400);
-    return () => clearTimeout(timeout);
-  }, [search, division, foreignOnly, state]);
+    applyFilters();
+  }, [search, division, foreignOnly, state, allColleges]);
 
-  const fetchColleges = async () => {
+  const fetchAllColleges = async () => {
     try {
-      const params = new URLSearchParams();
-      if (search) params.set("search", search);
-      if (division) params.set("division", division);
-      if (foreignOnly) params.set("foreign_friendly", "true");
-      if (state) params.set("state", state);
-      const { data } = await apiRequest("get", `/colleges?${params}`);
+      const { data } = await apiRequest("get", "/colleges");
+      setAllColleges(data);
       setColleges(data);
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
+  };
+
+  const applyFilters = () => {
+    let filtered = allColleges;
+    if (search) filtered = filtered.filter(c => c.name.toLowerCase().includes(search.toLowerCase()) || c.location.toLowerCase().includes(search.toLowerCase()));
+    if (division) filtered = filtered.filter(c => c.division === division);
+    if (foreignOnly) filtered = filtered.filter(c => c.foreign_friendly);
+    if (state) filtered = filtered.filter(c => c.state?.toLowerCase().includes(state.toLowerCase()) || c.location?.toLowerCase().includes(state.toLowerCase()));
+    setColleges(filtered);
   };
 
   const fetchTracked = async () => {
@@ -57,6 +62,7 @@ export default function CollegesPage() {
     }
   };
 
+  const ukFriendlyCount = allColleges.filter(c => c.foreign_friendly).length;
   const divisions = ["Division I", "Division II", "NAIA", "JUCO"];
 
   return (
@@ -66,53 +72,98 @@ export default function CollegesPage() {
         <h1 className="text-3xl font-bold text-slate-900 mt-1" style={{ fontFamily: "Barlow Condensed, sans-serif", textTransform: "uppercase" }}>
           Find Your College
         </h1>
-        <p className="text-slate-500 mt-1">Browse {colleges.length} US colleges with basketball programs</p>
+        <p className="text-slate-500 mt-1">Browse {allColleges.length} US colleges with basketball programs</p>
       </div>
 
-      {/* Filters */}
-      <div className="bg-white border border-slate-200 rounded-lg p-4 mb-6 flex flex-wrap gap-3 items-center">
-        <div className="relative flex-1 min-w-48">
-          <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
-          <input
-            data-testid="college-search-input"
-            type="text"
-            placeholder="Search colleges..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none"
-          />
-        </div>
-        <select
-          data-testid="college-division-filter"
-          value={division}
-          onChange={e => setDivision(e.target.value)}
-          className="border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 outline-none text-slate-700 bg-white"
+      {/* UK Friendly Banner */}
+      {!foreignOnly && ukFriendlyCount > 0 && (
+        <div
+          data-testid="uk-friendly-banner"
+          className="bg-gradient-to-r from-green-600 to-green-500 rounded-xl p-4 mb-5 flex items-center justify-between cursor-pointer hover:from-green-700 hover:to-green-600 transition-all"
+          onClick={() => setForeignOnly(true)}
         >
-          <option value="">All Divisions</option>
-          {divisions.map(d => <option key={d} value={d}>{d}</option>)}
-        </select>
-        <input
-          data-testid="college-state-filter"
-          type="text"
-          placeholder="State..."
-          value={state}
-          onChange={e => setState(e.target.value)}
-          className="border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 outline-none w-28"
-        />
-        <label data-testid="college-foreign-filter" className="flex items-center gap-2 cursor-pointer">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Flag className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <p className="font-bold text-white text-sm uppercase tracking-wider">UK Recommended Colleges</p>
+              <p className="text-green-100 text-xs mt-0.5">{ukFriendlyCount} colleges actively recruit UK & international players</p>
+            </div>
+          </div>
+          <span className="bg-white text-green-700 font-black text-lg px-4 py-2 rounded-lg">
+            {ukFriendlyCount}
+          </span>
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="bg-white border border-slate-200 rounded-lg p-4 mb-6">
+        <div className="flex flex-wrap gap-3 items-center">
+          <div className="relative flex-1 min-w-48">
+            <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+            <input
+              data-testid="college-search-input"
+              type="text"
+              placeholder="Search colleges..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full pl-9 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none"
+            />
+          </div>
+          <select
+            data-testid="college-division-filter"
+            value={division}
+            onChange={e => setDivision(e.target.value)}
+            className="border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 outline-none text-slate-700 bg-white"
+          >
+            <option value="">All Divisions</option>
+            {divisions.map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
           <input
-            type="checkbox"
-            checked={foreignOnly}
-            onChange={e => setForeignOnly(e.target.checked)}
-            className="w-4 h-4 rounded accent-orange-500"
+            data-testid="college-state-filter"
+            type="text"
+            placeholder="State..."
+            value={state}
+            onChange={e => setState(e.target.value)}
+            className="border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 outline-none w-28"
           />
-          <span className="text-sm font-medium text-slate-700">Foreign-Friendly Only</span>
-        </label>
+          <button
+            data-testid="college-foreign-filter"
+            onClick={() => setForeignOnly(!foreignOnly)}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold uppercase tracking-wider border-2 transition-all ${foreignOnly ? "bg-green-500 text-white border-green-500 shadow-sm" : "bg-white text-green-700 border-green-300 hover:bg-green-50"}`}
+          >
+            <Flag className="w-3.5 h-3.5" />
+            UK Friendly {foreignOnly && `(${colleges.length})`}
+          </button>
+          {(search || division || foreignOnly || state) && (
+            <button
+              onClick={() => { setSearch(""); setDivision(""); setForeignOnly(false); setState(""); }}
+              className="px-3 py-2.5 text-xs text-slate-500 hover:text-slate-700 font-medium border border-slate-200 rounded-lg hover:bg-slate-50 transition-all"
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
+        {foreignOnly && (
+          <div className="mt-3 flex items-center gap-2 text-xs text-green-700 bg-green-50 rounded-lg px-3 py-2 border border-green-200">
+            <Flag className="w-3.5 h-3.5" />
+            Showing {colleges.length} colleges that actively recruit UK & international players — great targets for you as an England U18 player.
+          </div>
+        )}
       </div>
 
       {loading ? (
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-10 w-10 border-4 border-orange-500 border-t-transparent" />
+        </div>
+      ) : colleges.length === 0 ? (
+        <div className="bg-white border border-slate-200 rounded-xl p-12 text-center">
+          <Search className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+          <p className="text-slate-500 font-medium">No colleges match your filters.</p>
+          <button onClick={() => { setSearch(""); setDivision(""); setForeignOnly(false); setState(""); }} className="mt-3 text-orange-500 font-semibold text-sm hover:text-orange-600">
+            Clear all filters
+          </button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -120,7 +171,7 @@ export default function CollegesPage() {
             <div
               key={college.id}
               data-testid={`college-card-${college.name}`}
-              className="bg-white border border-slate-200 rounded-lg hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 cursor-pointer overflow-hidden"
+              className={`bg-white border rounded-lg hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 cursor-pointer overflow-hidden ${college.foreign_friendly ? "border-green-200" : "border-slate-200"}`}
               onClick={() => navigate(`/colleges/${college.id}`)}
             >
               <div className="h-32 relative overflow-hidden">
@@ -131,7 +182,7 @@ export default function CollegesPage() {
                   onError={e => { e.target.src = "https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=400"; }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent" />
-                <div className="absolute top-3 right-3 flex gap-1.5">
+                <div className="absolute top-3 right-3 flex gap-1.5 flex-wrap justify-end">
                   <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${
                     college.division === "Division I" ? "bg-orange-500 text-white" :
                     college.division === "Division II" ? "bg-blue-500 text-white" :
@@ -142,8 +193,8 @@ export default function CollegesPage() {
                     {college.division?.replace("Division ", "D")}
                   </span>
                   {college.foreign_friendly && (
-                    <span className="px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide bg-green-500 text-white">
-                      Intl Friendly
+                    <span className="px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide bg-green-500 text-white flex items-center gap-1">
+                      <Flag className="w-2.5 h-2.5" /> UK Pick
                     </span>
                   )}
                 </div>
@@ -177,6 +228,11 @@ export default function CollegesPage() {
                     <Globe className="w-3 h-3" />
                     <span>{college.acceptance_rate} accept</span>
                   </div>
+                  {college.foreign_friendly && (
+                    <span className="text-green-600 font-semibold flex items-center gap-0.5">
+                      <Flag className="w-3 h-3" /> UK Friendly
+                    </span>
+                  )}
                 </div>
               </div>
             </div>

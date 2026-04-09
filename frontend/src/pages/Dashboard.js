@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiRequest } from "../context/AuthContext";
-import { Trophy, Mail, BookOpen, TrendingUp, ChevronRight, Bell, Plus } from "lucide-react";
+import { Trophy, Mail, BookOpen, TrendingUp, ChevronRight, Bell, Plus, AlertTriangle, Clock, Calendar, CheckCircle } from "lucide-react";
 
 const statusColors = {
   interested: "bg-blue-100 text-blue-700",
@@ -10,24 +10,30 @@ const statusColors = {
   rejected: "bg-red-100 text-red-700"
 };
 
+function daysUntil(dateStr) {
+  if (!dateStr) return null;
+  return Math.ceil((new Date(dateStr).setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / 86400000);
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [tracked, setTracked] = useState([]);
+  const [alerts, setAlerts] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
 
   const fetchData = async () => {
     try {
-      const [statsRes, trackedRes] = await Promise.all([
+      const [statsRes, trackedRes, alertsRes] = await Promise.all([
         apiRequest("get", "/dashboard/stats"),
-        apiRequest("get", "/my-colleges")
+        apiRequest("get", "/my-colleges"),
+        apiRequest("get", "/dashboard/alerts"),
       ]);
       setStats(statsRes.data);
       setTracked(trackedRes.data);
+      setAlerts(alertsRes.data);
     } catch (err) {
       console.error(err);
     } finally {
@@ -41,6 +47,8 @@ export default function Dashboard() {
     { label: "Responses Received", value: stats?.emails_received ?? 0, icon: Bell, color: "text-green-600", bg: "bg-green-50" },
     { label: "Response Rate", value: stats ? (stats.emails_sent > 0 ? `${Math.round((stats.emails_received / stats.emails_sent) * 100)}%` : "0%") : "—", icon: TrendingUp, color: "text-purple-600", bg: "bg-purple-50" }
   ];
+
+  const totalAlerts = alerts ? (alerts.overdue_followups.length + alerts.upcoming_followups.length + alerts.upcoming_deadlines.length) : 0;
 
   if (loading) {
     return (
@@ -65,7 +73,6 @@ export default function Dashboard() {
             Your Scholarship Tracker
           </h1>
           <p className="text-white/60 mt-1">England Under-18 | Basketball Scholarship Tracker</p>
-
           <div className="flex gap-3 mt-5">
             <button
               data-testid="dashboard-find-colleges-btn"
@@ -88,7 +95,11 @@ export default function Dashboard() {
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {statCards.map((card) => (
-          <div key={card.label} data-testid={`stat-card-${card.label.toLowerCase().replace(/ /g, "-")}`} className="bg-white border border-slate-200 rounded-lg p-5 hover:shadow-md transition-all duration-200 hover:-translate-y-0.5">
+          <div
+            key={card.label}
+            data-testid={`stat-card-${card.label.toLowerCase().replace(/ /g, "-")}`}
+            className="bg-white border border-slate-200 rounded-lg p-5 hover:shadow-md transition-all duration-200 hover:-translate-y-0.5"
+          >
             <div className={`w-10 h-10 ${card.bg} rounded-lg flex items-center justify-center mb-3`}>
               <card.icon className={`w-5 h-5 ${card.color}`} />
             </div>
@@ -97,6 +108,87 @@ export default function Dashboard() {
           </div>
         ))}
       </div>
+
+      {/* Priority Actions Widget */}
+      {alerts && totalAlerts > 0 && (
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden" data-testid="priority-actions-widget">
+          <div className="flex items-center gap-2.5 px-5 py-3.5 border-b border-slate-100 bg-red-50">
+            <AlertTriangle className="w-4 h-4 text-red-500" />
+            <h2 className="font-bold text-sm text-red-700 uppercase tracking-widest">Priority Actions</h2>
+            <span className="ml-auto bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">{totalAlerts}</span>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {alerts.overdue_followups.map(a => (
+              <div
+                key={a.college_id + "fo"}
+                data-testid="alert-overdue-followup"
+                className="flex items-center gap-4 px-5 py-3 hover:bg-slate-50 cursor-pointer transition-colors"
+                onClick={() => navigate(`/colleges/${a.college_id}`)}
+              >
+                <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Clock className="w-4 h-4 text-red-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-slate-800 truncate">{a.name}</p>
+                  <p className="text-xs text-red-500 font-medium">Follow-up overdue — was due {new Date(a.date).toLocaleDateString("en-GB")}</p>
+                </div>
+                <span className="text-xs bg-red-100 text-red-700 font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wide flex-shrink-0">Overdue</span>
+              </div>
+            ))}
+            {alerts.upcoming_followups.map(a => {
+              const days = daysUntil(a.date);
+              return (
+                <div
+                  key={a.college_id + "fu"}
+                  data-testid="alert-upcoming-followup"
+                  className="flex items-center gap-4 px-5 py-3 hover:bg-slate-50 cursor-pointer transition-colors"
+                  onClick={() => navigate(`/colleges/${a.college_id}`)}
+                >
+                  <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Clock className="w-4 h-4 text-orange-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-800 truncate">{a.name}</p>
+                    <p className="text-xs text-orange-500 font-medium">Follow-up due {days === 0 ? "today" : `in ${days} day${days !== 1 ? "s" : ""}`}</p>
+                  </div>
+                  <span className="text-xs bg-orange-100 text-orange-700 font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wide flex-shrink-0">
+                    {days === 0 ? "Today" : `${days}d`}
+                  </span>
+                </div>
+              );
+            })}
+            {alerts.upcoming_deadlines.map((a, i) => {
+              const days = daysUntil(a.deadline);
+              return (
+                <div
+                  key={a.college_id + a.type + i}
+                  data-testid="alert-deadline"
+                  className="flex items-center gap-4 px-5 py-3 hover:bg-slate-50 cursor-pointer transition-colors"
+                  onClick={() => navigate(`/colleges/${a.college_id}`)}
+                >
+                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Calendar className="w-4 h-4 text-blue-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-800 truncate">{a.name}</p>
+                    <p className="text-xs text-blue-600 font-medium">{a.type} deadline — {new Date(a.deadline).toLocaleDateString("en-GB")}</p>
+                  </div>
+                  <span className="text-xs bg-blue-100 text-blue-700 font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wide flex-shrink-0">
+                    {days === 0 ? "Today" : `${days}d`}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {alerts && totalAlerts === 0 && (
+        <div className="bg-green-50 border border-green-200 rounded-xl px-5 py-4 flex items-center gap-3" data-testid="no-alerts-banner">
+          <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
+          <p className="text-sm text-green-700 font-medium">No urgent actions needed — you're on top of your recruitment!</p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Tracked Colleges */}
@@ -119,25 +211,36 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
-              {tracked.slice(0, 5).map((t) => (
-                <div
-                  key={t.id}
-                  data-testid={`tracked-college-${t.college?.name}`}
-                  className="flex items-center gap-4 p-4 hover:bg-slate-50 cursor-pointer transition-colors"
-                  onClick={() => navigate(`/colleges/${t.college_id}`)}
-                >
-                  <div className="w-10 h-10 bg-orange-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <Trophy className="w-5 h-5 text-orange-500" />
+              {tracked.slice(0, 6).map((t) => {
+                const fuDays = daysUntil(t.follow_up_date);
+                return (
+                  <div
+                    key={t.id}
+                    data-testid={`tracked-college-${t.college?.name}`}
+                    className="flex items-center gap-4 p-4 hover:bg-slate-50 cursor-pointer transition-colors"
+                    onClick={() => navigate(`/colleges/${t.college_id}`)}
+                  >
+                    <div className="w-10 h-10 bg-orange-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <Trophy className="w-5 h-5 text-orange-500" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-slate-900 text-sm truncate">{t.college?.name}</p>
+                      <p className="text-xs text-slate-500 truncate">{t.college?.location} · {t.college?.division}</p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {t.follow_up_date && fuDays !== null && fuDays <= 7 && (
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-bold flex items-center gap-0.5 ${fuDays < 0 ? "bg-red-100 text-red-600" : "bg-orange-100 text-orange-600"}`}>
+                          <Clock className="w-2.5 h-2.5" />
+                          {fuDays < 0 ? "Overdue" : fuDays === 0 ? "Today" : `${fuDays}d`}
+                        </span>
+                      )}
+                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${statusColors[t.status] || "bg-slate-100 text-slate-600"}`}>
+                        {t.status}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-slate-900 text-sm truncate">{t.college?.name}</p>
-                    <p className="text-xs text-slate-500 truncate">{t.college?.location} • {t.college?.division}</p>
-                  </div>
-                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${statusColors[t.status] || "bg-slate-100 text-slate-600"}`}>
-                    {t.status}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -182,8 +285,8 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[
           { title: "AI Message Composer", desc: "Draft personalised emails to coaches with AI", action: () => navigate("/compose"), icon: "✍️", color: "border-orange-200 hover:border-orange-400" },
+          { title: "Response Tracker", desc: "Log coach replies and get AI follow-up advice", action: () => navigate("/responses"), icon: "📬", color: "border-green-200 hover:border-green-400" },
           { title: "Strategy Advisor", desc: "Get AI-powered recruitment strategy tips", action: () => navigate("/strategy"), icon: "🎯", color: "border-blue-200 hover:border-blue-400" },
-          { title: "Communication Log", desc: "View all your email history with coaches", action: () => navigate("/communications"), icon: "📧", color: "border-green-200 hover:border-green-400" }
         ].map((item) => (
           <button
             key={item.title}
