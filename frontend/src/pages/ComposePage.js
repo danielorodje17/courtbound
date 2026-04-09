@@ -7,7 +7,7 @@ export default function ComposePage() {
   const location = useLocation();
   const navigate = useNavigate();
   const preloaded = location.state;
-
+  const [playerProfile, setPlayerProfile] = useState({});
   const [colleges, setColleges] = useState([]);
   const [selectedCollege, setSelectedCollege] = useState(preloaded?.college || null);
   const [selectedCoach, setSelectedCoach] = useState(preloaded?.coach || null);
@@ -24,6 +24,12 @@ export default function ComposePage() {
 
   useEffect(() => {
     apiRequest("get", "/colleges").then(r => setColleges(r.data)).catch(() => {});
+    apiRequest("get", "/profile").then(r => {
+      const p = r.data || {};
+      setPlayerProfile(p);
+      if (p.position) setPosition(p.position.toLowerCase());
+      if (p.ppg && p.apg) setStats(`${p.ppg} PPG, ${p.apg} APG${p.rpg ? `, ${p.rpg} RPG` : ""}${p.current_team ? ` — ${p.current_team}` : ""}`);
+    }).catch(() => {});
   }, []);
 
   const generateDraft = async () => {

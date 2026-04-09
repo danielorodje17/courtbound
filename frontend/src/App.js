@@ -6,14 +6,18 @@ import ComposePage from "./pages/ComposePage";
 import CommunicationsPage from "./pages/CommunicationsPage";
 import StrategyPage from "./pages/StrategyPage";
 import NCAACHeckerPage from "./pages/NCAACHeckerPage";
-import { Trophy, Home, BookOpen, Mail, Wand2, Lightbulb, Menu, X, ShieldCheck } from "lucide-react";
+import ProfilePage from "./pages/ProfilePage";
+import ResponseTrackerPage from "./pages/ResponseTrackerPage";
+import { Trophy, Home, BookOpen, Mail, Wand2, Lightbulb, Menu, X, ShieldCheck, UserCircle, MessageSquare } from "lucide-react";
 import { useState } from "react";
 import "./App.css";
 
 const navItems = [
   { path: "/dashboard", label: "Dashboard", icon: Home },
+  { path: "/profile", label: "Profile", icon: UserCircle },
   { path: "/colleges", label: "Colleges", icon: BookOpen },
   { path: "/communications", label: "Emails", icon: Mail },
+  { path: "/responses", label: "Responses", icon: MessageSquare },
   { path: "/compose", label: "Compose", icon: Wand2 },
   { path: "/strategy", label: "Strategy", icon: Lightbulb },
   { path: "/ncaa", label: "NCAA Check", icon: ShieldCheck }
@@ -113,6 +117,8 @@ function App() {
         <Route path="/compose" element={<AppLayout><ComposePage /></AppLayout>} />
         <Route path="/strategy" element={<AppLayout><StrategyPage /></AppLayout>} />
         <Route path="/ncaa" element={<AppLayout><NCAACHeckerPage /></AppLayout>} />
+        <Route path="/profile" element={<AppLayout><ProfilePage /></AppLayout>} />
+        <Route path="/responses" element={<AppLayout><ResponseTrackerPage /></AppLayout>} />
       </Routes>
     </BrowserRouter>
   );

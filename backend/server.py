@@ -72,7 +72,70 @@ class BulkEmailImport(BaseModel):
     subject: str
     body: str
     coach_name: Optional[str] = ""
-    sent_date: Optional[str] = ""  # ISO date string
+    sent_date: Optional[str] = ""
+
+class ReplyLogRequest(BaseModel):
+    college_id: str
+    subject: Optional[str] = ""
+    body: str
+    coach_name: Optional[str] = ""
+    coach_email: Optional[str] = ""
+    received_date: Optional[str] = ""
+
+class FollowUpRequest(BaseModel):
+    college_name: str
+    coach_name: str
+    reply_content: str
+    original_subject: Optional[str] = ""
+
+class PlayerProfile(BaseModel):
+    # Personal
+    full_name: Optional[str] = "Daniel Orodje"
+    date_of_birth: Optional[str] = ""
+    nationality: Optional[str] = "British-Nigerian"
+    hometown: Optional[str] = ""
+    email: Optional[str] = ""
+    phone: Optional[str] = ""
+    # Physical
+    height_ft: Optional[str] = ""
+    height_cm: Optional[str] = ""
+    weight_kg: Optional[str] = ""
+    wingspan_cm: Optional[str] = ""
+    position: Optional[str] = "Point Guard"
+    dominant_hand: Optional[str] = "Right"
+    # Athletic
+    current_team: Optional[str] = "England Under-18"
+    club_team: Optional[str] = ""
+    jersey_number: Optional[str] = ""
+    years_playing: Optional[str] = ""
+    # Stats
+    ppg: Optional[str] = ""
+    apg: Optional[str] = ""
+    rpg: Optional[str] = ""
+    spg: Optional[str] = ""
+    fg_percent: Optional[str] = ""
+    three_pt_percent: Optional[str] = ""
+    # Academic
+    current_school: Optional[str] = ""
+    school_year: Optional[str] = ""
+    expected_graduation: Optional[str] = ""
+    gcse_grades: Optional[str] = ""
+    a_level_subjects: Optional[str] = ""
+    predicted_grades: Optional[str] = ""
+    gpa_equivalent: Optional[str] = ""
+    intended_major: Optional[str] = ""
+    sat_score: Optional[str] = ""
+    act_score: Optional[str] = ""
+    # Recruitment
+    target_start_year: Optional[str] = "2026"
+    target_division: Optional[str] = "Division I, Division II, NAIA"
+    ncaa_id: Optional[str] = ""
+    ncaa_registered: Optional[bool] = False
+    highlight_tape_url: Optional[str] = ""
+    bio: Optional[str] = ""
+    # Social
+    instagram: Optional[str] = ""
+    twitter: Optional[str] = ""
 
 class NCAACHeckRequest(BaseModel):
     # Academic
@@ -614,6 +677,129 @@ Be specific about UK qualifications. Mention that UK GCSEs/A-Levels are generall
     chat = LlmChat(api_key=api_key, session_id=str(uuid.uuid4()), system_message="You are an NCAA eligibility expert for international student athletes.").with_model("openai", "gpt-4.1-mini")
     response = await chat.send_message(UserMessage(text=prompt))
     return {"assessment": response}
+
+@api_router.post("/emails/log-reply")
+async def log_reply(data: ReplyLogRequest):
+    received_at = data.received_date or datetime.now(timezone.utc).isoformat()
+    doc = {
+        "user_id": OWNER_ID, "college_id": data.college_id,
+        "direction": "received",
+        "subject": data.subject or f"Reply from coach",
+        "body": data.body, "coach_name": data.coach_name,
+        "coach_email": data.coach_email, "created_at": received_at,
+    }
+    result = await db.emails.insert_one(doc)
+    doc["id"] = str(result.inserted_id)
+    doc.pop("_id", None)
+    # Auto-update tracked college status to "replied"
+    await db.tracked_colleges.update_one(
+        {"user_id": OWNER_ID, "college_id": data.college_id, "status": {"$in": ["interested", "contacted"]}},
+        {"$set": {"status": "replied", "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    return doc
+
+
+@api_router.get("/responses/summary")
+async def get_response_summary():
+    tracked = await db.tracked_colleges.find({"user_id": OWNER_ID}).to_list(500)
+    if not tracked:
+        return []
+    college_ids_str = [t["college_id"] for t in tracked]
+    college_ids_obj = []
+    for cid in college_ids_str:
+        try:
+            college_ids_obj.append(ObjectId(cid))
+        except Exception:
+            pass
+    colleges_cursor = await db.colleges.find({"_id": {"$in": college_ids_obj}}).to_list(500)
+    colleges_map = {str(c["_id"]): c for c in colleges_cursor}
+    # Aggregate email stats per college
+    pipeline = [
+        {"$match": {"user_id": OWNER_ID, "college_id": {"$in": college_ids_str}}},
+        {"$group": {
+            "_id": {"college_id": "$college_id", "direction": "$direction"},
+            "count": {"$sum": 1}, "last_date": {"$max": "$created_at"},
+            "last_subject": {"$last": "$subject"}, "last_body": {"$last": "$body"},
+            "last_coach": {"$last": "$coach_name"},
+        }}
+    ]
+    email_stats_raw = await db.emails.aggregate(pipeline).to_list(1000)
+    email_stats = {}
+    for stat in email_stats_raw:
+        cid = stat["_id"]["college_id"]
+        direction = stat["_id"]["direction"]
+        if cid not in email_stats:
+            email_stats[cid] = {}
+        email_stats[cid][direction] = {
+            "count": stat["count"], "last_date": stat["last_date"],
+            "last_subject": stat["last_subject"], "last_body": stat["last_body"],
+            "last_coach": stat["last_coach"],
+        }
+    result = []
+    for t in tracked:
+        college = colleges_map.get(t["college_id"])
+        if not college:
+            continue
+        result.append({
+            "tracked_id": str(t["_id"]),
+            "college_id": t["college_id"],
+            "college": {
+                "id": str(college["_id"]),
+                "name": college.get("name", ""),
+                "division": college.get("division", ""),
+                "location": college.get("location", ""),
+                "coaches": college.get("coaches", []),
+            },
+            "status": t.get("status", "interested"),
+            "notes": t.get("notes", ""),
+            "sent": email_stats.get(t["college_id"], {}).get("sent"),
+            "received": email_stats.get(t["college_id"], {}).get("received"),
+        })
+    return result
+
+
+@api_router.post("/ai/follow-up")
+async def generate_follow_up(data: FollowUpRequest):
+    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    api_key = os.environ.get("EMERGENT_LLM_KEY")
+    prompt = f"""You are an expert college basketball recruitment advisor helping an 18-year-old UK player (England Under-18) respond to a coach's reply.
+
+Coach Reply from {data.college_name} (Coach: {data.coach_name}):
+"{data.reply_content}"
+
+Original Subject: {data.original_subject or 'Basketball Scholarship Inquiry'}
+
+Provide:
+1. **SENTIMENT ANALYSIS** - Is this positive, neutral, or a polite rejection? (1-2 sentences)
+2. **RECOMMENDED ACTION** - Exactly what to do next (specific and actionable)
+3. **REPLY TIMING** - When to respond and urgency level
+4. **KEY POINTS TO INCLUDE** - 3-4 bullet points for your response
+5. **THINGS TO AVOID** - Common mistakes UK players make when replying to US coaches
+6. **QUICK WIN** - One thing you can do RIGHT NOW to strengthen your position
+
+Be specific for UK/international players. Encouraging but realistic."""
+    chat = LlmChat(api_key=api_key, session_id=str(uuid.uuid4()), system_message="You are an expert college basketball recruitment advisor.").with_model("openai", "gpt-4.1-mini")
+    response = await chat.send_message(UserMessage(text=prompt))
+    return {"suggestion": response, "college": data.college_name}
+
+
+# ─── Player Profile ───────────────────────────────────────────────────────────
+@api_router.get("/profile")
+async def get_profile():
+    doc = await db.profiles.find_one({"user_id": OWNER_ID})
+    if not doc:
+        return {}
+    doc.pop("_id", None)
+    doc.pop("user_id", None)
+    return doc
+
+@api_router.put("/profile")
+async def save_profile(data: PlayerProfile):
+    payload = data.dict()
+    payload["user_id"] = OWNER_ID
+    payload["updated_at"] = datetime.now(timezone.utc).isoformat()
+    await db.profiles.update_one({"user_id": OWNER_ID}, {"$set": payload}, upsert=True)
+    return {"message": "Profile saved"}
 
 # ─── Root ──────────────────────────────────────────────────────────────────────
 @api_router.get("/")
