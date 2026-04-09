@@ -1,10 +1,11 @@
 # CourtBound - Basketball Scholarship Tracker PRD
 
 ## Problem Statement
-An 18-year-old student basketball player from UK (England Under-18) wants to track US college basketball scholarship opportunities. Needs: college directory, coach contacts, AI message drafting, communication log, and strategy advice.
+An 18-year-old student basketball player from UK (England Under-18) wants to track US college basketball scholarship opportunities. Needs: college directory, coach contacts, AI message drafting, communication log, strategy advice, NCAA checker, player profile, and response tracking.
 
 ## App: CourtBound
-**URL:** https://b-ball-pathway.preview.emergentagent.com
+**Stack:** React + TailwindCSS + shadcn/ui + FastAPI (Python) + MongoDB + OpenAI gpt-4.1-mini (Emergent LLM Key)
+**Auth:** None — single-user personal tool
 
 ---
 
@@ -13,34 +14,27 @@ An 18-year-old student basketball player from UK (England Under-18) wants to tra
 - **Backend:** FastAPI (Python) on port 8001
 - **Database:** MongoDB (`courtbound_db`)
 - **AI:** OpenAI gpt-4.1-mini via emergentintegrations library (EMERGENT_LLM_KEY)
-- **Auth:** JWT (httpOnly cookies + localStorage fallback), bcrypt passwords
+- **Auth:** REMOVED — single-user mode, no login required
 
 ---
 
-## Pages & Features Implemented
+## Pages & Features
 
-### Authentication
-- Login / Register split-screen page with basketball hero image
-- JWT tokens (access: 60min, refresh: 7 days)
-- Brute force protection (5 attempts → 15min lockout)
-- Admin seeded: admin@courtbound.com / admin123
-
-### Dashboard
+### Dashboard (/dashboard)
 - Stats: Colleges tracked, Emails sent, Responses received, Response rate
-- My Colleges list (tracked colleges with status badges)
+- My Colleges list with status badges
 - Recent emails sidebar
-- Quick action buttons (Find Colleges, Draft Email, Strategy)
+- Quick action buttons
 
 ### College Directory (/colleges)
-- 25 pre-loaded US colleges with full details
+- 90 pre-loaded US colleges (D1, D2, NAIA, JUCO)
 - Search by name/location
-- Filter: Division (I/II/III), Foreign-Friendly, State
-- Track/Untrack college with one click
-- College cards with images, division badges, "International Friendly" badge
+- Filter: Division, Foreign-Friendly, State
+- Track/Untrack college
+- College cards with division badges, "International Friendly" badge
 
 ### College Detail (/colleges/:id)
 - Hero image with location, division, conference
-- Scholarship info & notable alumni
 - Coaching staff with Email & Call buttons
 - Email history per college
 - My Status tracker (Interested/Contacted/Replied/Rejected) + notes
@@ -49,7 +43,7 @@ An 18-year-old student basketball player from UK (England Under-18) wants to tra
 ### AI Message Composer (/compose)
 - Select college + coach
 - Choose message type: Initial Outreach, Follow-Up, Thank You
-- Position & stats input
+- Auto-fills position/stats from saved Player Profile
 - AI generates personalised draft email
 - Edit, copy, and save to communication log
 
@@ -58,65 +52,108 @@ An 18-year-old student basketball player from UK (England Under-18) wants to tra
 - Expandable email body view
 - Delete emails
 - Manual email logging form
-- Filter by college, direction (sent/received), search
+- CSV bulk upload (preserves exact dates, auto-creates colleges)
+- Bulk import same email to multiple colleges
 
 ### AI Strategy Advisor (/strategy)
 - Select tracked college
-- Set response status (No Response / Replied / Showing Interest)
+- Set response status
 - Last contact date
-- AI generates specific step-by-step recruitment strategy
-- Strategy history (last 5 generated)
-- Quick tips panel
+- AI generates step-by-step recruitment strategy
+
+### NCAA Eligibility Checker (/ncaa)
+- AI-powered, UK-specific eligibility assessment
+- Covers academics, amateurism, registration steps
+- Division recommendations (D1/D2/D3/NAIA/JUCO)
+
+### Player Profile (/profile)
+- Personal info (name, DOB, nationality, hometown, email, phone, bio)
+- Athletic profile (position, height, weight, wingspan, stats: PPG/APG/RPG/SPG/FG%/3PT%)
+- Academic profile (school, year, GCSE results, A-Levels, predicted grades, SAT/ACT)
+- Recruitment targets (target division, NCAA EC ID, enrolment year)
+- Profile completion % tracker
+- Auto-fills Compose page for personalised drafts
+
+### Response Tracker (/responses) ← NEW
+- Stats: Colleges contacted, Awaiting Reply, Received Reply, Response Rate
+- Filter tabs: All Contacted / Awaiting Reply / Received Reply
+- "Log Reply" flow: log coach's reply text, auto-updates college status to "Replied"
+- "AI Follow-up" button: analyzes coach's reply, generates tailored next-step strategy
+- Reply preview per college
+- Days-waiting counter with follow-up reminder (>21 days)
+- "Draft Follow-up Email" shortcut to Compose page
 
 ---
 
 ## Data Models
-- `users` - email, name, password_hash, role
-- `colleges` - full college info with coaches array
-- `tracked_colleges` - user → college link with status & notes
-- `emails` - communication log (sent/received)
-- `login_attempts` - brute force protection
+- `colleges` - college info with coaches array
+- `tracked_colleges` - user → college link (status: interested/contacted/replied/rejected)
+- `emails` - communication log (sent/received, direction, subject, body)
+- `profiles` - player profile (all personal/athletic/academic fields)
 
 ---
 
-## Implementation Date: April 2026
+## Key API Endpoints
+- `GET /api/colleges`, `GET /api/my-colleges`
+- `POST /api/my-colleges`, `DELETE /api/my-colleges/{id}`, `PATCH /api/my-colleges/{id}/status`
+- `GET /api/emails`, `POST /api/emails`, `DELETE /api/emails/{id}`
+- `POST /api/emails/bulk` — bulk import same email to multiple colleges
+- `POST /api/emails/import-csv` — CSV bulk upload
+- `POST /api/emails/log-reply` — log coach reply + auto-update status to replied
+- `GET /api/responses/summary` — response tracker data with email aggregates
+- `POST /api/ai/draft-message` — AI email draft
+- `POST /api/ai/strategy` — AI recruitment strategy
+- `POST /api/ai/follow-up` — AI follow-up advice based on coach reply
+- `POST /api/ai/ncaa-check` — NCAA eligibility assessment
+- `GET /api/profile`, `PUT /api/profile` — player profile CRUD
+- `GET /api/dashboard/stats`
 
-## What's Working
-- [x] Full auth flow (register/login/logout)
-- [x] 25 colleges pre-seeded (15 Division I, foreign-friendly highlighted)
+---
+
+## Implementation Log
+
+### v1.0 - Initial MVP (Apr 2026)
+- [x] Full app scaffold (React + FastAPI + MongoDB)
+- [x] 90 colleges seeded (D1, D2, NAIA, JUCO)
 - [x] College tracking with status management
 - [x] AI email drafting (OpenAI gpt-4.1-mini)
-- [x] Email communication log
+- [x] Email communication log (single + bulk)
 - [x] AI strategy generation
 - [x] Responsive navigation
 
----
+### v1.1 - Auth Removed + NCAA Checker (Apr 2026)
+- [x] Removed JWT auth — single-user mode
+- [x] NCAA Eligibility Checker (/ncaa) — UK-specific AI assessment
 
-## Update: April 2026 - v1.1
-- Removed login/authentication — single-user mode (no login screen)
-- Added NCAA Eligibility Checker (/ncaa) — AI-powered, UK-specific, covers academics/amateurism/deadlines
-- "ENGLAND U18" badge added to top nav
+### v1.2 - CSV Import (Apr 2026)
+- [x] CSV bulk email import (preserves dates, auto-creates colleges)
+- [x] Character encoding fixes for CSV subjects
+
+### v1.3 - Player Profile (Apr 2026)
+- [x] Player Profile page with all personal/athletic/academic fields
+- [x] Profile completion tracker
+- [x] Profile data auto-fills Compose page
+
+### v1.4 - Response Tracker (Apr 2026)
+- [x] Response Tracker page (/responses)
+- [x] Log coach replies with auto status update
+- [x] AI follow-up strategy based on coach reply content
+- [x] Days-waiting counter and follow-up reminders
+- [x] Navigation updated with Responses link
+
+---
 
 ## Prioritised Backlog
 
-### P0 (Critical - core functionality)
-- All implemented ✅
-
 ### P1 (High value)
-- [ ] Highlight tape / video link storage per college
-- [ ] Reminder system for follow-ups (e.g. "Follow up with Duke in 3 days")
+- [ ] Reminder/follow-up scheduler: "Follow up with [college] in X days"
 - [ ] Export communication history to PDF/CSV
 - [ ] Email template library (save favourite drafts)
+- [ ] College filtering: highlight colleges known to be favourable to international students
 
 ### P2 (Nice to have)
 - [ ] Scholarship deadline tracker per college
 - [ ] College comparison table
 - [ ] Coach profile photos
-- [ ] Application checklist per college (SAT scores, visa, academic transcripts)
-- [ ] NCAA eligibility tracker
-
----
-
-## Test Credentials
-- Admin: admin@courtbound.com / admin123
-- Test User: testplayer2026@test.com / test1234
+- [ ] Application checklist per college (visa, transcripts, SAT/ACT requirements)
+- [ ] Dashboard analytics charts (email activity over time, response trend)
