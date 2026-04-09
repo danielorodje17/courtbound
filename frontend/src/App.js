@@ -164,7 +164,7 @@ function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/login/callback" element={<AuthCallback />} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<ProtectedRoute><AppLayout><Dashboard /></AppLayout></ProtectedRoute>} />
           <Route path="/colleges" element={<ProtectedRoute><AppLayout><CollegesPage /></AppLayout></ProtectedRoute>} />

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 const GOOGLE_AUTH_URL = "https://demobackend.emergentagent.com/auth/v1/env/oauth/google?redirect_url=" +
-  encodeURIComponent(window.location.origin + "/auth/callback");
+  encodeURIComponent(window.location.origin + "/login/callback");
 
 export default function LoginPage() {
   const navigate = useNavigate();
