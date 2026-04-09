@@ -141,7 +141,15 @@ An 18-year-old student basketball player from UK (England Under-18) wants to tra
 - [x] Days-waiting counter and follow-up reminders
 - [x] Navigation updated with Responses link
 
-### v1.5 - High Impact Improvements (Apr 2026)
+### v1.6 - Google Auth + Multi-user + Profile Wipe Fix (Apr 2026)
+- [x] Google OAuth login via Emergent-managed Google Auth
+- [x] Multi-user support — each user has completely separate data (tracked colleges, emails, profile)
+- [x] LoginPage.js — "Continue with Google" sign-in page with CourtBound branding
+- [x] AuthCallback.js — handles OAuth redirect, exchanges session_id for httpOnly cookie
+- [x] ProtectedRoute — all app routes redirect to /login when not authenticated
+- [x] User menu in navbar — shows avatar, name, and sign out button
+- [x] Profile wipe fix — profile save now uses merge update (only saves non-empty fields, preserves existing data)
+- [x] All backend endpoints use user_id from JWT session instead of hardcoded OWNER_ID
 - [x] UK / International Friendly Badge overhaul — green "UK PICK" badges on college cards, "UK / International Friendly" note in College Detail explaining why it's a good target for UK players
 - [x] UK Recommended Banner on Colleges page — clickable green banner showing count, activates UK-friendly filter
 - [x] Prominent "UK Friendly" filter button (replaces old checkbox)
