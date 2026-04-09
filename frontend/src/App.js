@@ -162,22 +162,32 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/login/callback" element={<AuthCallback />} />
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<ProtectedRoute><AppLayout><Dashboard /></AppLayout></ProtectedRoute>} />
-          <Route path="/colleges" element={<ProtectedRoute><AppLayout><CollegesPage /></AppLayout></ProtectedRoute>} />
-          <Route path="/colleges/:id" element={<ProtectedRoute><AppLayout><CollegeDetailPage /></AppLayout></ProtectedRoute>} />
-          <Route path="/communications" element={<ProtectedRoute><AppLayout><CommunicationsPage /></AppLayout></ProtectedRoute>} />
-          <Route path="/compose" element={<ProtectedRoute><AppLayout><ComposePage /></AppLayout></ProtectedRoute>} />
-          <Route path="/strategy" element={<ProtectedRoute><AppLayout><StrategyPage /></AppLayout></ProtectedRoute>} />
-          <Route path="/ncaa" element={<ProtectedRoute><AppLayout><NCAACHeckerPage /></AppLayout></ProtectedRoute>} />
-          <Route path="/profile" element={<ProtectedRoute><AppLayout><ProfilePage /></AppLayout></ProtectedRoute>} />
-          <Route path="/responses" element={<ProtectedRoute><AppLayout><ResponseTrackerPage /></AppLayout></ProtectedRoute>} />
-        </Routes>
+        <AppRouter />
       </AuthProvider>
     </BrowserRouter>
+  );
+}
+
+function AppRouter() {
+  const location = useLocation();
+  // Synchronously detect OAuth callback BEFORE routes render (prevents race condition with ProtectedRoute)
+  if (location.hash?.includes("session_id=")) {
+    return <AuthCallback />;
+  }
+  return (
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/dashboard" element={<ProtectedRoute><AppLayout><Dashboard /></AppLayout></ProtectedRoute>} />
+      <Route path="/colleges" element={<ProtectedRoute><AppLayout><CollegesPage /></AppLayout></ProtectedRoute>} />
+      <Route path="/colleges/:id" element={<ProtectedRoute><AppLayout><CollegeDetailPage /></AppLayout></ProtectedRoute>} />
+      <Route path="/communications" element={<ProtectedRoute><AppLayout><CommunicationsPage /></AppLayout></ProtectedRoute>} />
+      <Route path="/compose" element={<ProtectedRoute><AppLayout><ComposePage /></AppLayout></ProtectedRoute>} />
+      <Route path="/strategy" element={<ProtectedRoute><AppLayout><StrategyPage /></AppLayout></ProtectedRoute>} />
+      <Route path="/ncaa" element={<ProtectedRoute><AppLayout><NCAACHeckerPage /></AppLayout></ProtectedRoute>} />
+      <Route path="/profile" element={<ProtectedRoute><AppLayout><ProfilePage /></AppLayout></ProtectedRoute>} />
+      <Route path="/responses" element={<ProtectedRoute><AppLayout><ResponseTrackerPage /></AppLayout></ProtectedRoute>} />
+    </Routes>
   );
 }
 

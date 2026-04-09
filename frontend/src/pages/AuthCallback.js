@@ -1,32 +1,35 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiRequest, setToken, useAuth } from "../context/AuthContext";
 
 export default function AuthCallback() {
   const navigate = useNavigate();
+  const hasProcessed = useRef(false);
   const { checkAuth } = useAuth();
 
   useEffect(() => {
-    // Session_id may arrive in the URL hash or as a query param
+    // useRef prevents double execution under React StrictMode
+    if (hasProcessed.current) return;
+    hasProcessed.current = true;
+
     const hashParams = new URLSearchParams(window.location.hash.replace("#", ""));
-    const searchParams = new URLSearchParams(window.location.search);
-    const sessionId = hashParams.get("session_id") || searchParams.get("session_id");
+    const sessionId = hashParams.get("session_id");
 
     if (!sessionId) {
-      navigate("/login");
+      navigate("/login", { replace: true });
       return;
     }
 
     apiRequest("post", "/auth/session", { session_id: sessionId })
       .then(async ({ data }) => {
-        // Store the token in localStorage so all subsequent requests use it
         if (data.session_token) {
           setToken(data.session_token);
         }
         await checkAuth();
-        navigate("/dashboard");
+        // Navigate to dashboard with clean URL (no hash)
+        navigate("/dashboard", { replace: true });
       })
-      .catch(() => navigate("/login"));
+      .catch(() => navigate("/login", { replace: true }));
   }, []);
 
   return (
