@@ -141,6 +141,16 @@ An 18-year-old student basketball player from UK (England Under-18) wants to tra
 - [x] Days-waiting counter and follow-up reminders
 - [x] Navigation updated with Responses link
 
+### v1.5 - High Impact Improvements (Apr 2026)
+- [x] UK / International Friendly Badge overhaul — green "UK PICK" badges on college cards, "UK / International Friendly" note in College Detail explaining why it's a good target for UK players
+- [x] UK Recommended Banner on Colleges page — clickable green banner showing count, activates UK-friendly filter
+- [x] Prominent "UK Friendly" filter button (replaces old checkbox)
+- [x] Follow-up Scheduler — set follow-up date per college in College Detail sidebar, shown with countdown badge
+- [x] Scholarship Deadline Tracker — Application Deadline + Signing Day fields per college, countdown badges (red/orange/yellow based on urgency)
+- [x] Dashboard Priority Actions widget — shows overdue follow-ups (red), upcoming within 7 days (orange), deadlines within 30 days (blue) with college name and date. Clicking navigates to college detail
+- [x] Dashboard green "on track" banner when no urgent actions needed
+- [x] Follow-up date badges on Dashboard My Colleges list
+
 ---
 
 ## Prioritised Backlog
