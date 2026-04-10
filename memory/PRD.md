@@ -187,6 +187,13 @@ An 18-year-old student basketball player from UK (England Under-18) wants to tra
 - [x] Best-value highlighting: top division highlighted orange, most selective acceptance rate highlighted blue
 - [x] GET /api/colleges/compare?ids=... endpoint (auth-protected)
 
+### v1.11 - Recruitment Progress Score (Apr 2026)
+- [x] Progress score (0-100%) calculated per tracked college in GET /api/my-colleges
+- [x] Scoring: tracked(10) + email sent(15) + status advanced(10) + replied(20) + follow-up set(5) + deadline set(5) + call notes(10) + checklist ≥50%(15) + checklist 100%(+10)
+- [x] CollegesPage: colored badge pill on tracked college card images
+- [x] Dashboard My Colleges: thin animated progress bar below each list item
+- [x] CollegeDetailPage sidebar: SVG ring gauge + status label + contextual improvement tip
+
 ---
 
 ## Backlog
