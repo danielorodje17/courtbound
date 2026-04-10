@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { apiRequest } from "../context/AuthContext";
-import { Wand2, Copy, Save, ArrowLeft, ChevronDown, Trash2, X, Plus, BookMarked } from "lucide-react";
+import { Wand2, Copy, Save, ArrowLeft, ChevronDown, Trash2, X, Plus, BookMarked, Film } from "lucide-react";
 
 export default function ComposePage() {
   const location = useLocation();
@@ -64,6 +64,7 @@ export default function ComposePage() {
         user_stats: stats,
         user_email: playerProfile.email || "",
         user_phone: playerProfile.phone || "",
+        highlight_tape_url: playerProfile.highlight_tape_url || "",
         message_type: messageType
       });
       setDraft(data.draft);
@@ -330,6 +331,24 @@ export default function ComposePage() {
               <Wand2 className="w-4 h-4" />
               {generating ? "Generating..." : "Generate Draft with AI"}
             </button>
+
+            {/* Tape indicator */}
+            {playerProfile.highlight_tape_url ? (
+              <div className="mt-2 flex items-start gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2.5" data-testid="tape-included-indicator">
+                <Film className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-emerald-700">Highlight tape auto-included in draft</p>
+                  <a href={playerProfile.highlight_tape_url} target="_blank" rel="noreferrer" className="text-xs text-emerald-600 hover:underline truncate block max-w-xs">
+                    {playerProfile.highlight_tape_url}
+                  </a>
+                </div>
+              </div>
+            ) : (
+              <p className="mt-2 text-xs text-slate-400 flex items-center gap-1.5" data-testid="tape-missing-hint">
+                <Film className="w-3 h-3" />
+                Add your Hudl/YouTube link in Profile to auto-include in drafts
+              </p>
+            )}
           </div>
         </div>
 

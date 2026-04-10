@@ -167,7 +167,21 @@ An 18-year-old student basketball player from UK (England Under-18) wants to tra
 - [x] College Application Checklist on College Detail page — 10-item pre-loaded checklist with progress bar, auto-saves on toggle
 - [x] GET /api/ai/match, GET /api/dashboard/analytics, GET/PUT /api/checklist/{college_id} endpoints
 
-### v1.8 - Export, Template Library, Coach Notes (Apr 2026)
+### v1.9 - Highlight Tape Auto-Include (Apr 2026)
+- [x] `highlight_tape_url` from player profile auto-injected into every AI email draft
+- [x] ComposePage shows green "Highlight tape auto-included" indicator (with link) when tape URL is saved; orange hint if missing
+- [x] CollegeDetailPage sidebar shows "Your Highlight Tape" quick-link card (or amber prompt to add one if missing)
+- [x] AI prompt updated: tape link is explicitly placed in email body by the AI
+
+---
+
+## Prioritised Backlog
+
+### P1
+- [ ] College comparison table side-by-side
+
+### P2
+- [ ] Coach profile photos
 - [x] Export CSV: one-click download of filtered email history as .csv
 - [x] Export PDF: opens formatted print-ready HTML view for browser print-to-PDF
 - [x] Email Template Library: save/load/delete templates in ComposePage. 'Save as Template' is optional

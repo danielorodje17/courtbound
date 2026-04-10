@@ -156,6 +156,7 @@ class AIMessageRequest(BaseModel):
     user_stats: Optional[str] = ""
     user_email: Optional[str] = ""
     user_phone: Optional[str] = ""
+    highlight_tape_url: Optional[str] = ""
     message_type: str = "initial_outreach"
 
 class AIStrategyRequest(BaseModel):
@@ -741,6 +742,7 @@ Details:
 - Message Type: {data.message_type}
 {f"- Contact Email: {data.user_email}" if data.user_email else ""}
 {f"- Contact Phone: {data.user_phone}" if data.user_phone else ""}
+{f"- Highlight Tape: {data.highlight_tape_url}" if data.highlight_tape_url else ""}
 
 Write a compelling, personal, and professional email. Include:
 1. Strong opening that catches attention
@@ -748,8 +750,9 @@ Write a compelling, personal, and professional email. Include:
 3. Why this specific college/program appeals to them
 4. Key athletic highlights
 5. Academic commitment mention
-6. Clear call to action
-7. Professional sign-off with the player's full name{', email address' if data.user_email else ''}{' and phone number' if data.user_phone else ''}
+{f"6. Naturally include the highlight tape link: {data.highlight_tape_url}" if data.highlight_tape_url else "6. Encourage the coach to request a highlight tape"}
+7. Clear call to action
+8. Professional sign-off with the player's full name{', email address' if data.user_email else ''}{' and phone number' if data.user_phone else ''}
 
 Keep it concise (200-300 words). Make it feel authentic and personal, not generic."""
     chat = LlmChat(api_key=api_key, session_id=str(uuid.uuid4()), system_message="You are an expert college basketball recruitment advisor.").with_model("openai", "gpt-4.1-mini")

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { apiRequest } from "../context/AuthContext";
-import { MapPin, Globe, Mail, Phone, Plus, Check, ArrowLeft, Pen, Clock, Calendar, AlertTriangle, ListChecks, MessageSquare, Trash2 } from "lucide-react";
+import { MapPin, Globe, Mail, Phone, Plus, Check, ArrowLeft, Pen, Clock, Calendar, AlertTriangle, ListChecks, MessageSquare, Trash2, Film } from "lucide-react";
 
 export default function CollegeDetailPage() {
   const { id } = useParams();
@@ -23,6 +23,7 @@ export default function CollegeDetailPage() {
   const [newNote, setNewNote] = useState("");
   const [newNoteDate, setNewNoteDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [addingNote, setAddingNote] = useState(false);
+  const [tapeUrl, setTapeUrl] = useState("");
 
   function daysUntil(dateStr) {
     if (!dateStr) return null;
@@ -49,11 +50,12 @@ export default function CollegeDetailPage() {
 
   const fetchAll = async () => {
     try {
-      const [collegeRes, myCollegesRes, emailsRes, checklistRes] = await Promise.all([
+      const [collegeRes, myCollegesRes, emailsRes, checklistRes, profileRes] = await Promise.all([
         apiRequest("get", `/colleges/${id}`),
         apiRequest("get", "/my-colleges"),
         apiRequest("get", `/emails?college_id=${id}`),
         apiRequest("get", `/checklist/${id}`),
+        apiRequest("get", "/profile"),
       ]);
       setCollege(collegeRes.data);
       const t = myCollegesRes.data.find(c => c.college_id === id);
@@ -67,6 +69,7 @@ export default function CollegeDetailPage() {
       }
       setEmails(emailsRes.data);
       setChecklist(checklistRes.data?.items || []);
+      setTapeUrl(profileRes.data?.highlight_tape_url || "");
       // Call notes stored in tracked college doc
       if (t && t.call_notes) setCallNotes(t.call_notes);
     } catch (err) {
@@ -354,6 +357,38 @@ export default function CollegeDetailPage() {
                   {savedMsg || (saving ? "Saving..." : "Save Status & Dates")}
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* Highlight Tape Quick-Link */}
+          {tapeUrl ? (
+            <div className="bg-white border border-slate-200 rounded-lg p-4" data-testid="college-tape-card">
+              <div className="flex items-center gap-2 mb-2">
+                <Film className="w-4 h-4 text-red-500" />
+                <span className="text-xs font-bold text-slate-700 uppercase tracking-wide">Your Highlight Tape</span>
+              </div>
+              <a
+                href={tapeUrl}
+                target="_blank"
+                rel="noreferrer"
+                data-testid="college-tape-link"
+                className="block text-xs text-orange-500 hover:text-orange-600 hover:underline break-all font-medium leading-relaxed"
+              >
+                {tapeUrl}
+              </a>
+              <p className="text-xs text-slate-400 mt-1.5">Auto-included when composing emails to this college</p>
+            </div>
+          ) : (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4" data-testid="college-tape-missing">
+              <div className="flex items-center gap-2 mb-1">
+                <Film className="w-4 h-4 text-amber-500" />
+                <span className="text-xs font-bold text-amber-700 uppercase tracking-wide">No Highlight Tape</span>
+              </div>
+              <p className="text-xs text-amber-600">
+                Add your Hudl or YouTube link in{" "}
+                <button onClick={() => navigate("/profile")} className="font-semibold underline">your profile</button>{" "}
+                to auto-include it in email drafts.
+              </p>
             </div>
           )}
 
