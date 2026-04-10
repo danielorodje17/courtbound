@@ -403,6 +403,28 @@ async def get_colleges(search: Optional[str] = None, division: Optional[str] = N
         c["id"] = str(c.pop("_id"))
     return colleges
 
+@api_router.get("/colleges/compare")
+async def compare_colleges(ids: str, current_user: UserModel = Depends(get_current_user)):
+    college_ids = [i.strip() for i in ids.split(",") if i.strip()][:3]
+    colleges = []
+    for cid in college_ids:
+        try:
+            c = await db.colleges.find_one({"_id": ObjectId(cid)}, {"_id": 0})
+            if c:
+                c["id"] = cid
+                colleges.append(c)
+        except Exception:
+            pass
+    tracked_docs = await db.tracked_colleges.find(
+        {"user_id": current_user.user_id, "college_id": {"$in": college_ids}},
+        {"_id": 0, "college_id": 1, "status": 1, "follow_up_date": 1, "application_deadline": 1}
+    ).to_list(3)
+    tracked_map = {t["college_id"]: t for t in tracked_docs}
+    for c in colleges:
+        c["tracking"] = tracked_map.get(c["id"])
+    return colleges
+
+
 @api_router.get("/colleges/{college_id}")
 async def get_college(college_id: str):
     try:
@@ -948,6 +970,7 @@ async def save_profile(data: PlayerProfile, current_user: UserModel = Depends(ge
     payload["updated_at"] = datetime.now(timezone.utc).isoformat()
     await db.profiles.update_one({"user_id": current_user.user_id}, {"$set": payload}, upsert=True)
     return {"message": "Profile saved"}
+
 
 # ─── AI Match ────────────────────────────────────────────────────────────────
 @api_router.get("/ai/match")

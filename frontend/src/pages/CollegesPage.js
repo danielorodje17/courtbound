@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiRequest } from "../context/AuthContext";
-import { Search, MapPin, Users, Globe, Plus, Check, Flag } from "lucide-react";
+import { Search, MapPin, Users, Globe, Plus, Check, Flag, BarChart2 } from "lucide-react";
 
 export default function CollegesPage() {
   const navigate = useNavigate();
   const [colleges, setColleges] = useState([]);
   const [allColleges, setAllColleges] = useState([]);
   const [tracked, setTracked] = useState(new Set());
+  const [compareSet, setCompareSet] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [division, setDivision] = useState("");
@@ -60,6 +61,20 @@ export default function CollegesPage() {
       await apiRequest("post", "/my-colleges", { college_id: college.id, notes: "" });
       setTracked(prev => new Set([...prev, college.id]));
     }
+  };
+
+  const toggleCompare = (e, college) => {
+    e.stopPropagation();
+    setCompareSet(prev => {
+      const s = new Set(prev);
+      if (s.has(college.id)) { s.delete(college.id); }
+      else if (s.size < 3) { s.add(college.id); }
+      return s;
+    });
+  };
+
+  const startComparison = () => {
+    if (compareSet.size >= 2) navigate(`/compare?ids=${[...compareSet].join(",")}`);
   };
 
   const ukFriendlyCount = allColleges.filter(c => c.foreign_friendly).length;
@@ -171,7 +186,7 @@ export default function CollegesPage() {
             <div
               key={college.id}
               data-testid={`college-card-${college.name}`}
-              className={`bg-white border rounded-lg hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 cursor-pointer overflow-hidden ${college.foreign_friendly ? "border-green-200" : "border-slate-200"}`}
+              className={`bg-white border rounded-lg hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 cursor-pointer overflow-hidden ${compareSet.has(college.id) ? "border-purple-400 ring-2 ring-purple-300" : college.foreign_friendly ? "border-green-200" : "border-slate-200"}`}
               onClick={() => navigate(`/colleges/${college.id}`)}
             >
               <div className="h-32 relative overflow-hidden">
@@ -198,6 +213,15 @@ export default function CollegesPage() {
                     </span>
                   )}
                 </div>
+                {/* Compare toggle */}
+                <button
+                  data-testid={`compare-toggle-${college.name}`}
+                  onClick={(e) => toggleCompare(e, college)}
+                  className={`absolute top-3 left-3 w-7 h-7 rounded-lg flex items-center justify-center transition-all text-xs font-black ${compareSet.has(college.id) ? "bg-purple-500 text-white shadow-lg" : compareSet.size >= 3 ? "bg-black/30 text-white/40 cursor-not-allowed" : "bg-black/30 text-white hover:bg-purple-500"}`}
+                  title={compareSet.has(college.id) ? "Remove from comparison" : compareSet.size >= 3 ? "Max 3 colleges" : "Add to comparison"}
+                >
+                  {compareSet.has(college.id) ? <Check className="w-3.5 h-3.5" /> : <BarChart2 className="w-3.5 h-3.5" />}
+                </button>
                 <div className="absolute bottom-3 left-3">
                   <span className="text-xs text-white/80 font-medium">{college.conference}</span>
                 </div>
@@ -239,6 +263,38 @@ export default function CollegesPage() {
           ))}
         </div>
       )}
+
+      {/* Sticky Compare Bar */}
+      {compareSet.size > 0 && (
+        <div
+          data-testid="compare-sticky-bar"
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white rounded-2xl shadow-2xl px-5 py-3.5 flex items-center gap-4 border border-white/10"
+          style={{ backdropFilter: "blur(12px)" }}
+        >
+          <div className="flex items-center gap-2">
+            <BarChart2 className="w-4 h-4 text-purple-400" />
+            <span className="text-sm font-bold">{compareSet.size} selected</span>
+            <span className="text-white/40 text-xs">(max 3)</span>
+          </div>
+          <div className="h-4 w-px bg-white/20" />
+          <button
+            data-testid="clear-compare-btn"
+            onClick={() => setCompareSet(new Set())}
+            className="text-xs text-white/50 hover:text-white transition-colors"
+          >
+            Clear
+          </button>
+          <button
+            data-testid="start-compare-btn"
+            onClick={startComparison}
+            disabled={compareSet.size < 2}
+            className="bg-purple-500 hover:bg-purple-600 text-white font-bold text-sm px-4 py-1.5 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {compareSet.size < 2 ? `Select ${2 - compareSet.size} more` : "Compare →"}
+          </button>
+        </div>
+      )}
+
     </div>
   );
 }

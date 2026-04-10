@@ -11,6 +11,7 @@ import NCAACHeckerPage from "./pages/NCAACHeckerPage";
 import ProfilePage from "./pages/ProfilePage";
 import ResponseTrackerPage from "./pages/ResponseTrackerPage";
 import AIMatchPage from "./pages/AIMatchPage";
+import ComparePage from "./pages/ComparePage";
 import LoginPage from "./pages/LoginPage";
 import AuthCallback from "./pages/AuthCallback";
 import { Trophy, Home, BookOpen, Mail, Wand2, Lightbulb, Menu, X, ShieldCheck, UserCircle, MessageSquare, LogOut, ChevronDown, Sparkles } from "lucide-react";
@@ -190,6 +191,7 @@ function AppRouter() {
       <Route path="/profile" element={<ProtectedRoute><AppLayout><ProfilePage /></AppLayout></ProtectedRoute>} />
       <Route path="/responses" element={<ProtectedRoute><AppLayout><ResponseTrackerPage /></AppLayout></ProtectedRoute>} />
       <Route path="/ai-match" element={<ProtectedRoute><AppLayout><AIMatchPage /></AppLayout></ProtectedRoute>} />
+      <Route path="/compare" element={<ProtectedRoute><AppLayout><ComparePage /></AppLayout></ProtectedRoute>} />
     </Routes>
   );
 }
