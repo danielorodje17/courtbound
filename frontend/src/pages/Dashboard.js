@@ -67,7 +67,7 @@ export default function Dashboard() {
   };
 
   const statCards = [
-    { label: "Colleges Tracked", value: stats?.tracked_colleges ?? 0, icon: BookOpen, color: "text-blue-600", bg: "bg-blue-50", route: "/colleges" },
+    { label: "Colleges Tracked", value: stats?.tracked_colleges ?? 0, icon: BookOpen, color: "text-blue-600", bg: "bg-blue-50", route: "/colleges?view=tracked" },
     { label: "Emails Sent", value: stats?.emails_sent ?? 0, icon: Mail, color: "text-orange-600", bg: "bg-orange-50", route: "/communications" },
     { label: "Responses Received", value: stats?.emails_received ?? 0, icon: Bell, color: "text-green-600", bg: "bg-green-50", route: "/responses" },
     { label: "Response Rate", value: stats ? (stats.emails_sent > 0 ? `${Math.round((stats.emails_received / stats.emails_sent) * 100)}%` : "0%") : "—", icon: TrendingUp, color: "text-purple-600", bg: "bg-purple-50", route: "/responses" }

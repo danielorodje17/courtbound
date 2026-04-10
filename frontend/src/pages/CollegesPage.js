@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { apiRequest } from "../context/AuthContext";
-import { Search, MapPin, Users, Globe, Plus, Check, Flag, BarChart2 } from "lucide-react";
+import { Search, MapPin, Users, Globe, Plus, Check, Flag, BarChart2, ArrowLeft } from "lucide-react";
 
 export default function CollegesPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const trackedOnly = searchParams.get("view") === "tracked";
   const [colleges, setColleges] = useState([]);
   const [allColleges, setAllColleges] = useState([]);
   const [tracked, setTracked] = useState(new Set());
@@ -23,7 +25,7 @@ export default function CollegesPage() {
 
   useEffect(() => {
     applyFilters();
-  }, [search, division, foreignOnly, state, allColleges]);
+  }, [search, division, foreignOnly, state, allColleges, trackedOnly, trackedData]);
 
   const fetchAllColleges = async () => {
     try {
@@ -39,6 +41,7 @@ export default function CollegesPage() {
 
   const applyFilters = () => {
     let filtered = allColleges;
+    if (trackedOnly) filtered = filtered.filter(c => tracked.has(c.id));
     if (search) filtered = filtered.filter(c => c.name.toLowerCase().includes(search.toLowerCase()) || c.location.toLowerCase().includes(search.toLowerCase()));
     if (division) filtered = filtered.filter(c => c.division === division);
     if (foreignOnly) filtered = filtered.filter(c => c.foreign_friendly);
@@ -92,11 +95,32 @@ export default function CollegesPage() {
   return (
     <div style={{ fontFamily: "Manrope, sans-serif" }}>
       <div className="mb-6">
-        <span className="text-xs tracking-[0.2em] uppercase font-bold text-orange-600">College Directory</span>
-        <h1 className="text-3xl font-bold text-slate-900 mt-1" style={{ fontFamily: "Barlow Condensed, sans-serif", textTransform: "uppercase" }}>
-          Find Your College
-        </h1>
-        <p className="text-slate-500 mt-1">Browse {allColleges.length} US colleges with basketball programs</p>
+        {trackedOnly ? (
+          <>
+            <button
+              onClick={() => navigate("/colleges")}
+              className="flex items-center gap-1.5 text-slate-500 hover:text-slate-800 text-sm mb-2 transition-colors"
+              data-testid="back-to-all-colleges"
+            >
+              <ArrowLeft className="w-4 h-4" /> All Colleges
+            </button>
+            <span className="text-xs tracking-[0.2em] uppercase font-bold text-orange-600">Your Pipeline</span>
+            <h1 className="text-3xl font-bold text-slate-900 mt-1" style={{ fontFamily: "Barlow Condensed, sans-serif", textTransform: "uppercase" }}>
+              My Tracked Colleges
+            </h1>
+            <p className="text-slate-500 mt-1">
+              {tracked.size > 0 ? `${tracked.size} college${tracked.size !== 1 ? "s" : ""} in your list` : "No colleges tracked yet"}
+            </p>
+          </>
+        ) : (
+          <>
+            <span className="text-xs tracking-[0.2em] uppercase font-bold text-orange-600">College Directory</span>
+            <h1 className="text-3xl font-bold text-slate-900 mt-1" style={{ fontFamily: "Barlow Condensed, sans-serif", textTransform: "uppercase" }}>
+              Find Your College
+            </h1>
+            <p className="text-slate-500 mt-1">Browse {allColleges.length} US colleges with basketball programs</p>
+          </>
+        )}
       </div>
 
       {/* UK Friendly Banner */}
@@ -184,10 +208,22 @@ export default function CollegesPage() {
       ) : colleges.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded-xl p-12 text-center">
           <Search className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-          <p className="text-slate-500 font-medium">No colleges match your filters.</p>
-          <button onClick={() => { setSearch(""); setDivision(""); setForeignOnly(false); setState(""); }} className="mt-3 text-orange-500 font-semibold text-sm hover:text-orange-600">
-            Clear all filters
-          </button>
+          {trackedOnly ? (
+            <>
+              <p className="text-slate-600 font-semibold text-base mb-1">No colleges in your list yet</p>
+              <p className="text-slate-400 text-sm mb-4">Browse the full directory and click "Add to My List" on any college to start tracking.</p>
+              <button onClick={() => navigate("/colleges")} className="bg-orange-500 text-white font-bold uppercase tracking-wider rounded-lg px-5 py-2.5 text-sm hover:bg-orange-600 transition-colors">
+                Browse All Colleges
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="text-slate-500 font-medium">No colleges match your filters.</p>
+              <button onClick={() => { setSearch(""); setDivision(""); setForeignOnly(false); setState(""); }} className="mt-3 text-orange-500 font-semibold text-sm hover:text-orange-600">
+                Clear all filters
+              </button>
+            </>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
