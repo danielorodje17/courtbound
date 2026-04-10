@@ -167,21 +167,7 @@ An 18-year-old student basketball player from UK (England Under-18) wants to tra
 - [x] College Application Checklist on College Detail page — 10-item pre-loaded checklist with progress bar, auto-saves on toggle
 - [x] GET /api/ai/match, GET /api/dashboard/analytics, GET/PUT /api/checklist/{college_id} endpoints
 
-### v1.9 - Highlight Tape Auto-Include (Apr 2026)
-- [x] `highlight_tape_url` from player profile auto-injected into every AI email draft
-- [x] ComposePage shows green "Highlight tape auto-included" indicator (with link) when tape URL is saved; orange hint if missing
-- [x] CollegeDetailPage sidebar shows "Your Highlight Tape" quick-link card (or amber prompt to add one if missing)
-- [x] AI prompt updated: tape link is explicitly placed in email body by the AI
-
----
-
-## Prioritised Backlog
-
-### P1
-- [ ] College comparison table side-by-side
-
-### P2
-- [ ] Coach profile photos
+### v1.8 - Export, Template Library, Coach Notes (Apr 2026)
 - [x] Export CSV: one-click download of filtered email history as .csv
 - [x] Export PDF: opens formatted print-ready HTML view for browser print-to-PDF
 - [x] Email Template Library: save/load/delete templates in ComposePage. 'Save as Template' is optional
@@ -189,15 +175,21 @@ An 18-year-old student basketball player from UK (England Under-18) wants to tra
 - [x] GET/POST /api/templates, DELETE /api/templates/{id}
 - [x] POST/DELETE /api/my-colleges/{college_id}/call-note endpoints
 
+### v1.9 - Highlight Tape Auto-Include (Apr 2026)
+- [x] highlight_tape_url from player profile auto-injected into every AI email draft
+- [x] ComposePage shows green "Highlight tape auto-included" indicator
+- [x] CollegeDetailPage sidebar shows "Your Highlight Tape" quick-link card
+
+### v1.10 - College Comparison Table (Apr 2026)
+- [x] Compare toggle on every college card — select up to 3 colleges
+- [x] Sticky comparison bar: Clear + "Compare →" button
+- [x] /compare page: side-by-side table with 10 rows (Division, Location, Conference, UK Friendly, Acceptance Rate, Ranking, Scholarship, Coaches, Your Status, Website)
+- [x] Best-value highlighting: top division highlighted orange, most selective acceptance rate highlighted blue
+- [x] GET /api/colleges/compare?ids=... endpoint (auth-protected)
+
 ---
 
-## Prioritised Backlog
-
-### P1
-- [ ] College comparison table side-by-side
+## Backlog
 
 ### P2
 - [ ] Coach profile photos
-- [ ] Highlight tape links on college cards (Hudl/YouTube)
-- [ ] Coach notes field (quick notes after a call/meeting)
-- [ ] Highlight tape links on college cards (Hudl/YouTube)
