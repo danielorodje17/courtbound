@@ -194,9 +194,18 @@ An 18-year-old student basketball player from UK (England Under-18) wants to tra
 - [x] Dashboard My Colleges: thin animated progress bar below each list item
 - [x] CollegeDetailPage sidebar: SVG ring gauge + status label + contextual improvement tip
 
+### v1.12 - Intentional Tracking UX (Apr 2026)
+- [x] CollegesPage: small icon button → full-width "Add to My List" / "Tracking ✓" button per card
+- [x] CollegeDetailPage sidebar: prominent "Track This College" card with explanation when not yet tracked
+- [x] CollegeDetailPage header: button relabeled "Add to My List" with shadow when untracked
+- [x] All sidebar features (status, progress score, checklist, call notes) only shown when tracking
+
 ---
 
 ## Backlog
+
+### When ready
+- [ ] Weekly Digest email (deferred — needs Resend API key from user)
 
 ### P2
 - [ ] Coach profile photos
