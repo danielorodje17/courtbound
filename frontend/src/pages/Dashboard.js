@@ -14,6 +14,8 @@ const statusColors = {
   rejected: "bg-red-100 text-red-700"
 };
 
+const scoreColor = (s) => s >= 75 ? "#10b981" : s >= 50 ? "#f97316" : s >= 25 ? "#3b82f6" : "#94a3b8";
+
 const DIVISION_COLORS = ["#f97316", "#3b82f6", "#10b981", "#8b5cf6", "#ec4899", "#f59e0b"];
 
 function daysUntil(dateStr) {
@@ -257,27 +259,44 @@ export default function Dashboard() {
                   <div
                     key={t.id}
                     data-testid={`tracked-college-${t.college?.name}`}
-                    className="flex items-center gap-4 p-4 hover:bg-slate-50 cursor-pointer transition-colors"
+                    className="p-4 hover:bg-slate-50 cursor-pointer transition-colors"
                     onClick={() => navigate(`/colleges/${t.college_id}`)}
                   >
-                    <div className="w-10 h-10 bg-orange-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <Trophy className="w-5 h-5 text-orange-500" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-slate-900 text-sm truncate">{t.college?.name}</p>
-                      <p className="text-xs text-slate-500 truncate">{t.college?.location} · {t.college?.division}</p>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      {t.follow_up_date && fuDays !== null && fuDays <= 7 && (
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-bold flex items-center gap-0.5 ${fuDays < 0 ? "bg-red-100 text-red-600" : "bg-orange-100 text-orange-600"}`}>
-                          <Clock className="w-2.5 h-2.5" />
-                          {fuDays < 0 ? "Overdue" : fuDays === 0 ? "Today" : `${fuDays}d`}
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 bg-orange-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <Trophy className="w-5 h-5 text-orange-500" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-slate-900 text-sm truncate">{t.college?.name}</p>
+                        <p className="text-xs text-slate-500 truncate">{t.college?.location} · {t.college?.division}</p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {t.follow_up_date && fuDays !== null && fuDays <= 7 && (
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-bold flex items-center gap-0.5 ${fuDays < 0 ? "bg-red-100 text-red-600" : "bg-orange-100 text-orange-600"}`}>
+                            <Clock className="w-2.5 h-2.5" />
+                            {fuDays < 0 ? "Overdue" : fuDays === 0 ? "Today" : `${fuDays}d`}
+                          </span>
+                        )}
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${statusColors[t.status] || "bg-slate-100 text-slate-600"}`}>
+                          {t.status}
                         </span>
-                      )}
-                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${statusColors[t.status] || "bg-slate-100 text-slate-600"}`}>
-                        {t.status}
-                      </span>
+                      </div>
                     </div>
+                    {/* Progress Score Bar */}
+                    {t.progress_score !== undefined && (
+                      <div className="mt-2.5 flex items-center gap-2 pl-14">
+                        <div className="flex-1 h-1 bg-slate-100 rounded-full overflow-hidden">
+                          <div
+                            data-testid={`progress-bar-${t.college?.name}`}
+                            className="h-full rounded-full transition-all duration-700"
+                            style={{ width: `${t.progress_score}%`, backgroundColor: scoreColor(t.progress_score) }}
+                          />
+                        </div>
+                        <span className="text-xs font-bold flex-shrink-0" style={{ color: scoreColor(t.progress_score) }}>
+                          {t.progress_score}%
+                        </span>
+                      </div>
+                    )}
                   </div>
                 );
               })}

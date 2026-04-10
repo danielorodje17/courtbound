@@ -442,15 +442,24 @@ async def get_my_colleges(current_user: UserModel = Depends(get_current_user)):
     tracked = await db.tracked_colleges.find({"user_id": current_user.user_id}).to_list(500)
     if not tracked:
         return []
-    # Bulk fetch all colleges in one query
-    college_ids = []
-    for t in tracked:
+    uid = current_user.user_id
+    tracked_cids = [t["college_id"] for t in tracked]
+    college_ids_oid = []
+    for cid in tracked_cids:
         try:
-            college_ids.append(ObjectId(t["college_id"]))
+            college_ids_oid.append(ObjectId(cid))
         except Exception:
             pass
-    colleges_cursor = await db.colleges.find({"_id": {"$in": college_ids}}).to_list(500)
+
+    # Bulk fetches
+    colleges_cursor = await db.colleges.find({"_id": {"$in": college_ids_oid}}).to_list(500)
+    emails_cursor = await db.emails.find({"user_id": uid, "college_id": {"$in": tracked_cids}, "direction": "sent"}, {"_id": 0, "college_id": 1}).to_list(1000)
+    checklists_cursor = await db.college_checklists.find({"user_id": uid, "college_id": {"$in": tracked_cids}}, {"_id": 0, "college_id": 1, "items": 1}).to_list(500)
+
     colleges_map = {str(c["_id"]): c for c in colleges_cursor}
+    sent_set = {e["college_id"] for e in emails_cursor}
+    checklist_map = {cl["college_id"]: cl.get("items", []) for cl in checklists_cursor}
+
     result = []
     for t in tracked:
         college = colleges_map.get(t["college_id"])
@@ -458,6 +467,21 @@ async def get_my_colleges(current_user: UserModel = Depends(get_current_user)):
             college["id"] = str(college.pop("_id"))
             t["id"] = str(t.pop("_id"))
             t["college"] = college
+            # ── Progress Score ────────────────────────────────────────────────
+            cid = t["college_id"]
+            score = 10                                             # base: tracked
+            if cid in sent_set: score += 15                       # email sent
+            if t.get("status") in ["contacted", "replied", "rejected"]: score += 10  # status advanced
+            if t.get("status") == "replied": score += 20          # coach replied
+            if t.get("follow_up_date"): score += 5                # follow-up set
+            if t.get("application_deadline"): score += 5          # deadline set
+            if t.get("call_notes"): score += 10                   # call notes logged
+            items = checklist_map.get(cid, [])
+            if items:
+                pct = sum(1 for i in items if i.get("checked")) / len(items)
+                if pct >= 1.0: score += 25
+                elif pct >= 0.5: score += 15
+            t["progress_score"] = min(score, 100)
             result.append(t)
     return result
 

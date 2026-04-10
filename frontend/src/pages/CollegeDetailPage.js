@@ -24,6 +24,7 @@ export default function CollegeDetailPage() {
   const [newNoteDate, setNewNoteDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [addingNote, setAddingNote] = useState(false);
   const [tapeUrl, setTapeUrl] = useState("");
+  const [progressScore, setProgressScore] = useState(null);
 
   function daysUntil(dateStr) {
     if (!dateStr) return null;
@@ -70,8 +71,9 @@ export default function CollegeDetailPage() {
       setEmails(emailsRes.data);
       setChecklist(checklistRes.data?.items || []);
       setTapeUrl(profileRes.data?.highlight_tape_url || "");
-      // Call notes stored in tracked college doc
+      // Call notes + progress score stored in tracked college doc
       if (t && t.call_notes) setCallNotes(t.call_notes);
+      if (t && t.progress_score !== undefined) setProgressScore(t.progress_score);
     } catch (err) {
       console.error(err);
     } finally {
@@ -274,6 +276,55 @@ export default function CollegeDetailPage() {
 
         {/* Sidebar */}
         <div className="space-y-5">
+
+          {/* Recruitment Progress Score */}
+          {tracked && progressScore !== null && (
+            <div className="bg-white border border-slate-200 rounded-xl p-5" data-testid="progress-score-card">
+              <h2 className="font-bold text-slate-900 mb-4 flex items-center gap-2" style={{ fontFamily: "Barlow Condensed, sans-serif", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                Recruitment Progress
+              </h2>
+              <div className="flex items-center gap-4">
+                {/* SVG Ring */}
+                <div className="relative w-20 h-20 flex-shrink-0">
+                  <svg width="80" height="80" className="-rotate-90">
+                    <circle cx="40" cy="40" r="28" fill="none" stroke="#e2e8f0" strokeWidth="6" />
+                    <circle
+                      cx="40" cy="40" r="28" fill="none"
+                      stroke={progressScore >= 75 ? "#10b981" : progressScore >= 50 ? "#f97316" : progressScore >= 25 ? "#3b82f6" : "#94a3b8"}
+                      strokeWidth="6"
+                      strokeDasharray={2 * Math.PI * 28}
+                      strokeDashoffset={2 * Math.PI * 28 * (1 - progressScore / 100)}
+                      strokeLinecap="round"
+                      style={{ transition: "stroke-dashoffset 0.8s ease" }}
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span
+                      className="font-black text-base leading-none"
+                      style={{ color: progressScore >= 75 ? "#10b981" : progressScore >= 50 ? "#f97316" : progressScore >= 25 ? "#3b82f6" : "#94a3b8" }}
+                      data-testid="progress-score-value"
+                    >
+                      {progressScore}%
+                    </span>
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-slate-800">
+                    {progressScore >= 75 ? "Strong pipeline" : progressScore >= 50 ? "Good progress" : progressScore >= 25 ? "Getting started" : "Just tracking"}
+                  </p>
+                  <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
+                    {progressScore < 100 && (
+                      progressScore < 25 ? "Send an email to start building your pipeline" :
+                      progressScore < 50 ? "Set a follow-up date and log call notes" :
+                      progressScore < 75 ? "Tick off checklist items to boost your score" :
+                      "Almost there — aim for a reply!"
+                    )}
+                    {progressScore === 100 && "Full pipeline complete — great work!"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
           {tracked && (
             <div className="bg-white border border-slate-200 rounded-lg p-5">
               <h2 className="font-bold text-slate-900 mb-4" style={{ fontFamily: "Barlow Condensed, sans-serif", textTransform: "uppercase", letterSpacing: "0.05em" }}>My Status</h2>

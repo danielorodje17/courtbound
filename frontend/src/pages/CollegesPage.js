@@ -8,6 +8,7 @@ export default function CollegesPage() {
   const [colleges, setColleges] = useState([]);
   const [allColleges, setAllColleges] = useState([]);
   const [tracked, setTracked] = useState(new Set());
+  const [trackedData, setTrackedData] = useState({});
   const [compareSet, setCompareSet] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -49,6 +50,9 @@ export default function CollegesPage() {
     try {
       const { data } = await apiRequest("get", "/my-colleges");
       setTracked(new Set(data.map(t => t.college_id)));
+      const map = {};
+      data.forEach(t => { map[t.college_id] = t; });
+      setTrackedData(map);
     } catch {}
   };
 
@@ -57,9 +61,11 @@ export default function CollegesPage() {
     if (tracked.has(college.id)) {
       await apiRequest("delete", `/my-colleges/${college.id}`);
       setTracked(prev => { const s = new Set(prev); s.delete(college.id); return s; });
+      setTrackedData(prev => { const d = { ...prev }; delete d[college.id]; return d; });
     } else {
       await apiRequest("post", "/my-colleges", { college_id: college.id, notes: "" });
       setTracked(prev => new Set([...prev, college.id]));
+      setTrackedData(prev => ({ ...prev, [college.id]: { status: "interested", progress_score: 10 } }));
     }
   };
 
@@ -79,6 +85,9 @@ export default function CollegesPage() {
 
   const ukFriendlyCount = allColleges.filter(c => c.foreign_friendly).length;
   const divisions = ["Division I", "Division II", "NAIA", "JUCO"];
+
+  const scoreColor = (s) => s >= 75 ? "#10b981" : s >= 50 ? "#f97316" : s >= 25 ? "#3b82f6" : "#94a3b8";
+  const scoreBg = (s) => s >= 75 ? "bg-emerald-500" : s >= 50 ? "bg-orange-500" : s >= 25 ? "bg-blue-500" : "bg-slate-400";
 
   return (
     <div style={{ fontFamily: "Manrope, sans-serif" }}>
@@ -225,6 +234,15 @@ export default function CollegesPage() {
                 <div className="absolute bottom-3 left-3">
                   <span className="text-xs text-white/80 font-medium">{college.conference}</span>
                 </div>
+                {/* Progress score badge (only for tracked colleges) */}
+                {trackedData[college.id] && (
+                  <div
+                    data-testid={`progress-badge-${college.name}`}
+                    className={`absolute bottom-3 right-3 text-white text-xs font-black px-2 py-0.5 rounded-full ${scoreBg(trackedData[college.id].progress_score ?? 0)}`}
+                  >
+                    {trackedData[college.id].progress_score ?? 0}%
+                  </div>
+                )}
               </div>
               <div className="p-4">
                 <div className="flex items-start justify-between gap-2">
