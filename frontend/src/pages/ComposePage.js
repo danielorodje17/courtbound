@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { apiRequest } from "../context/AuthContext";
-import { Wand2, Copy, Save, ArrowLeft, ChevronDown, BookTemplate, Trash2, X, Plus, BookMarked } from "lucide-react";
+import { Wand2, Copy, Save, ArrowLeft, ChevronDown, Trash2, X, Plus, BookMarked } from "lucide-react";
 
 export default function ComposePage() {
   const location = useLocation();

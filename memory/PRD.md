@@ -167,16 +167,23 @@ An 18-year-old student basketball player from UK (England Under-18) wants to tra
 - [x] College Application Checklist on College Detail page — 10-item pre-loaded checklist with progress bar, auto-saves on toggle
 - [x] GET /api/ai/match, GET /api/dashboard/analytics, GET/PUT /api/checklist/{college_id} endpoints
 
+### v1.8 - Export, Template Library, Coach Notes (Apr 2026)
+- [x] Export CSV: one-click download of filtered email history as .csv
+- [x] Export PDF: opens formatted print-ready HTML view for browser print-to-PDF
+- [x] Email Template Library: save/load/delete templates in ComposePage. 'Save as Template' is optional
+- [x] Coach Call Notes: timestamped call/meeting log per college in CollegeDetailPage sidebar
+- [x] GET/POST /api/templates, DELETE /api/templates/{id}
+- [x] POST/DELETE /api/my-colleges/{college_id}/call-note endpoints
+
 ---
 
 ## Prioritised Backlog
 
-### P1 (High value)
-- [ ] Export communication history to PDF/CSV
-- [ ] Email template library (save favourite drafts)
+### P1
+- [ ] College comparison table side-by-side
 
-### P2 (Nice to have)
-- [ ] College comparison table
+### P2
 - [ ] Coach profile photos
+- [ ] Highlight tape links on college cards (Hudl/YouTube)
 - [ ] Coach notes field (quick notes after a call/meeting)
 - [ ] Highlight tape links on college cards (Hudl/YouTube)
