@@ -245,23 +245,14 @@ export default function CollegesPage() {
                 )}
               </div>
               <div className="p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-slate-900 text-sm truncate">{college.name}</h3>
-                    <div className="flex items-center gap-1 mt-1">
-                      <MapPin className="w-3 h-3 text-slate-400" />
-                      <span className="text-xs text-slate-500">{college.location}</span>
-                    </div>
+                <div className="min-w-0 mb-3">
+                  <h3 className="font-bold text-slate-900 text-sm truncate">{college.name}</h3>
+                  <div className="flex items-center gap-1 mt-1">
+                    <MapPin className="w-3 h-3 text-slate-400" />
+                    <span className="text-xs text-slate-500">{college.location}</span>
                   </div>
-                  <button
-                    data-testid={`track-college-${college.name}`}
-                    onClick={(e) => toggleTrack(e, college)}
-                    className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all ${tracked.has(college.id) ? "bg-orange-500 text-white" : "bg-slate-100 text-slate-500 hover:bg-orange-50 hover:text-orange-500"}`}
-                  >
-                    {tracked.has(college.id) ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-                  </button>
                 </div>
-                <div className="mt-3 flex items-center gap-3 text-xs text-slate-500">
+                <div className="flex items-center gap-3 text-xs text-slate-500 mb-4">
                   <div className="flex items-center gap-1">
                     <Users className="w-3 h-3" />
                     <span>{college.coaches?.length || 0} coaches</span>
@@ -272,10 +263,22 @@ export default function CollegesPage() {
                   </div>
                   {college.foreign_friendly && (
                     <span className="text-green-600 font-semibold flex items-center gap-0.5">
-                      <Flag className="w-3 h-3" /> UK Friendly
+                      <Flag className="w-3 h-3" /> UK
                     </span>
                   )}
                 </div>
+                {/* Full-width Track button */}
+                <button
+                  data-testid={`track-college-${college.name}`}
+                  onClick={(e) => toggleTrack(e, college)}
+                  className={`w-full flex items-center justify-center gap-2 py-2 rounded-lg font-bold uppercase tracking-wider text-xs transition-all ${
+                    tracked.has(college.id)
+                      ? "bg-green-50 text-green-700 border-2 border-green-300 hover:bg-red-50 hover:text-red-600 hover:border-red-300"
+                      : "bg-orange-500 text-white hover:bg-orange-600"
+                  }`}
+                >
+                  {tracked.has(college.id) ? <><Check className="w-3.5 h-3.5" /> Tracking</> : <><Plus className="w-3.5 h-3.5" /> Add to My List</>}
+                </button>
               </div>
             </div>
           ))}

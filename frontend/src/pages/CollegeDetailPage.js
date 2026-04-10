@@ -177,9 +177,13 @@ export default function CollegeDetailPage() {
             <button
               data-testid="college-detail-track-btn"
               onClick={toggleTrack}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold uppercase tracking-wider text-sm transition-all ${tracked ? "bg-green-500 text-white" : "bg-orange-500 text-white hover:bg-orange-600"}`}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-black uppercase tracking-wider text-sm transition-all ${
+                tracked
+                  ? "bg-green-500 text-white hover:bg-red-500"
+                  : "bg-orange-500 text-white hover:bg-orange-600 shadow-lg shadow-orange-200"
+              }`}
             >
-              {tracked ? <><Check className="w-4 h-4" /> Tracking</> : <><Plus className="w-4 h-4" /> Track</>}
+              {tracked ? <><Check className="w-4 h-4" /> Tracking</> : <><Plus className="w-4 h-4" /> Add to My List</>}
             </button>
           </div>
         </div>
@@ -276,6 +280,28 @@ export default function CollegeDetailPage() {
 
         {/* Sidebar */}
         <div className="space-y-5">
+
+          {/* === NOT TRACKED: Prominent Add to List card === */}
+          {!tracked && (
+            <div className="bg-orange-50 border-2 border-orange-300 rounded-xl p-5 text-center" data-testid="add-to-list-card">
+              <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center mx-auto mb-3">
+                <Plus className="w-6 h-6 text-orange-500" />
+              </div>
+              <h3 className="font-black text-slate-900 text-base mb-1" style={{ fontFamily: "Barlow Condensed, sans-serif", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                Track This College
+              </h3>
+              <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+                Add to your tracked list to log status, set follow-up dates, use the checklist, and build your recruitment pipeline.
+              </p>
+              <button
+                data-testid="sidebar-track-btn"
+                onClick={toggleTrack}
+                className="w-full bg-orange-500 text-white font-black uppercase tracking-wider rounded-xl py-3 text-sm hover:bg-orange-600 transition-all flex items-center justify-center gap-2"
+              >
+                <Plus className="w-4 h-4" /> Add to My List
+              </button>
+            </div>
+          )}
 
           {/* Recruitment Progress Score */}
           {tracked && progressScore !== null && (
