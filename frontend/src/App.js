@@ -10,9 +10,10 @@ import StrategyPage from "./pages/StrategyPage";
 import NCAACHeckerPage from "./pages/NCAACHeckerPage";
 import ProfilePage from "./pages/ProfilePage";
 import ResponseTrackerPage from "./pages/ResponseTrackerPage";
+import AIMatchPage from "./pages/AIMatchPage";
 import LoginPage from "./pages/LoginPage";
 import AuthCallback from "./pages/AuthCallback";
-import { Trophy, Home, BookOpen, Mail, Wand2, Lightbulb, Menu, X, ShieldCheck, UserCircle, MessageSquare, LogOut, ChevronDown } from "lucide-react";
+import { Trophy, Home, BookOpen, Mail, Wand2, Lightbulb, Menu, X, ShieldCheck, UserCircle, MessageSquare, LogOut, ChevronDown, Sparkles } from "lucide-react";
 
 const NAV_ITEMS = [
   { path: "/dashboard", label: "Dashboard", icon: Home },
@@ -20,6 +21,7 @@ const NAV_ITEMS = [
   { path: "/colleges", label: "Colleges", icon: BookOpen },
   { path: "/communications", label: "Emails", icon: Mail },
   { path: "/responses", label: "Responses", icon: MessageSquare },
+  { path: "/ai-match", label: "AI Match", icon: Sparkles },
   { path: "/compose", label: "Compose", icon: Wand2 },
   { path: "/strategy", label: "Strategy", icon: Lightbulb },
   { path: "/ncaa", label: "NCAA Check", icon: ShieldCheck }
@@ -187,6 +189,7 @@ function AppRouter() {
       <Route path="/ncaa" element={<ProtectedRoute><AppLayout><NCAACHeckerPage /></AppLayout></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><AppLayout><ProfilePage /></AppLayout></ProtectedRoute>} />
       <Route path="/responses" element={<ProtectedRoute><AppLayout><ResponseTrackerPage /></AppLayout></ProtectedRoute>} />
+      <Route path="/ai-match" element={<ProtectedRoute><AppLayout><AIMatchPage /></AppLayout></ProtectedRoute>} />
     </Routes>
   );
 }

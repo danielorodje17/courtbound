@@ -1,7 +1,11 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiRequest } from "../context/AuthContext";
-import { Trophy, Mail, BookOpen, TrendingUp, ChevronRight, Bell, Plus, AlertTriangle, Clock, Calendar, CheckCircle } from "lucide-react";
+import { Trophy, Mail, BookOpen, TrendingUp, ChevronRight, Bell, Plus, AlertTriangle, Clock, Calendar, CheckCircle, BarChart2 } from "lucide-react";
+import {
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, Cell
+} from "recharts";
 
 const statusColors = {
   interested: "bg-blue-100 text-blue-700",
@@ -10,9 +14,25 @@ const statusColors = {
   rejected: "bg-red-100 text-red-700"
 };
 
+const DIVISION_COLORS = ["#f97316", "#3b82f6", "#10b981", "#8b5cf6", "#ec4899", "#f59e0b"];
+
 function daysUntil(dateStr) {
   if (!dateStr) return null;
   return Math.ceil((new Date(dateStr).setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / 86400000);
+}
+
+function CustomTooltip({ active, payload, label }) {
+  if (!active || !payload || !payload.length) return null;
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg px-3 py-2 shadow text-xs">
+      <p className="text-slate-500 mb-1">{label}</p>
+      {payload.map(p => (
+        <p key={p.name} style={{ color: p.color }} className="font-semibold">
+          {p.name === "sent" ? "Sent" : "Received"}: {p.value}
+        </p>
+      ))}
+    </div>
+  );
 }
 
 export default function Dashboard() {
@@ -20,20 +40,23 @@ export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [tracked, setTracked] = useState([]);
   const [alerts, setAlerts] = useState(null);
+  const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => { fetchData(); }, []);
 
   const fetchData = async () => {
     try {
-      const [statsRes, trackedRes, alertsRes] = await Promise.all([
+      const [statsRes, trackedRes, alertsRes, analyticsRes] = await Promise.all([
         apiRequest("get", "/dashboard/stats"),
         apiRequest("get", "/my-colleges"),
         apiRequest("get", "/dashboard/alerts"),
+        apiRequest("get", "/dashboard/analytics"),
       ]);
       setStats(statsRes.data);
       setTracked(trackedRes.data);
       setAlerts(alertsRes.data);
+      setAnalytics(analyticsRes.data);
     } catch (err) {
       console.error(err);
     } finally {
@@ -42,13 +65,27 @@ export default function Dashboard() {
   };
 
   const statCards = [
-    { label: "Colleges Tracked", value: stats?.tracked_colleges ?? 0, icon: BookOpen, color: "text-blue-600", bg: "bg-blue-50" },
-    { label: "Emails Sent", value: stats?.emails_sent ?? 0, icon: Mail, color: "text-orange-600", bg: "bg-orange-50" },
-    { label: "Responses Received", value: stats?.emails_received ?? 0, icon: Bell, color: "text-green-600", bg: "bg-green-50" },
-    { label: "Response Rate", value: stats ? (stats.emails_sent > 0 ? `${Math.round((stats.emails_received / stats.emails_sent) * 100)}%` : "0%") : "—", icon: TrendingUp, color: "text-purple-600", bg: "bg-purple-50" }
+    { label: "Colleges Tracked", value: stats?.tracked_colleges ?? 0, icon: BookOpen, color: "text-blue-600", bg: "bg-blue-50", route: "/colleges" },
+    { label: "Emails Sent", value: stats?.emails_sent ?? 0, icon: Mail, color: "text-orange-600", bg: "bg-orange-50", route: "/communications" },
+    { label: "Responses Received", value: stats?.emails_received ?? 0, icon: Bell, color: "text-green-600", bg: "bg-green-50", route: "/responses" },
+    { label: "Response Rate", value: stats ? (stats.emails_sent > 0 ? `${Math.round((stats.emails_received / stats.emails_sent) * 100)}%` : "0%") : "—", icon: TrendingUp, color: "text-purple-600", bg: "bg-purple-50", route: "/responses" }
   ];
 
   const totalAlerts = alerts ? (alerts.overdue_followups.length + alerts.upcoming_followups.length + alerts.upcoming_deadlines.length) : 0;
+
+  // Filter activity data to only show last 14 days for cleaner chart
+  const activityData = analytics?.activity?.slice(-14).map(d => ({
+    ...d,
+    label: new Date(d.date).toLocaleDateString("en-GB", { day: "numeric", month: "short" })
+  })) || [];
+
+  const hasActivity = activityData.some(d => d.sent > 0 || d.received > 0);
+  const funnel = analytics?.funnel;
+  const funnelData = funnel ? [
+    { name: "Tracked", value: funnel.tracked, fill: "#3b82f6" },
+    { name: "Contacted", value: funnel.contacted, fill: "#f97316" },
+    { name: "Replied", value: funnel.replied, fill: "#10b981" },
+  ] : [];
 
   if (loading) {
     return (
@@ -92,19 +129,22 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Stats Grid */}
+      {/* Stats Grid — clickable */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {statCards.map((card) => (
           <div
             key={card.label}
             data-testid={`stat-card-${card.label.toLowerCase().replace(/ /g, "-")}`}
-            className="bg-white border border-slate-200 rounded-lg p-5 hover:shadow-md transition-all duration-200 hover:-translate-y-0.5"
+            onClick={() => navigate(card.route)}
+            className="bg-white border border-slate-200 rounded-lg p-5 hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 cursor-pointer group"
           >
             <div className={`w-10 h-10 ${card.bg} rounded-lg flex items-center justify-center mb-3`}>
               <card.icon className={`w-5 h-5 ${card.color}`} />
             </div>
             <div className="text-2xl font-bold text-slate-900">{card.value}</div>
-            <div className="text-sm text-slate-500 mt-0.5">{card.label}</div>
+            <div className="text-sm text-slate-500 mt-0.5 flex items-center gap-1 group-hover:text-orange-500 transition-colors">
+              {card.label} <ChevronRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
           </div>
         ))}
       </div>
@@ -281,12 +321,102 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Analytics Charts */}
+      {analytics && (
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden" data-testid="analytics-section">
+          <div className="flex items-center gap-2.5 px-5 py-3.5 border-b border-slate-100">
+            <BarChart2 className="w-4 h-4 text-slate-500" />
+            <h2 className="font-bold text-sm text-slate-700 uppercase tracking-widest">Recruitment Analytics</h2>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-0 divide-y lg:divide-y-0 lg:divide-x divide-slate-100">
+            {/* Email Activity Chart */}
+            <div className="lg:col-span-2 p-5">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-4">Email Activity — Last 14 Days</p>
+              {hasActivity ? (
+                <ResponsiveContainer width="100%" height={160}>
+                  <AreaChart data={activityData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="sentGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#f97316" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="recvGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#94a3b8" }} tickLine={false} axisLine={false} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: "#94a3b8" }} tickLine={false} axisLine={false} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Area type="monotone" dataKey="sent" name="sent" stroke="#f97316" strokeWidth={2} fill="url(#sentGrad)" />
+                    <Area type="monotone" dataKey="received" name="received" stroke="#10b981" strokeWidth={2} fill="url(#recvGrad)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-40 flex items-center justify-center text-slate-400 text-sm">
+                  No email activity in the last 14 days
+                </div>
+              )}
+              <div className="flex items-center gap-5 mt-2">
+                <span className="flex items-center gap-1.5 text-xs text-slate-500"><span className="w-3 h-3 rounded-full bg-orange-400 inline-block" /> Sent</span>
+                <span className="flex items-center gap-1.5 text-xs text-slate-500"><span className="w-3 h-3 rounded-full bg-emerald-400 inline-block" /> Received</span>
+              </div>
+            </div>
+
+            {/* Funnel + Division */}
+            <div className="p-5 space-y-5">
+              <div>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">Recruitment Funnel</p>
+                <div className="space-y-2">
+                  {funnelData.map((item) => (
+                    <div key={item.name}>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="text-slate-600 font-medium">{item.name}</span>
+                        <span className="font-bold text-slate-800">{item.value}</span>
+                      </div>
+                      <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{
+                            width: funnelData[0].value > 0 ? `${(item.value / funnelData[0].value) * 100}%` : "0%",
+                            backgroundColor: item.fill
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {analytics.division_breakdown?.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">By Division</p>
+                  <div className="space-y-1.5">
+                    {analytics.division_breakdown.slice(0, 4).map((d, i) => (
+                      <div key={d.division} className="flex items-center justify-between text-xs">
+                        <span className="flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: DIVISION_COLORS[i % DIVISION_COLORS.length] }} />
+                          <span className="text-slate-600 truncate max-w-24">{d.division}</span>
+                        </span>
+                        <span className="font-bold text-slate-800">{d.count}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {[
           { title: "AI Message Composer", desc: "Draft personalised emails to coaches with AI", action: () => navigate("/compose"), icon: "✍️", color: "border-orange-200 hover:border-orange-400" },
+          { title: "AI Match", desc: "Find your best-fit colleges with AI analysis", action: () => navigate("/ai-match"), icon: "🎯", color: "border-purple-200 hover:border-purple-400" },
           { title: "Response Tracker", desc: "Log coach replies and get AI follow-up advice", action: () => navigate("/responses"), icon: "📬", color: "border-green-200 hover:border-green-400" },
-          { title: "Strategy Advisor", desc: "Get AI-powered recruitment strategy tips", action: () => navigate("/strategy"), icon: "🎯", color: "border-blue-200 hover:border-blue-400" },
+          { title: "Strategy Advisor", desc: "Get AI-powered recruitment strategy tips", action: () => navigate("/strategy"), icon: "💡", color: "border-blue-200 hover:border-blue-400" },
         ].map((item) => (
           <button
             key={item.title}

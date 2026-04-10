@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { apiRequest } from "../context/AuthContext";
-import { MapPin, Globe, Users, Mail, Phone, Plus, Check, ArrowLeft, Pen, Clock, Calendar, AlertTriangle } from "lucide-react";
+import { MapPin, Globe, Mail, Phone, Plus, Check, ArrowLeft, Pen, Clock, Calendar, AlertTriangle, ListChecks } from "lucide-react";
 
 export default function CollegeDetailPage() {
   const { id } = useParams();
@@ -17,6 +17,8 @@ export default function CollegeDetailPage() {
   const [signingDay, setSigningDay] = useState("");
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState("");
+  const [checklist, setChecklist] = useState([]);
+  const [checklistSaving, setChecklistSaving] = useState(false);
 
   function daysUntil(dateStr) {
     if (!dateStr) return null;
@@ -43,10 +45,11 @@ export default function CollegeDetailPage() {
 
   const fetchAll = async () => {
     try {
-      const [collegeRes, myCollegesRes, emailsRes] = await Promise.all([
+      const [collegeRes, myCollegesRes, emailsRes, checklistRes] = await Promise.all([
         apiRequest("get", `/colleges/${id}`),
         apiRequest("get", "/my-colleges"),
-        apiRequest("get", `/emails?college_id=${id}`)
+        apiRequest("get", `/emails?college_id=${id}`),
+        apiRequest("get", `/checklist/${id}`),
       ]);
       setCollege(collegeRes.data);
       const t = myCollegesRes.data.find(c => c.college_id === id);
@@ -59,6 +62,7 @@ export default function CollegeDetailPage() {
         setSigningDay(t.signing_day || "");
       }
       setEmails(emailsRes.data);
+      setChecklist(checklistRes.data?.items || []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -74,6 +78,18 @@ export default function CollegeDetailPage() {
       await apiRequest("post", "/my-colleges", { college_id: id, notes });
       setTracked(true);
     }
+  };
+
+  const toggleCheckItem = async (itemId) => {
+    const updated = checklist.map(item =>
+      item.id === itemId ? { ...item, checked: !item.checked } : item
+    );
+    setChecklist(updated);
+    setChecklistSaving(true);
+    try {
+      await apiRequest("put", `/checklist/${id}`, { items: updated });
+    } catch {}
+    setChecklistSaving(false);
   };
 
   const saveStatus = async () => {
@@ -320,6 +336,45 @@ export default function CollegeDetailPage() {
           >
             Get AI Strategy Advice
           </button>
+
+          {/* Application Checklist */}
+          {checklist.length > 0 && (
+            <div className="bg-white border border-slate-200 rounded-lg p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-bold text-slate-900 flex items-center gap-2" style={{ fontFamily: "Barlow Condensed, sans-serif", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  <ListChecks className="w-4 h-4 text-slate-500" /> Checklist
+                </h2>
+                {checklistSaving && <span className="text-xs text-slate-400">Saving...</span>}
+                <span className="text-xs font-bold text-slate-500">
+                  {checklist.filter(i => i.checked).length}/{checklist.length}
+                </span>
+              </div>
+              {/* Progress bar */}
+              <div className="h-1.5 bg-slate-100 rounded-full mb-4 overflow-hidden">
+                <div
+                  className="h-full bg-orange-500 rounded-full transition-all duration-500"
+                  style={{ width: `${(checklist.filter(i => i.checked).length / checklist.length) * 100}%` }}
+                />
+              </div>
+              <div className="space-y-2">
+                {checklist.map((item) => (
+                  <button
+                    key={item.id}
+                    data-testid={`checklist-item-${item.id}`}
+                    onClick={() => toggleCheckItem(item.id)}
+                    className={`w-full flex items-center gap-3 p-2.5 rounded-lg text-left transition-all ${item.checked ? "bg-green-50" : "hover:bg-slate-50"}`}
+                  >
+                    <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all ${item.checked ? "bg-green-500 border-green-500" : "border-slate-300"}`}>
+                      {item.checked && <Check className="w-3 h-3 text-white" />}
+                    </div>
+                    <span className={`text-xs font-medium leading-snug ${item.checked ? "text-green-700 line-through" : "text-slate-700"}`}>
+                      {item.label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

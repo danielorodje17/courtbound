@@ -12,9 +12,12 @@ import logging
 import uuid
 import csv
 import io
+import json
+import re
 import httpx
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
+from collections import defaultdict
 
 # ─── DB ────────────────────────────────────────────────────────────────────────
 mongo_url = os.environ["MONGO_URL"]
@@ -942,6 +945,166 @@ async def save_profile(data: PlayerProfile, current_user: UserModel = Depends(ge
     payload["updated_at"] = datetime.now(timezone.utc).isoformat()
     await db.profiles.update_one({"user_id": current_user.user_id}, {"$set": payload}, upsert=True)
     return {"message": "Profile saved"}
+
+# ─── AI Match ────────────────────────────────────────────────────────────────
+@api_router.get("/ai/match")
+async def ai_match(current_user: UserModel = Depends(get_current_user)):
+    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    api_key = os.environ.get("EMERGENT_LLM_KEY")
+
+    profile = await db.profiles.find_one({"user_id": current_user.user_id}, {"_id": 0})
+    if not profile:
+        raise HTTPException(status_code=400, detail="Please complete your player profile first")
+
+    colleges = await db.colleges.find(
+        {}, {"_id": 1, "name": 1, "division": 1, "foreign_friendly": 1, "acceptance_rate": 1, "scholarship_info": 1}
+    ).to_list(200)
+
+    college_lines = []
+    for c in colleges:
+        ff = "UK-Friendly" if c.get("foreign_friendly") else "Standard"
+        college_lines.append(
+            f"{str(c['_id'])}|{c.get('name','?')}|{c.get('division','?')}|{ff}|{c.get('acceptance_rate','?')}"
+        )
+
+    name = profile.get("full_name", current_user.name or "Player")
+    position = profile.get("position", "Not specified")
+    ppg = profile.get("ppg", "N/A")
+    rpg = profile.get("rpg", "N/A")
+    apg = profile.get("apg", "N/A")
+    height_ft = profile.get("height_ft", "")
+    height_cm = profile.get("height_cm", "")
+    height = f"{height_ft} / {height_cm}cm" if height_ft or height_cm else "Not specified"
+    target_div = profile.get("target_division", "Any Division")
+    gcse = profile.get("gcse_results", "N/A")
+    predicted = profile.get("predicted_grades", profile.get("a_level_grades", "N/A"))
+    bio = profile.get("bio", "")
+
+    prompt = f"""You are a college basketball recruitment AI. Analyse this UK player profile and categorize ALL the colleges listed.
+
+PLAYER PROFILE:
+- Name: {name}
+- Position: {position}
+- Height: {height}
+- Stats: PPG {ppg} | RPG {rpg} | APG {apg}
+- Target Division: {target_div}
+- Academic: GCSEs {gcse} | Predicted {predicted}
+- Background: England Under-18 national team player{', ' + bio[:120] if bio else ''}
+
+COLLEGES (format: id|name|division|UK-Friendly|acceptance_rate):
+{chr(10).join(college_lines)}
+
+Categorise each college as excellent_fit, good_fit, or possible_fit.
+
+Rules:
+- excellent_fit (88-100%): UK-Friendly + division matches target + feasible for player level
+- good_fit (65-87%): UK-Friendly OR division is close match + reasonable path
+- possible_fit (45-64%): Achievable with effort, different division or less UK-friendly
+
+Include at most 10 per category. Prioritise UK-Friendly colleges.
+
+Return ONLY valid JSON — no markdown, no explanation:
+{{"excellent_fit":[{{"id":"...","name":"...","division":"...","pct":92,"why":"One sentence max 20 words"}}],"good_fit":[...],"possible_fit":[...]}}"""
+
+    chat = LlmChat(
+        api_key=api_key,
+        session_id=str(uuid.uuid4()),
+        system_message="You are a college basketball recruitment AI. Return only valid JSON."
+    ).with_model("openai", "gpt-4.1-mini")
+    response = await chat.send_message(UserMessage(text=prompt))
+
+    try:
+        json_match = re.search(r'\{.*\}', response, re.DOTALL)
+        result = json.loads(json_match.group()) if json_match else json.loads(response)
+    except Exception:
+        raise HTTPException(status_code=500, detail="AI response could not be parsed. Please try again.")
+
+    return result
+
+
+# ─── Dashboard Analytics ──────────────────────────────────────────────────────
+@api_router.get("/dashboard/analytics")
+async def get_analytics(current_user: UserModel = Depends(get_current_user)):
+    thirty_days_ago = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+
+    emails = await db.emails.find(
+        {"user_id": current_user.user_id, "created_at": {"$gte": thirty_days_ago}},
+        {"_id": 0, "direction": 1, "created_at": 1}
+    ).to_list(1000)
+
+    daily_sent = defaultdict(int)
+    daily_received = defaultdict(int)
+    for email in emails:
+        date_str = str(email.get("created_at", ""))[:10]
+        if email["direction"] == "sent":
+            daily_sent[date_str] += 1
+        else:
+            daily_received[date_str] += 1
+
+    activity = []
+    for i in range(29, -1, -1):
+        d = (datetime.now(timezone.utc).date() - timedelta(days=i)).isoformat()
+        activity.append({"date": d, "sent": daily_sent.get(d, 0), "received": daily_received.get(d, 0)})
+
+    tracked = await db.tracked_colleges.count_documents({"user_id": current_user.user_id})
+    contacted = await db.tracked_colleges.count_documents(
+        {"user_id": current_user.user_id, "status": {"$in": ["contacted", "replied", "rejected"]}}
+    )
+    replied = await db.tracked_colleges.count_documents({"user_id": current_user.user_id, "status": "replied"})
+
+    pipeline = [
+        {"$match": {"user_id": current_user.user_id}},
+        {"$addFields": {"college_oid": {"$toObjectId": "$college_id"}}},
+        {"$lookup": {"from": "colleges", "localField": "college_oid", "foreignField": "_id", "as": "college"}},
+        {"$unwind": {"path": "$college", "preserveNullAndEmptyArrays": True}},
+        {"$group": {"_id": "$college.division", "count": {"$sum": 1}}}
+    ]
+    div_raw = await db.tracked_colleges.aggregate(pipeline).to_list(20)
+    division_breakdown = [{"division": d["_id"] or "Unknown", "count": d["count"]} for d in div_raw if d["_id"]]
+
+    return {
+        "activity": activity,
+        "funnel": {"tracked": tracked, "contacted": contacted, "replied": replied},
+        "division_breakdown": sorted(division_breakdown, key=lambda x: -x["count"])
+    }
+
+
+# ─── College Application Checklist ───────────────────────────────────────────
+class ChecklistUpdate(BaseModel):
+    items: List[dict]
+
+DEFAULT_CHECKLIST = [
+    {"id": "email_sent", "label": "Send initial email to coach"},
+    {"id": "info_requested", "label": "Request programme info / brochure"},
+    {"id": "highlight_tape", "label": "Send highlight tape (Hudl / YouTube)"},
+    {"id": "transcripts", "label": "Gather academic transcripts"},
+    {"id": "ncaa_id", "label": "Register with NCAA Eligibility Center"},
+    {"id": "sat_act", "label": "Complete SAT / ACT exam (if required)"},
+    {"id": "application", "label": "Submit college application"},
+    {"id": "financial_aid", "label": "Apply for financial aid / scholarship forms"},
+    {"id": "visa", "label": "Apply for student visa (F-1)"},
+    {"id": "nli_signed", "label": "Sign National Letter of Intent (NLI)"},
+]
+
+@api_router.get("/checklist/{college_id}")
+async def get_checklist(college_id: str, current_user: UserModel = Depends(get_current_user)):
+    doc = await db.college_checklists.find_one(
+        {"user_id": current_user.user_id, "college_id": college_id}, {"_id": 0}
+    )
+    if doc:
+        return doc
+    items = [{"id": i["id"], "label": i["label"], "checked": False} for i in DEFAULT_CHECKLIST]
+    return {"user_id": current_user.user_id, "college_id": college_id, "items": items}
+
+@api_router.put("/checklist/{college_id}")
+async def update_checklist(college_id: str, data: ChecklistUpdate, current_user: UserModel = Depends(get_current_user)):
+    await db.college_checklists.update_one(
+        {"user_id": current_user.user_id, "college_id": college_id},
+        {"$set": {"items": data.items, "updated_at": datetime.now(timezone.utc).isoformat()}},
+        upsert=True
+    )
+    return {"message": "Checklist updated"}
+
 
 # ─── Root ──────────────────────────────────────────────────────────────────────
 @api_router.get("/")
