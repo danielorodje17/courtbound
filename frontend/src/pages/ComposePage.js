@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { apiRequest } from "../context/AuthContext";
-import { Wand2, Copy, Save, ArrowLeft, ChevronDown } from "lucide-react";
+import { Wand2, Copy, Save, ArrowLeft, ChevronDown, BookTemplate, Trash2, X, Plus, BookMarked } from "lucide-react";
 
 export default function ComposePage() {
   const location = useLocation();
   const navigate = useNavigate();
   const preloaded = location.state;
+
   const [playerProfile, setPlayerProfile] = useState({});
   const [colleges, setColleges] = useState([]);
   const [selectedCollege, setSelectedCollege] = useState(preloaded?.college || null);
@@ -22,6 +23,14 @@ export default function ComposePage() {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
 
+  // Template library state
+  const [templates, setTemplates] = useState([]);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false);
+  const [templateName, setTemplateName] = useState("");
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [templateSaved, setTemplateSaved] = useState(false);
+
   useEffect(() => {
     apiRequest("get", "/colleges").then(r => setColleges(r.data)).catch(() => {});
     apiRequest("get", "/profile").then(r => {
@@ -30,12 +39,21 @@ export default function ComposePage() {
       if (p.position) setPosition(p.position.toLowerCase());
       if (p.ppg && p.apg) setStats(`${p.ppg} PPG, ${p.apg} APG${p.rpg ? `, ${p.rpg} RPG` : ""}${p.current_team ? ` — ${p.current_team}` : ""}`);
     }).catch(() => {});
+    loadTemplates();
   }, []);
+
+  const loadTemplates = async () => {
+    try {
+      const r = await apiRequest("get", "/templates");
+      setTemplates(r.data);
+    } catch {}
+  };
 
   const generateDraft = async () => {
     if (!selectedCollege) { setError("Please select a college first."); return; }
     setError("");
     setGenerating(true);
+    setShowSaveTemplate(false);
     try {
       const { data } = await apiRequest("post", "/ai/draft-message", {
         college_name: selectedCollege.name,
@@ -58,7 +76,7 @@ export default function ComposePage() {
         };
         setSubject(subjectMap[messageType] || "Basketball Scholarship Inquiry");
       }
-    } catch (err) {
+    } catch {
       setError("AI generation failed. Please try again.");
     } finally {
       setGenerating(false);
@@ -89,6 +107,41 @@ export default function ComposePage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleSaveTemplate = async (e) => {
+    e.preventDefault();
+    if (!templateName.trim() || !draft) return;
+    setSavingTemplate(true);
+    try {
+      const res = await apiRequest("post", "/templates", {
+        name: templateName.trim(),
+        subject: subject || "",
+        body: draft,
+        message_type: messageType,
+      });
+      setTemplates(prev => [res.data, ...prev]);
+      setTemplateName("");
+      setShowSaveTemplate(false);
+      setTemplateSaved(true);
+      setTimeout(() => setTemplateSaved(false), 2500);
+    } catch {}
+    setSavingTemplate(false);
+  };
+
+  const loadTemplate = (tpl) => {
+    setDraft(tpl.body);
+    if (tpl.subject) setSubject(tpl.subject);
+    setMessageType(tpl.message_type || "initial_outreach");
+    setShowTemplates(false);
+  };
+
+  const deleteTemplate = async (id, e) => {
+    e.stopPropagation();
+    try {
+      await apiRequest("delete", `/templates/${id}`);
+      setTemplates(prev => prev.filter(t => t.id !== id));
+    } catch {}
+  };
+
   const messageTypes = [
     { value: "initial_outreach", label: "Initial Outreach" },
     { value: "follow_up", label: "Follow-Up" },
@@ -112,9 +165,70 @@ export default function ComposePage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left: Settings Panel */}
         <div className="space-y-4">
+
+          {/* Template Library Panel */}
+          <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+            <button
+              data-testid="templates-toggle-btn"
+              onClick={() => setShowTemplates(!showTemplates)}
+              className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-slate-50 transition-colors"
+            >
+              <div className="flex items-center gap-2.5">
+                <BookMarked className="w-4 h-4 text-slate-500" />
+                <span className="font-bold text-sm text-slate-700 uppercase tracking-wider" style={{ fontFamily: "Barlow Condensed, sans-serif", letterSpacing: "0.05em" }}>
+                  My Templates
+                </span>
+                {templates.length > 0 && (
+                  <span className="bg-orange-100 text-orange-600 text-xs font-bold px-2 py-0.5 rounded-full">
+                    {templates.length}
+                  </span>
+                )}
+              </div>
+              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showTemplates ? "rotate-180" : ""}`} />
+            </button>
+
+            {showTemplates && (
+              <div className="border-t border-slate-100 p-4">
+                {templates.length === 0 ? (
+                  <p className="text-slate-400 text-sm text-center py-3">
+                    No saved templates yet. Generate a draft and save it as a template.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {templates.map(tpl => (
+                      <div
+                        key={tpl.id}
+                        data-testid={`template-item-${tpl.id}`}
+                        onClick={() => loadTemplate(tpl)}
+                        className="flex items-center justify-between p-3 bg-slate-50 rounded-lg cursor-pointer hover:bg-orange-50 transition-colors group"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-slate-800 truncate">{tpl.name}</p>
+                          <p className="text-xs text-slate-400 mt-0.5 truncate">{tpl.subject || "No subject"}</p>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                          <span className="text-xs bg-orange-100 text-orange-600 font-bold px-2 py-0.5 rounded-full uppercase">
+                            {tpl.message_type?.replace("_", " ")}
+                          </span>
+                          <button
+                            data-testid={`delete-template-${tpl.id}`}
+                            onClick={(e) => deleteTemplate(tpl.id, e)}
+                            className="text-slate-300 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           <div className="bg-white border border-slate-200 rounded-lg p-5">
             <h2 className="font-bold text-slate-900 mb-4" style={{ fontFamily: "Barlow Condensed, sans-serif", textTransform: "uppercase", letterSpacing: "0.05em" }}>Message Settings</h2>
-            
+
             {/* College selector */}
             <div className="mb-4">
               <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1.5">Target College *</label>
@@ -221,12 +335,20 @@ export default function ComposePage() {
 
         {/* Right: Draft Editor */}
         <div className="bg-white border border-slate-200 rounded-lg p-5">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
             <h2 className="font-bold text-slate-900" style={{ fontFamily: "Barlow Condensed, sans-serif", textTransform: "uppercase", letterSpacing: "0.05em" }}>Email Draft</h2>
             {draft && (
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <button data-testid="compose-copy-btn" onClick={copyDraft} className="flex items-center gap-1.5 text-xs bg-slate-100 text-slate-700 hover:bg-slate-200 px-3 py-1.5 rounded-lg font-medium transition-colors">
                   <Copy className="w-3.5 h-3.5" /> {copied ? "Copied!" : "Copy"}
+                </button>
+                <button
+                  data-testid="save-template-btn"
+                  onClick={() => setShowSaveTemplate(!showSaveTemplate)}
+                  className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${showSaveTemplate ? "bg-purple-100 text-purple-700" : "bg-purple-50 text-purple-600 hover:bg-purple-100"}`}
+                >
+                  <BookMarked className="w-3.5 h-3.5" />
+                  {templateSaved ? "Template Saved!" : "Save as Template"}
                 </button>
                 <button data-testid="compose-save-btn" onClick={saveDraft} disabled={saving} className="flex items-center gap-1.5 text-xs bg-green-500 text-white hover:bg-green-600 px-3 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-60">
                   <Save className="w-3.5 h-3.5" /> {saved ? "Saved!" : saving ? "Saving..." : "Save to Log"}
@@ -234,6 +356,38 @@ export default function ComposePage() {
               </div>
             )}
           </div>
+
+          {/* Optional: Save as Template inline form */}
+          {showSaveTemplate && draft && (
+            <form
+              data-testid="save-template-form"
+              onSubmit={handleSaveTemplate}
+              className="mb-4 bg-purple-50 border border-purple-200 rounded-lg p-3"
+            >
+              <p className="text-xs font-semibold text-purple-700 uppercase tracking-wide mb-2">Save as Template</p>
+              <div className="flex gap-2">
+                <input
+                  data-testid="template-name-input"
+                  type="text"
+                  required
+                  value={templateName}
+                  onChange={e => setTemplateName(e.target.value)}
+                  placeholder="Template name (e.g. D1 Initial Outreach)..."
+                  className="flex-1 border border-purple-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 outline-none bg-white"
+                />
+                <button
+                  type="submit"
+                  disabled={savingTemplate || !templateName.trim()}
+                  className="bg-purple-600 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-60"
+                >
+                  {savingTemplate ? "Saving..." : "Save"}
+                </button>
+                <button type="button" onClick={() => setShowSaveTemplate(false)} className="text-slate-400 hover:text-slate-600 p-2">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </form>
+          )}
 
           {/* Subject */}
           <div className="mb-3">

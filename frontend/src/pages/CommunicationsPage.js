@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { apiRequest } from "../context/AuthContext";
-import { Mail, Plus, Trash2, ChevronDown, ArrowUpRight, ArrowDownLeft, Search, Send, CheckSquare, Square, X, Upload, FileText, CheckCircle } from "lucide-react";
+import { Mail, Plus, Trash2, ChevronDown, ArrowUpRight, ArrowDownLeft, Search, Send, CheckSquare, Square, X, Upload, FileText, CheckCircle, Download, Printer } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
@@ -144,6 +144,65 @@ export default function CommunicationsPage() {
     return c?.name || "Unknown College";
   };
 
+  const exportCSV = () => {
+    const rows = [
+      ["Date", "Direction", "College", "Subject", "Coach Name", "Coach Email", "Body"]
+    ];
+    filtered.forEach(e => {
+      rows.push([
+        new Date(e.created_at).toLocaleDateString("en-GB"),
+        e.direction,
+        getCollegeName(e.college_id),
+        e.subject || "",
+        e.coach_name || "",
+        e.coach_email || "",
+        (e.body || "").replace(/\n/g, " ")
+      ]);
+    });
+    const csv = rows.map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `CourtBound_Emails_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportPDF = () => {
+    const rows = filtered.map(e => `
+      <tr>
+        <td>${new Date(e.created_at).toLocaleDateString("en-GB")}</td>
+        <td><span class="${e.direction === "sent" ? "sent" : "received"}">${e.direction.toUpperCase()}</span></td>
+        <td>${getCollegeName(e.college_id)}</td>
+        <td>${e.subject || ""}</td>
+        <td>${e.coach_name || ""}</td>
+        <td style="max-width:300px;word-break:break-word;">${(e.body || "").slice(0, 200)}${e.body?.length > 200 ? "..." : ""}</td>
+      </tr>`).join("");
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>CourtBound Email History</title>
+    <style>
+      body{font-family:sans-serif;padding:24px;color:#1e293b}
+      h1{font-size:22px;font-weight:900;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px}
+      p{color:#64748b;font-size:13px;margin-bottom:20px}
+      table{width:100%;border-collapse:collapse;font-size:12px}
+      th{background:#0f172a;color:#fff;text-align:left;padding:8px 10px;font-size:11px;text-transform:uppercase;letter-spacing:0.05em}
+      td{padding:7px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top}
+      tr:nth-child(even) td{background:#f8fafc}
+      .sent{background:#fff7ed;color:#ea580c;padding:2px 7px;border-radius:99px;font-weight:700;font-size:10px}
+      .received{background:#f0fdf4;color:#16a34a;padding:2px 7px;border-radius:99px;font-weight:700;font-size:10px}
+      @media print{body{padding:0}}
+    </style></head><body>
+    <h1>CourtBound — Email History</h1>
+    <p>Exported ${new Date().toLocaleDateString("en-GB")} · ${filtered.length} emails</p>
+    <table><thead><tr><th>Date</th><th>Type</th><th>College</th><th>Subject</th><th>Coach</th><th>Preview</th></tr></thead>
+    <tbody>${rows}</tbody></table>
+    <script>window.onload=()=>window.print()</script>
+    </body></html>`;
+    const w = window.open("", "_blank");
+    w.document.write(html);
+    w.document.close();
+  };
+
   // Build college map for filter dropdown from emails
   const emailCollegeIds = [...new Set(emails.map(e => e.college_id))];
   const filterCollegeOptions = emailCollegeIds.map(id => ({ id, name: getCollegeName(id) })).sort((a,b) => a.name.localeCompare(b.name));
@@ -166,6 +225,22 @@ export default function CommunicationsPage() {
           <p className="text-slate-500 mt-1">{emails.length} total emails · {emails.filter(e=>e.direction==="sent").length} sent · {emails.filter(e=>e.direction==="received").length} received</p>
         </div>
         <div className="flex gap-2 flex-wrap">
+          <button
+            data-testid="export-csv-btn"
+            onClick={exportCSV}
+            disabled={filtered.length === 0}
+            className="bg-emerald-600 text-white font-bold uppercase tracking-wider rounded-lg px-4 py-2.5 text-sm hover:bg-emerald-700 transition-all flex items-center gap-2 disabled:opacity-50"
+          >
+            <Download className="w-4 h-4" /> CSV
+          </button>
+          <button
+            data-testid="export-pdf-btn"
+            onClick={exportPDF}
+            disabled={filtered.length === 0}
+            className="bg-slate-600 text-white font-bold uppercase tracking-wider rounded-lg px-4 py-2.5 text-sm hover:bg-slate-700 transition-all flex items-center gap-2 disabled:opacity-50"
+          >
+            <Printer className="w-4 h-4" /> PDF
+          </button>
           <button
             data-testid="csv-import-btn"
             onClick={() => { setShowCSV(true); setShowBulk(false); setShowSingle(false); }}

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { apiRequest } from "../context/AuthContext";
-import { MapPin, Globe, Mail, Phone, Plus, Check, ArrowLeft, Pen, Clock, Calendar, AlertTriangle, ListChecks } from "lucide-react";
+import { MapPin, Globe, Mail, Phone, Plus, Check, ArrowLeft, Pen, Clock, Calendar, AlertTriangle, ListChecks, MessageSquare, Trash2 } from "lucide-react";
 
 export default function CollegeDetailPage() {
   const { id } = useParams();
@@ -19,6 +19,10 @@ export default function CollegeDetailPage() {
   const [savedMsg, setSavedMsg] = useState("");
   const [checklist, setChecklist] = useState([]);
   const [checklistSaving, setChecklistSaving] = useState(false);
+  const [callNotes, setCallNotes] = useState([]);
+  const [newNote, setNewNote] = useState("");
+  const [newNoteDate, setNewNoteDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [addingNote, setAddingNote] = useState(false);
 
   function daysUntil(dateStr) {
     if (!dateStr) return null;
@@ -63,6 +67,8 @@ export default function CollegeDetailPage() {
       }
       setEmails(emailsRes.data);
       setChecklist(checklistRes.data?.items || []);
+      // Call notes stored in tracked college doc
+      if (t && t.call_notes) setCallNotes(t.call_notes);
     } catch (err) {
       console.error(err);
     } finally {
@@ -78,6 +84,28 @@ export default function CollegeDetailPage() {
       await apiRequest("post", "/my-colleges", { college_id: id, notes });
       setTracked(true);
     }
+  };
+
+  const addCallNote = async () => {
+    if (!newNote.trim()) return;
+    setAddingNote(true);
+    try {
+      const res = await apiRequest("post", `/my-colleges/${id}/call-note`, {
+        content: newNote.trim(),
+        date: newNoteDate,
+      });
+      setCallNotes(prev => [...prev, res.data]);
+      setNewNote("");
+      setNewNoteDate(new Date().toISOString().slice(0, 10));
+    } catch {}
+    setAddingNote(false);
+  };
+
+  const deleteCallNote = async (noteId) => {
+    try {
+      await apiRequest("delete", `/my-colleges/${id}/call-note/${noteId}`);
+      setCallNotes(prev => prev.filter(n => n.id !== noteId));
+    } catch {}
   };
 
   const toggleCheckItem = async (itemId) => {
@@ -372,6 +400,69 @@ export default function CollegeDetailPage() {
                     </span>
                   </button>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Coach / Call Notes */}
+          {tracked && (
+            <div className="bg-white border border-slate-200 rounded-lg p-5" data-testid="call-notes-section">
+              <h2 className="font-bold text-slate-900 mb-4 flex items-center gap-2" style={{ fontFamily: "Barlow Condensed, sans-serif", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                <MessageSquare className="w-4 h-4 text-slate-500" /> Call Notes
+              </h2>
+
+              {/* Existing notes */}
+              {callNotes.length > 0 ? (
+                <div className="space-y-2 mb-4">
+                  {[...callNotes].reverse().map(note => (
+                    <div key={note.id} data-testid={`call-note-${note.id}`} className="bg-slate-50 rounded-lg p-3 group">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-bold text-slate-500">{new Date(note.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</span>
+                        <button
+                          data-testid={`delete-call-note-${note.id}`}
+                          onClick={() => deleteCallNote(note.id)}
+                          className="text-slate-300 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap">{note.content}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-slate-400 text-xs mb-4">No notes yet. Log calls, meetings, or key info below.</p>
+              )}
+
+              {/* Add note form */}
+              <div className="space-y-2">
+                <div>
+                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1">Date</label>
+                  <input
+                    data-testid="call-note-date"
+                    type="date"
+                    value={newNoteDate}
+                    onChange={e => setNewNoteDate(e.target.value)}
+                    className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
+                  />
+                </div>
+                <textarea
+                  data-testid="call-note-input"
+                  value={newNote}
+                  onChange={e => setNewNote(e.target.value)}
+                  rows={3}
+                  placeholder="e.g. Spoke with Coach Smith, very interested. Wants highlight tape by Friday..."
+                  className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-orange-500 outline-none resize-none"
+                />
+                <button
+                  data-testid="add-call-note-btn"
+                  onClick={addCallNote}
+                  disabled={addingNote || !newNote.trim()}
+                  className="w-full bg-slate-800 text-white font-bold uppercase tracking-wider rounded-lg py-2 text-xs hover:bg-slate-700 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  {addingNote ? "Adding..." : "Add Note"}
+                </button>
               </div>
             </div>
           )}

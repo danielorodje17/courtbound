@@ -1073,6 +1073,16 @@ async def get_analytics(current_user: UserModel = Depends(get_current_user)):
 class ChecklistUpdate(BaseModel):
     items: List[dict]
 
+class EmailTemplateCreate(BaseModel):
+    name: str
+    subject: str
+    body: str
+    message_type: str = "initial_outreach"
+
+class CallNoteCreate(BaseModel):
+    content: str
+    date: Optional[str] = ""
+
 DEFAULT_CHECKLIST = [
     {"id": "email_sent", "label": "Send initial email to coach"},
     {"id": "info_requested", "label": "Request programme info / brochure"},
@@ -1104,6 +1114,59 @@ async def update_checklist(college_id: str, data: ChecklistUpdate, current_user:
         upsert=True
     )
     return {"message": "Checklist updated"}
+
+
+# ─── Email Template Library ───────────────────────────────────────────────────
+@api_router.get("/templates")
+async def get_templates(current_user: UserModel = Depends(get_current_user)):
+    templates = await db.email_templates.find({"user_id": current_user.user_id}).sort("created_at", -1).to_list(100)
+    for t in templates:
+        t["id"] = str(t.pop("_id"))
+    return templates
+
+@api_router.post("/templates")
+async def save_template(data: EmailTemplateCreate, current_user: UserModel = Depends(get_current_user)):
+    doc = {
+        "user_id": current_user.user_id,
+        "name": data.name,
+        "subject": data.subject,
+        "body": data.body,
+        "message_type": data.message_type,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    result = await db.email_templates.insert_one(doc)
+    doc["id"] = str(result.inserted_id)
+    doc.pop("_id", None)
+    return doc
+
+@api_router.delete("/templates/{template_id}")
+async def delete_template(template_id: str, current_user: UserModel = Depends(get_current_user)):
+    await db.email_templates.delete_one({"_id": ObjectId(template_id), "user_id": current_user.user_id})
+    return {"message": "Deleted"}
+
+
+# ─── Coach Call Notes ─────────────────────────────────────────────────────────
+@api_router.post("/my-colleges/{college_id}/call-note")
+async def add_call_note(college_id: str, data: CallNoteCreate, current_user: UserModel = Depends(get_current_user)):
+    note = {
+        "id": str(uuid.uuid4()),
+        "content": data.content,
+        "date": data.date or datetime.now(timezone.utc).date().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.tracked_colleges.update_one(
+        {"user_id": current_user.user_id, "college_id": college_id},
+        {"$push": {"call_notes": note}}
+    )
+    return note
+
+@api_router.delete("/my-colleges/{college_id}/call-note/{note_id}")
+async def delete_call_note(college_id: str, note_id: str, current_user: UserModel = Depends(get_current_user)):
+    await db.tracked_colleges.update_one(
+        {"user_id": current_user.user_id, "college_id": college_id},
+        {"$pull": {"call_notes": {"id": note_id}}}
+    )
+    return {"message": "Deleted"}
 
 
 # ─── Root ──────────────────────────────────────────────────────────────────────
