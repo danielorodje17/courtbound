@@ -159,19 +159,24 @@ An 18-year-old student basketball player from UK (England Under-18) wants to tra
 - [x] Dashboard green "on track" banner when no urgent actions needed
 - [x] Follow-up date badges on Dashboard My Colleges list
 
+### v1.7 - Clickable Stats, AI Match, Analytics Charts, Application Checklist (Apr 2026)
+- [x] Dashboard stat cards clickable: Colleges Tracked → /colleges, Emails Sent → /communications, Responses Received → /responses
+- [x] AI Match feature (/ai-match) — AI analyses player profile vs all 90+ colleges, categorises as Excellent/Good/Possible Fit with % + narrative
+- [x] AI Match added to navigation bar (Sparkles icon)
+- [x] Dashboard Analytics section: 14-day email activity area chart (recharts), recruitment funnel bar chart, division breakdown
+- [x] College Application Checklist on College Detail page — 10-item pre-loaded checklist with progress bar, auto-saves on toggle
+- [x] GET /api/ai/match, GET /api/dashboard/analytics, GET/PUT /api/checklist/{college_id} endpoints
+
 ---
 
 ## Prioritised Backlog
 
 ### P1 (High value)
-- [ ] Reminder/follow-up scheduler: "Follow up with [college] in X days"
 - [ ] Export communication history to PDF/CSV
 - [ ] Email template library (save favourite drafts)
-- [ ] College filtering: highlight colleges known to be favourable to international students
 
 ### P2 (Nice to have)
-- [ ] Scholarship deadline tracker per college
 - [ ] College comparison table
 - [ ] Coach profile photos
-- [ ] Application checklist per college (visa, transcripts, SAT/ACT requirements)
-- [ ] Dashboard analytics charts (email activity over time, response trend)
+- [ ] Coach notes field (quick notes after a call/meeting)
+- [ ] Highlight tape links on college cards (Hudl/YouTube)
