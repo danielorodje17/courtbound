@@ -261,6 +261,8 @@ async def startup():
         await seed_colleges()
     # Always seed extended colleges if they're missing (by name check)
     await seed_extended_colleges()
+    # Always seed European colleges if they're missing (by name check)
+    await _seed_european_colleges_startup()
 
 async def seed_colleges():
     colleges = [
@@ -387,6 +389,19 @@ async def seed_extended_colleges():
         logger.info(f"Seeded {inserted} extended colleges (D2/NAIA/JUCO)")
 
 
+async def _seed_european_colleges_startup():
+    """Seed European colleges on startup — skips any already in DB by name."""
+    inserted = 0
+    for college in EUROPEAN_COLLEGES:
+        exists = await db.colleges.find_one({"name": college["name"]})
+        if not exists:
+            college_doc = {**college, "created_at": datetime.now(timezone.utc).isoformat()}
+            await db.colleges.insert_one(college_doc)
+            inserted += 1
+    if inserted:
+        logger.info(f"Seeded {inserted} European colleges")
+
+
 @api_router.get("/colleges")
 async def get_colleges(search: Optional[str] = None, division: Optional[str] = None, foreign_friendly: Optional[bool] = None, state: Optional[str] = None):
     query = {}
@@ -398,7 +413,7 @@ async def get_colleges(search: Optional[str] = None, division: Optional[str] = N
         query["foreign_friendly"] = foreign_friendly
     if state:
         query["state"] = {"$regex": state, "$options": "i"}
-    colleges = await db.colleges.find(query, {"_id": 1, "name": 1, "location": 1, "state": 1, "division": 1, "conference": 1, "foreign_friendly": 1, "ranking": 1, "acceptance_rate": 1, "coaches": 1, "image_url": 1, "scholarship_info": 1, "notable_alumni": 1, "website": 1}).sort("ranking", 1).to_list(500)
+    colleges = await db.colleges.find(query, {"_id": 1, "name": 1, "location": 1, "state": 1, "division": 1, "conference": 1, "foreign_friendly": 1, "ranking": 1, "acceptance_rate": 1, "coaches": 1, "image_url": 1, "scholarship_info": 1, "notable_alumni": 1, "website": 1, "region": 1, "country": 1, "language_of_study": 1, "scholarship_type": 1}).sort("ranking", 1).to_list(500)
     for c in colleges:
         c["id"] = str(c.pop("_id"))
     return colleges
@@ -1429,6 +1444,90 @@ async def get_analytics(current_user: UserModel = Depends(get_current_user)):
         "activity": activity,
         "funnel": {"tracked": tracked, "contacted": contacted, "replied": replied},
         "division_breakdown": sorted(division_breakdown, key=lambda x: -x["count"])
+    }
+
+
+# ─── Weekly Digest ────────────────────────────────────────────────────────────
+@api_router.get("/dashboard/weekly-digest")
+async def get_weekly_digest(current_user: UserModel = Depends(get_current_user)):
+    uid = current_user.user_id
+    now = datetime.now(timezone.utc)
+
+    week_start = (now - timedelta(days=7)).isoformat()
+    prev_week_start = (now - timedelta(days=14)).isoformat()
+
+    # Emails this week vs last week
+    emails_this_week = await db.emails.count_documents({"user_id": uid, "direction": "sent", "created_at": {"$gte": week_start}})
+    emails_last_week = await db.emails.count_documents({"user_id": uid, "direction": "sent", "created_at": {"$gte": prev_week_start, "$lt": week_start}})
+
+    # Responses this week
+    responses_this_week = await db.emails.count_documents({"user_id": uid, "direction": "received", "created_at": {"$gte": week_start}})
+
+    # New colleges tracked this week
+    new_tracked = await db.tracked_colleges.count_documents({"user_id": uid, "created_at": {"$gte": week_start}})
+
+    # Overdue follow-ups
+    today_str = now.date().isoformat()
+    overdue_docs = await db.tracked_colleges.find(
+        {"user_id": uid, "follow_up_date": {"$lt": today_str, "$exists": True, "$ne": ""}},
+        {"_id": 0, "college_id": 1}
+    ).to_list(100)
+    overdue_count = len(overdue_docs)
+
+    # Top college by progress score
+    top_tracked = await db.tracked_colleges.find(
+        {"user_id": uid},
+        {"_id": 0, "college_id": 1, "progress_score": 1}
+    ).sort("progress_score", -1).to_list(1)
+
+    top_college = None
+    if top_tracked:
+        try:
+            c = await db.colleges.find_one({"_id": ObjectId(top_tracked[0]["college_id"])}, {"_id": 0, "name": 1})
+            if c:
+                top_college = {"name": c["name"], "progress_score": top_tracked[0].get("progress_score", 0)}
+        except Exception:
+            pass
+
+    # Colleges with no email contact at all
+    tracked_all = await db.tracked_colleges.find({"user_id": uid}, {"_id": 0, "college_id": 1}).to_list(500)
+    tracked_ids = [t["college_id"] for t in tracked_all]
+    emailed_ids = set()
+    if tracked_ids:
+        emailed = await db.emails.find(
+            {"user_id": uid, "college_id": {"$in": tracked_ids}, "direction": "sent"},
+            {"_id": 0, "college_id": 1}
+        ).to_list(500)
+        emailed_ids = {e["college_id"] for e in emailed}
+    not_contacted_count = len([cid for cid in tracked_ids if cid not in emailed_ids])
+
+    # Build recommended action
+    if overdue_count > 0:
+        recommended_action = f"You have {overdue_count} overdue follow-up{'s' if overdue_count > 1 else ''} — send a check-in email to stay top of mind."
+        recommended_link = "/responses"
+    elif not_contacted_count > 0:
+        recommended_action = f"{not_contacted_count} tracked college{'s' if not_contacted_count > 1 else ''} still {'have' if not_contacted_count > 1 else 'has'} no email sent — start your outreach."
+        recommended_link = "/compose"
+    elif emails_this_week == 0:
+        recommended_action = "No emails sent this week — maintain your outreach momentum."
+        recommended_link = "/compose"
+    else:
+        recommended_action = "Great week! Keep the momentum going and log any coach replies."
+        recommended_link = "/responses"
+
+    week_label = f"Week of {(now - timedelta(days=7)).strftime('%-d %b')} – {now.strftime('%-d %b %Y')}"
+
+    return {
+        "week_label": week_label,
+        "emails_sent_this_week": emails_this_week,
+        "emails_sent_last_week": emails_last_week,
+        "responses_this_week": responses_this_week,
+        "new_colleges_tracked": new_tracked,
+        "overdue_followups": overdue_count,
+        "not_contacted_count": not_contacted_count,
+        "top_college": top_college,
+        "recommended_action": recommended_action,
+        "recommended_link": recommended_link,
     }
 
 

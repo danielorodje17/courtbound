@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiRequest } from "../context/AuthContext";
-import { Trophy, Mail, BookOpen, TrendingUp, ChevronRight, Bell, Plus, AlertTriangle, Clock, Calendar, CheckCircle, BarChart2 } from "lucide-react";
+import { Trophy, Mail, BookOpen, TrendingUp, ChevronRight, Bell, Plus, AlertTriangle, Clock, Calendar, CheckCircle, BarChart2, Newspaper, ArrowUp, ArrowDown, Minus } from "lucide-react";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell
@@ -43,22 +43,25 @@ export default function Dashboard() {
   const [tracked, setTracked] = useState([]);
   const [alerts, setAlerts] = useState(null);
   const [analytics, setAnalytics] = useState(null);
+  const [digest, setDigest] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => { fetchData(); }, []);
 
   const fetchData = async () => {
     try {
-      const [statsRes, trackedRes, alertsRes, analyticsRes] = await Promise.all([
+      const [statsRes, trackedRes, alertsRes, analyticsRes, digestRes] = await Promise.all([
         apiRequest("get", "/dashboard/stats"),
         apiRequest("get", "/my-colleges"),
         apiRequest("get", "/dashboard/alerts"),
         apiRequest("get", "/dashboard/analytics"),
+        apiRequest("get", "/dashboard/weekly-digest"),
       ]);
       setStats(statsRes.data);
       setTracked(trackedRes.data);
       setAlerts(alertsRes.data);
       setAnalytics(analyticsRes.data);
+      setDigest(digestRes.data);
     } catch (err) {
       console.error(err);
     } finally {
@@ -339,6 +342,77 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+
+      {/* Weekly Digest */}
+      {digest && (
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden" data-testid="weekly-digest-widget">
+          <div className="flex items-center gap-2.5 px-5 py-3.5 border-b border-slate-100 bg-slate-900">
+            <Newspaper className="w-4 h-4 text-orange-400" />
+            <h2 className="font-bold text-sm text-white uppercase tracking-widest">Weekly Digest</h2>
+            <span className="ml-auto text-xs text-slate-400 font-medium">{digest.week_label}</span>
+          </div>
+          <div className="p-5">
+            {/* Stats row */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+              {/* Emails sent */}
+              <div className="bg-orange-50 border border-orange-100 rounded-lg p-3">
+                <p className="text-xs text-orange-600 font-semibold uppercase tracking-wide mb-1">Emails Sent</p>
+                <div className="flex items-end gap-1.5">
+                  <span className="text-2xl font-bold text-slate-900">{digest.emails_sent_this_week}</span>
+                  {digest.emails_sent_this_week > digest.emails_sent_last_week ? (
+                    <span className="flex items-center text-xs text-emerald-600 font-bold mb-0.5 gap-0.5"><ArrowUp className="w-3 h-3" /> vs last week</span>
+                  ) : digest.emails_sent_this_week < digest.emails_sent_last_week ? (
+                    <span className="flex items-center text-xs text-red-500 font-bold mb-0.5 gap-0.5"><ArrowDown className="w-3 h-3" /> vs last week</span>
+                  ) : (
+                    <span className="flex items-center text-xs text-slate-400 font-bold mb-0.5 gap-0.5"><Minus className="w-3 h-3" /> vs last week</span>
+                  )}
+                </div>
+              </div>
+              {/* Responses */}
+              <div className="bg-green-50 border border-green-100 rounded-lg p-3">
+                <p className="text-xs text-green-700 font-semibold uppercase tracking-wide mb-1">Responses In</p>
+                <span className="text-2xl font-bold text-slate-900">{digest.responses_this_week}</span>
+              </div>
+              {/* New tracked */}
+              <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
+                <p className="text-xs text-blue-700 font-semibold uppercase tracking-wide mb-1">New Colleges</p>
+                <span className="text-2xl font-bold text-slate-900">{digest.new_colleges_tracked}</span>
+              </div>
+              {/* Overdue */}
+              <div className={`${digest.overdue_followups > 0 ? "bg-red-50 border-red-100" : "bg-slate-50 border-slate-100"} border rounded-lg p-3`}>
+                <p className={`text-xs font-semibold uppercase tracking-wide mb-1 ${digest.overdue_followups > 0 ? "text-red-600" : "text-slate-500"}`}>Overdue</p>
+                <span className={`text-2xl font-bold ${digest.overdue_followups > 0 ? "text-red-600" : "text-slate-900"}`}>{digest.overdue_followups}</span>
+              </div>
+            </div>
+
+            {/* Top college */}
+            {digest.top_college && (
+              <div className="flex items-center gap-3 bg-slate-50 rounded-lg p-3 mb-4">
+                <Trophy className="w-5 h-5 text-orange-500 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-slate-500 font-medium">Top Progress College</p>
+                  <p className="text-sm font-bold text-slate-900 truncate">{digest.top_college.name}</p>
+                </div>
+                <span className="text-sm font-black text-orange-500 flex-shrink-0">{digest.top_college.progress_score}%</span>
+              </div>
+            )}
+
+            {/* Recommended action */}
+            <div
+              className="flex items-start gap-3 bg-orange-500 rounded-lg px-4 py-3 cursor-pointer hover:bg-orange-600 transition-colors"
+              data-testid="digest-recommended-action"
+              onClick={() => navigate(digest.recommended_link)}
+            >
+              <CheckCircle className="w-4 h-4 text-white flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-xs text-orange-100 font-semibold uppercase tracking-wide">Recommended Action</p>
+                <p className="text-sm text-white font-semibold mt-0.5">{digest.recommended_action}</p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-white flex-shrink-0 mt-0.5" />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Analytics Charts */}
       {analytics && (
