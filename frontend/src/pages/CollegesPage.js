@@ -120,7 +120,7 @@ export default function CollegesPage() {
             <h1 className="text-3xl font-bold text-slate-900 mt-1" style={{ fontFamily: "Barlow Condensed, sans-serif", textTransform: "uppercase" }}>
               Find Your College
             </h1>
-            <p className="text-slate-500 mt-1">Browse {allColleges.length} US colleges with basketball programs</p>
+            <p className="text-slate-500 mt-1">Browse {allColleges.length} colleges with basketball programs</p>
           </>
         )}
       </div>

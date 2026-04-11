@@ -115,7 +115,7 @@ export default function Dashboard() {
           <h1 className="text-3xl font-bold text-white mt-1" style={{ fontFamily: "Barlow Condensed, sans-serif", textTransform: "uppercase" }}>
             Your Scholarship Tracker
           </h1>
-          <p className="text-white/60 mt-1">England Under-18 | Basketball Scholarship Tracker</p>
+          <p className="text-white/60 mt-1">European | Basketball Scholarship Tracker</p>
           <div className="flex gap-3 mt-5">
             <button
               data-testid="dashboard-find-colleges-btn"
