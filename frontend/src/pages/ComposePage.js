@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { apiRequest } from "../context/AuthContext";
-import { Wand2, Copy, Save, ArrowLeft, ChevronDown, Trash2, X, Plus, BookMarked, Film, Mail, ExternalLink, CheckCircle } from "lucide-react";
+import { Wand2, Copy, ArrowLeft, ChevronDown, Trash2, X, Plus, BookMarked, Film, Mail, ExternalLink, CheckCircle } from "lucide-react";
 
 export default function ComposePage() {
   const location = useLocation();
@@ -18,8 +18,6 @@ export default function ComposePage() {
   const [subject, setSubject] = useState("");
   const [draft, setDraft] = useState("");
   const [generating, setGenerating] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -85,24 +83,6 @@ export default function ComposePage() {
     } finally {
       setGenerating(false);
     }
-  };
-
-  const saveDraft = async () => {
-    if (!draft || !selectedCollege) return;
-    setSaving(true);
-    try {
-      await apiRequest("post", "/emails", {
-        college_id: selectedCollege.id,
-        direction: "sent",
-        subject: subject || "Draft",
-        body: draft,
-        coach_name: selectedCoach?.name || "",
-        coach_email: selectedCoach?.email || ""
-      });
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2500);
-    } catch {}
-    setSaving(false);
   };
 
   const copyDraft = () => {
@@ -412,9 +392,6 @@ export default function ComposePage() {
                 >
                   <BookMarked className="w-3.5 h-3.5" />
                   {templateSaved ? "Template Saved!" : "Save as Template"}
-                </button>
-                <button data-testid="compose-save-btn" onClick={saveDraft} disabled={saving} className="flex items-center gap-1.5 text-xs bg-green-500 text-white hover:bg-green-600 px-3 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-60">
-                  <Save className="w-3.5 h-3.5" /> {saved ? "Saved!" : saving ? "Saving..." : "Save to Log"}
                 </button>
               </div>
             )}
