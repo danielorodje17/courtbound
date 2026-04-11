@@ -210,6 +210,15 @@ An 18-year-old student basketball player from UK (England Under-18) wants to tra
 - [x] In-app Weekly Digest widget on Dashboard: emails sent (vs last week trend), responses in, new colleges tracked, overdue count, top progress college, recommended action CTA
 - [x] GET /api/dashboard/weekly-digest endpoint
 
+### v1.14 - Weekly Goals + 8-Week Achievement History (Apr 2026)
+- [x] WeeklyGoalsWidget component on Dashboard (below stat cards)
+- [x] 4 trackable metrics: Emails Sent, Follow-Ups, New Colleges, Coach Calls
+- [x] Set Goals modal: +/- stepper inputs, save/cancel
+- [x] Live progress bars updating from real DB data (email counts, tracked colleges, call notes)
+- [x] Follow-up tracking: emails now store message_type in DB
+- [x] 8-week achievement history (expandable): shows each week's progress vs goals, colour-coded achievement % (green=100%, amber=50-99%, red=<50%)
+- [x] GET /api/goals/current, PUT /api/goals/current, GET /api/goals/history endpoints
+
 ---
 
 ## Backlog
