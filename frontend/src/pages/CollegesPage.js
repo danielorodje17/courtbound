@@ -15,6 +15,7 @@ export default function CollegesPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [division, setDivision] = useState("");
+  const [region, setRegion] = useState("");
   const [foreignOnly, setForeignOnly] = useState(false);
   const [state, setState] = useState("");
 
@@ -25,7 +26,7 @@ export default function CollegesPage() {
 
   useEffect(() => {
     applyFilters();
-  }, [search, division, foreignOnly, state, allColleges, trackedOnly, trackedData]);
+  }, [search, division, region, foreignOnly, state, allColleges, trackedOnly, trackedData]);
 
   const fetchAllColleges = async () => {
     try {
@@ -42,10 +43,11 @@ export default function CollegesPage() {
   const applyFilters = () => {
     let filtered = allColleges;
     if (trackedOnly) filtered = filtered.filter(c => tracked.has(c.id));
-    if (search) filtered = filtered.filter(c => c.name.toLowerCase().includes(search.toLowerCase()) || c.location.toLowerCase().includes(search.toLowerCase()));
+    if (region) filtered = filtered.filter(c => (c.region || "USA") === region);
+    if (search) filtered = filtered.filter(c => c.name.toLowerCase().includes(search.toLowerCase()) || c.location.toLowerCase().includes(search.toLowerCase()) || c.country?.toLowerCase().includes(search.toLowerCase()));
     if (division) filtered = filtered.filter(c => c.division === division);
     if (foreignOnly) filtered = filtered.filter(c => c.foreign_friendly);
-    if (state) filtered = filtered.filter(c => c.state?.toLowerCase().includes(state.toLowerCase()) || c.location?.toLowerCase().includes(state.toLowerCase()));
+    if (state) filtered = filtered.filter(c => c.state?.toLowerCase().includes(state.toLowerCase()) || c.location?.toLowerCase().includes(state.toLowerCase()) || c.country?.toLowerCase().includes(state.toLowerCase()));
     setColleges(filtered);
   };
 
@@ -123,37 +125,43 @@ export default function CollegesPage() {
         )}
       </div>
 
-      {/* UK Friendly Banner */}
-      {!foreignOnly && ukFriendlyCount > 0 && (
-        <div
-          data-testid="uk-friendly-banner"
-          className="bg-gradient-to-r from-green-600 to-green-500 rounded-xl p-4 mb-5 flex items-center justify-between cursor-pointer hover:from-green-700 hover:to-green-600 transition-all"
-          onClick={() => setForeignOnly(true)}
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
-              <Flag className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <p className="font-bold text-white text-sm uppercase tracking-wider">UK Recommended Colleges</p>
-              <p className="text-green-100 text-xs mt-0.5">{ukFriendlyCount} colleges actively recruit UK & international players</p>
-            </div>
-          </div>
-          <span className="bg-white text-green-700 font-black text-lg px-4 py-2 rounded-lg">
-            {ukFriendlyCount}
-          </span>
-        </div>
-      )}
-
       {/* Filters */}
-      <div className="bg-white border border-slate-200 rounded-lg p-4 mb-6">
+      <div className="bg-white border border-slate-200 rounded-lg p-4 mb-6 space-y-3">
+        {/* Region Toggle */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mr-1">Region:</span>
+          {[["", "All"], ["USA", "USA"], ["Europe", "Europe"]].map(([val, label]) => (
+            <button
+              key={val}
+              data-testid={`region-filter-${label.toLowerCase()}`}
+              onClick={() => setRegion(val)}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-wider transition-all ${
+                region === val ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              {label === "USA" ? "🇺🇸 USA" : label === "Europe" ? "🇪🇺 Europe" : label}
+            </button>
+          ))}
+          <span className="text-slate-200 mx-1">|</span>
+          <button
+            data-testid="uk-friendly-filter-btn"
+            onClick={() => setForeignOnly(!foreignOnly)}
+            className={`px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1 ${
+              foreignOnly ? "bg-green-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            <Flag className="w-3 h-3" /> UK Friendly Only
+          </button>
+        </div>
+
+        {/* Search + Division filter row */}
         <div className="flex flex-wrap gap-3 items-center">
           <div className="relative flex-1 min-w-48">
             <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
             <input
               data-testid="college-search-input"
               type="text"
-              placeholder="Search colleges..."
+              placeholder="Search colleges, cities, countries..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="w-full pl-9 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none"
@@ -165,7 +173,7 @@ export default function CollegesPage() {
             onChange={e => setDivision(e.target.value)}
             className="border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 outline-none text-slate-700 bg-white"
           >
-            <option value="">All Divisions</option>
+            <option value="">All Divisions / Leagues</option>
             {divisions.map(d => <option key={d} value={d}>{d}</option>)}
           </select>
           <input
@@ -285,24 +293,40 @@ export default function CollegesPage() {
                   <h3 className="font-bold text-slate-900 text-sm truncate">{college.name}</h3>
                   <div className="flex items-center gap-1 mt-1">
                     <MapPin className="w-3 h-3 text-slate-400" />
-                    <span className="text-xs text-slate-500">{college.location}</span>
+                    <span className="text-xs text-slate-500">
+                      {college.region === "Europe" ? `${college.location}, ${college.country}` : college.location}
+                    </span>
                   </div>
                 </div>
-                <div className="flex items-center gap-3 text-xs text-slate-500 mb-4">
+                <div className="flex items-center gap-2 text-xs text-slate-500 mb-2 flex-wrap">
                   <div className="flex items-center gap-1">
                     <Users className="w-3 h-3" />
                     <span>{college.coaches?.length || 0} coaches</span>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Globe className="w-3 h-3" />
-                    <span>{college.acceptance_rate} accept</span>
-                  </div>
+                  {college.region === "Europe" ? (
+                    <div className="flex items-center gap-1 font-semibold text-blue-600">
+                      <Globe className="w-3 h-3" />
+                      <span>{college.language_of_study || "—"}</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      <Globe className="w-3 h-3" />
+                      <span>{college.acceptance_rate} accept</span>
+                    </div>
+                  )}
                   {college.foreign_friendly && (
                     <span className="text-green-600 font-semibold flex items-center gap-0.5">
                       <Flag className="w-3 h-3" /> UK
                     </span>
                   )}
                 </div>
+                {college.region === "Europe" && college.scholarship_type && (
+                  <div className="mb-2">
+                    <span className="text-xs bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded-full border border-blue-200">
+                      {college.scholarship_type}
+                    </span>
+                  </div>
+                )}
                 {/* Full-width Track button */}
                 <button
                   data-testid={`track-college-${college.name}`}

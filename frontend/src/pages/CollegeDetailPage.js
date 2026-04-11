@@ -157,8 +157,8 @@ export default function CollegeDetailPage() {
           <div className="flex items-end justify-between">
             <div>
               <div className="flex gap-2 mb-2">
-                <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${college.division === "Division I" ? "bg-orange-500 text-white" : "bg-slate-500 text-white"}`}>
-                  {college.division}
+                <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${college.region === "Europe" ? "bg-blue-500 text-white" : college.division === "Division I" ? "bg-orange-500 text-white" : "bg-slate-500 text-white"}`}>
+                  {college.region === "Europe" ? "Europe" : college.division}
                 </span>
                 {college.foreign_friendly && (
                   <span className="px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide bg-green-500 text-white">
@@ -171,7 +171,7 @@ export default function CollegeDetailPage() {
               </h1>
               <div className="flex items-center gap-1 mt-1">
                 <MapPin className="w-3.5 h-3.5 text-white/70" />
-                <span className="text-white/70 text-sm">{college.location} · {college.conference}</span>
+                <span className="text-white/70 text-sm">{college.region === "Europe" ? `${college.location}, ${college.country}` : college.location} · {college.region === "Europe" ? college.division : college.conference}</span>
               </div>
             </div>
             <button
@@ -196,10 +196,24 @@ export default function CollegeDetailPage() {
           <div className="bg-white border border-slate-200 rounded-lg p-5">
             <h2 className="font-bold text-slate-900 mb-4" style={{ fontFamily: "Barlow Condensed, sans-serif", textTransform: "uppercase", letterSpacing: "0.05em" }}>College Details</h2>
             <div className="grid grid-cols-2 gap-4 text-sm">
-              <div><span className="text-slate-400 text-xs uppercase tracking-wide">Acceptance Rate</span><p className="font-semibold text-slate-800 mt-0.5">{college.acceptance_rate}</p></div>
-              <div><span className="text-slate-400 text-xs uppercase tracking-wide">Conference</span><p className="font-semibold text-slate-800 mt-0.5">{college.conference}</p></div>
-              <div className="col-span-2"><span className="text-slate-400 text-xs uppercase tracking-wide">Scholarship Info</span><p className="font-medium text-slate-700 mt-0.5">{college.scholarship_info}</p></div>
-              <div className="col-span-2"><span className="text-slate-400 text-xs uppercase tracking-wide">Notable Alumni</span><p className="font-medium text-slate-700 mt-0.5">{college.notable_alumni}</p></div>
+              {college.region === "Europe" ? (
+                <>
+                  <div><span className="text-slate-400 text-xs uppercase tracking-wide">Country</span><p className="font-semibold text-slate-800 mt-0.5">{college.country}</p></div>
+                  <div><span className="text-slate-400 text-xs uppercase tracking-wide">League / Division</span><p className="font-semibold text-slate-800 mt-0.5">{college.division}</p></div>
+                  <div><span className="text-slate-400 text-xs uppercase tracking-wide">Language of Study</span><p className="font-semibold text-blue-700 mt-0.5">{college.language_of_study || "—"}</p></div>
+                  <div><span className="text-slate-400 text-xs uppercase tracking-wide">Scholarship Type</span><p className="font-semibold text-slate-800 mt-0.5">{college.scholarship_type || "—"}</p></div>
+                  <div><span className="text-slate-400 text-xs uppercase tracking-wide">Domestic Conference</span><p className="font-semibold text-slate-800 mt-0.5">{college.conference}</p></div>
+                  <div><span className="text-slate-400 text-xs uppercase tracking-wide">Entry Requirements</span><p className="font-semibold text-slate-800 mt-0.5">{college.acceptance_rate || "—"}</p></div>
+                  <div className="col-span-2"><span className="text-slate-400 text-xs uppercase tracking-wide">Scholarship Info</span><p className="font-medium text-slate-700 mt-0.5">{college.scholarship_info}</p></div>
+                </>
+              ) : (
+                <>
+                  <div><span className="text-slate-400 text-xs uppercase tracking-wide">Acceptance Rate</span><p className="font-semibold text-slate-800 mt-0.5">{college.acceptance_rate}</p></div>
+                  <div><span className="text-slate-400 text-xs uppercase tracking-wide">Conference</span><p className="font-semibold text-slate-800 mt-0.5">{college.conference}</p></div>
+                  <div className="col-span-2"><span className="text-slate-400 text-xs uppercase tracking-wide">Scholarship Info</span><p className="font-medium text-slate-700 mt-0.5">{college.scholarship_info}</p></div>
+                  <div className="col-span-2"><span className="text-slate-400 text-xs uppercase tracking-wide">Notable Alumni</span><p className="font-medium text-slate-700 mt-0.5">{college.notable_alumni}</p></div>
+                </>
+              )}
             </div>
             {college.website && (
               <a href={college.website} target="_blank" rel="noreferrer" className="mt-4 flex items-center gap-1.5 text-orange-500 hover:text-orange-600 text-sm font-medium">

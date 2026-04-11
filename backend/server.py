@@ -403,6 +403,319 @@ async def get_colleges(search: Optional[str] = None, division: Optional[str] = N
         c["id"] = str(c.pop("_id"))
     return colleges
 
+
+# ─── European Colleges Seed ────────────────────────────────────────────────────
+EUROPEAN_COLLEGES = [
+    # ── SPAIN ──────────────────────────────────────────────────────────────
+    {"name": "Universidad Europea de Madrid", "location": "Madrid", "country": "Spain", "region": "Europe",
+     "division": "Liga EBA / LEB Gold", "conference": "FEB Nacional", "state": "ES",
+     "foreign_friendly": True, "acceptance_rate": "Open enrolment",
+     "scholarship_info": "25% tuition reduction via Plan Compite for elite athletes. Fully bilingual campus.",
+     "scholarship_type": "Partial Athletic", "language_of_study": "English / Spanish",
+     "ranking": None, "website": "https://universidadeuropea.com",
+     "image_url": "https://images.unsplash.com/photo-1560553814-060afcd8904a?w=400",
+     "coaches": [{"name": "Carlos Jiménez", "title": "Head Basketball Coach", "email": "basketball@uem.es"}]},
+
+    {"name": "CEU Cardenal Herrera University", "location": "Valencia", "country": "Spain", "region": "Europe",
+     "division": "LEB Gold", "conference": "FEB Nacional", "state": "ES",
+     "foreign_friendly": True, "acceptance_rate": "Grade average 7+",
+     "scholarship_info": "CEU Merit 100 Scholarships for elite athletes. Requires strong academic and athletic record.",
+     "scholarship_type": "Merit-Based", "language_of_study": "Spanish",
+     "ranking": None, "website": "https://www.uchceu.es",
+     "image_url": "https://images.unsplash.com/photo-1583079806406-91731880e785?w=400",
+     "coaches": [{"name": "Sergio Pascual", "title": "Basketball Coordinator", "email": "deportes@uchceu.es"}]},
+
+    {"name": "UCAM Murcia (Universidad Católica de Murcia)", "location": "Murcia", "country": "Spain", "region": "Europe",
+     "division": "ACB (Liga Endesa)", "conference": "ACB", "state": "ES",
+     "foreign_friendly": True, "acceptance_rate": "Open enrolment",
+     "scholarship_info": "Full athletic scholarship through UCAM Basketball Club (ACB). One of Europe's most international-friendly clubs.",
+     "scholarship_type": "Full Academic + Athletic", "language_of_study": "Spanish / English",
+     "ranking": None, "website": "https://www.ucam.edu",
+     "image_url": "https://images.unsplash.com/photo-1560553814-060afcd8904a?w=400",
+     "coaches": [{"name": "Sito Alonso", "title": "Head Coach", "email": "baloncesto@ucam.edu"}]},
+
+    {"name": "Universidad de Zaragoza + Casademont", "location": "Zaragoza", "country": "Spain", "region": "Europe",
+     "division": "ACB (Liga Endesa)", "conference": "ACB", "state": "ES",
+     "foreign_friendly": True, "acceptance_rate": "Open enrolment",
+     "scholarship_info": "Partnership with Casademont Zaragoza ACB club. Partial scholarship covering tuition for student-athletes.",
+     "scholarship_type": "Partial Athletic", "language_of_study": "Spanish",
+     "ranking": None, "website": "https://www.unizar.es",
+     "image_url": "https://images.unsplash.com/photo-1583079806406-91731880e785?w=400",
+     "coaches": [{"name": "Juan Barea", "title": "Player Development", "email": "deporte@unizar.es"}]},
+
+    {"name": "Universidad de Sevilla (IUEFA)", "location": "Seville", "country": "Spain", "region": "Europe",
+     "division": "División de Honor", "conference": "FEB Andalucía", "state": "ES",
+     "foreign_friendly": True, "acceptance_rate": "Open enrolment",
+     "scholarship_info": "Athletic grants through IUEFA sports institute. Merit + performance based for international students.",
+     "scholarship_type": "Merit-Based", "language_of_study": "Spanish",
+     "ranking": None, "website": "https://www.us.es",
+     "image_url": "https://images.unsplash.com/photo-1560553814-060afcd8904a?w=400",
+     "coaches": [{"name": "Rafael Reyes", "title": "Basketball Director", "email": "deportes@us.es"}]},
+
+    # ── FRANCE ─────────────────────────────────────────────────────────────
+    {"name": "INSEP Paris", "location": "Paris", "country": "France", "region": "Europe",
+     "division": "Betclic Élite / National Elite", "conference": "FFBB National", "state": "FR",
+     "foreign_friendly": True, "acceptance_rate": "Highly competitive",
+     "scholarship_info": "France's premier sports institution. Full athletic scholarships for elite international athletes. Government-funded.",
+     "scholarship_type": "Full Academic + Athletic", "language_of_study": "French",
+     "ranking": None, "website": "https://www.insep.fr",
+     "image_url": "https://images.unsplash.com/photo-1583079806406-91731880e785?w=400",
+     "coaches": [{"name": "Frédéric Fauthoux", "title": "National Programme Director", "email": "basket@insep.fr"}]},
+
+    {"name": "Université Paris Nanterre + Nanterre 92", "location": "Nanterre", "country": "France", "region": "Europe",
+     "division": "Betclic Élite", "conference": "Pro A", "state": "FR",
+     "foreign_friendly": True, "acceptance_rate": "Open enrolment",
+     "scholarship_info": "Partnership with Pro A club Nanterre 92. Up to €15,000 scholarships for athletes on high-level lists.",
+     "scholarship_type": "Merit-Based", "language_of_study": "French / English",
+     "ranking": None, "website": "https://www.parisnanterre.fr",
+     "image_url": "https://images.unsplash.com/photo-1560553814-060afcd8904a?w=400",
+     "coaches": [{"name": "Laurent Legname", "title": "Elite Basketball Coordinator", "email": "sport-haut-niveau@parisnanterre.fr"}]},
+
+    {"name": "Université Claude Bernard Lyon 1 + ASVEL", "location": "Lyon", "country": "France", "region": "Europe",
+     "division": "Betclic Élite / EuroLeague", "conference": "Pro A", "state": "FR",
+     "foreign_friendly": True, "acceptance_rate": "Open enrolment",
+     "scholarship_info": "Partnership with Tony Parker's ASVEL (EuroLeague). Scholarship opportunities for enrolled student-athletes.",
+     "scholarship_type": "Partial Athletic", "language_of_study": "French",
+     "ranking": None, "website": "https://www.univ-lyon1.fr",
+     "image_url": "https://images.unsplash.com/photo-1583079806406-91731880e785?w=400",
+     "coaches": [{"name": "TJ Parker", "title": "Academy Director", "email": "sport.etudes@univ-lyon1.fr"}]},
+
+    {"name": "Université de Strasbourg + SIG Strasbourg", "location": "Strasbourg", "country": "France", "region": "Europe",
+     "division": "Pro B", "conference": "FFBB Pro B", "state": "FR",
+     "foreign_friendly": True, "acceptance_rate": "Open enrolment",
+     "scholarship_info": "Merit-based grants. SIG Strasbourg is one of France's most international-friendly clubs.",
+     "scholarship_type": "Merit-Based", "language_of_study": "French / English",
+     "ranking": None, "website": "https://www.unistra.fr",
+     "image_url": "https://images.unsplash.com/photo-1560553814-060afcd8904a?w=400",
+     "coaches": [{"name": "Vincent Collet", "title": "Head Coach", "email": "basket@unistra.fr"}]},
+
+    {"name": "Université de Limoges + Limoges CSP", "location": "Limoges", "country": "France", "region": "Europe",
+     "division": "Pro B", "conference": "FFBB Pro B", "state": "FR",
+     "foreign_friendly": True, "acceptance_rate": "Open enrolment",
+     "scholarship_info": "Limoges CSP has strong history of developing international talent. University + club dual registration.",
+     "scholarship_type": "Partial Athletic", "language_of_study": "French",
+     "ranking": None, "website": "https://www.unilim.fr",
+     "image_url": "https://images.unsplash.com/photo-1583079806406-91731880e785?w=400",
+     "coaches": [{"name": "Mehdy Mary", "title": "Basketball Coordinator", "email": "sport@unilim.fr"}]},
+
+    # ── GERMANY ────────────────────────────────────────────────────────────
+    {"name": "Universität Tübingen + Tigers Tübingen", "location": "Tübingen", "country": "Germany", "region": "Europe",
+     "division": "ProA (2. Basketball Bundesliga)", "conference": "BBL ProA", "state": "DE",
+     "foreign_friendly": True, "acceptance_rate": "Open enrolment",
+     "scholarship_info": "Germany's model student-athlete programme. Full university integration with ProA basketball. English modules available.",
+     "scholarship_type": "Partial Athletic", "language_of_study": "German / English",
+     "ranking": None, "website": "https://uni-tuebingen.de",
+     "image_url": "https://images.unsplash.com/photo-1560553814-060afcd8904a?w=400",
+     "coaches": [{"name": "Arne Woltmann", "title": "Head Coach Tigers", "email": "basketball@uni-tuebingen.de"}]},
+
+    {"name": "Humboldt-Universität Berlin + ALBA Berlin", "location": "Berlin", "country": "Germany", "region": "Europe",
+     "division": "BBL (Basketball Bundesliga)", "conference": "EuroLeague / BBL", "state": "DE",
+     "foreign_friendly": True, "acceptance_rate": "NC (numerus clausus)",
+     "scholarship_info": "ALBA Berlin elite development programme offers partial scholarships. Berlin is Europe's most international student city.",
+     "scholarship_type": "Partial Athletic", "language_of_study": "German / English",
+     "ranking": None, "website": "https://www.hu-berlin.de",
+     "image_url": "https://images.unsplash.com/photo-1583079806406-91731880e785?w=400",
+     "coaches": [{"name": "Israel González", "title": "Head Coach ALBA", "email": "academy@albaberlin.de"}]},
+
+    {"name": "Universität Ulm + Ratiopharm Ulm", "location": "Ulm", "country": "Germany", "region": "Europe",
+     "division": "BBL (Basketball Bundesliga)", "conference": "BBL", "state": "DE",
+     "foreign_friendly": True, "acceptance_rate": "Open enrolment",
+     "scholarship_info": "Official student-athlete programme. Ratiopharm Ulm (BBL). Flexible study planning around basketball schedule.",
+     "scholarship_type": "Merit-Based", "language_of_study": "German / English",
+     "ranking": None, "website": "https://www.uni-ulm.de",
+     "image_url": "https://images.unsplash.com/photo-1560553814-060afcd8904a?w=400",
+     "coaches": [{"name": "Anton Gavel", "title": "Development Coach", "email": "sport@uni-ulm.de"}]},
+
+    {"name": "Goethe-Universität Frankfurt + Skyliners", "location": "Frankfurt", "country": "Germany", "region": "Europe",
+     "division": "ProA (2. Basketball Bundesliga)", "conference": "BBL ProA", "state": "DE",
+     "foreign_friendly": True, "acceptance_rate": "Open enrolment",
+     "scholarship_info": "Frankfurt Skyliners student-athlete integration. Highly international city with excellent English-speaking support.",
+     "scholarship_type": "Merit-Based", "language_of_study": "German / English",
+     "ranking": None, "website": "https://www.goethe-university-frankfurt.de",
+     "image_url": "https://images.unsplash.com/photo-1583079806406-91731880e785?w=400",
+     "coaches": [{"name": "Mario Gutierrez", "title": "Head Coach", "email": "basketball@goethe-uni.de"}]},
+
+    {"name": "Hamburg Towers + Universität Hamburg", "location": "Hamburg", "country": "Germany", "region": "Europe",
+     "division": "BBL (Basketball Bundesliga)", "conference": "BBL", "state": "DE",
+     "foreign_friendly": True, "acceptance_rate": "Open enrolment",
+     "scholarship_info": "Official student-athlete programme. Hamburg is a major international city with large English-speaking community.",
+     "scholarship_type": "Merit-Based", "language_of_study": "German / English",
+     "ranking": None, "website": "https://www.uni-hamburg.de",
+     "image_url": "https://images.unsplash.com/photo-1560553814-060afcd8904a?w=400",
+     "coaches": [{"name": "Benka Barloschky", "title": "Head Coach", "email": "sport@uni-hamburg.de"}]},
+
+    # ── NETHERLANDS ────────────────────────────────────────────────────────
+    {"name": "Universiteit van Amsterdam + Heroes Den Bosch", "location": "Amsterdam", "country": "Netherlands", "region": "Europe",
+     "division": "DBL (Dutch Basketball League)", "conference": "NBB", "state": "NL",
+     "foreign_friendly": True, "acceptance_rate": "Open enrolment",
+     "scholarship_info": "Netherlands is highly English-friendly. UvA student-athlete scheme with DBL champions Heroes Den Bosch.",
+     "scholarship_type": "Partial Academic", "language_of_study": "English",
+     "ranking": None, "website": "https://www.uva.nl",
+     "image_url": "https://images.unsplash.com/photo-1583079806406-91731880e785?w=400",
+     "coaches": [{"name": "Toon van Helden", "title": "Head Coach", "email": "basketball@uva.nl"}]},
+
+    {"name": "Rijksuniversiteit Groningen + Donar Groningen", "location": "Groningen", "country": "Netherlands", "region": "Europe",
+     "division": "DBL (Dutch Basketball League)", "conference": "NBB", "state": "NL",
+     "foreign_friendly": True, "acceptance_rate": "Open enrolment",
+     "scholarship_info": "Donar Groningen is one of the Netherlands' top clubs. University offers full English-medium bachelor/master degrees.",
+     "scholarship_type": "Merit-Based", "language_of_study": "English",
+     "ranking": None, "website": "https://www.rug.nl",
+     "image_url": "https://images.unsplash.com/photo-1560553814-060afcd8904a?w=400",
+     "coaches": [{"name": "Lucas Bons", "title": "Head Coach Donar", "email": "sport@rug.nl"}]},
+
+    {"name": "Universiteit Utrecht + ZZ Leiden", "location": "Utrecht", "country": "Netherlands", "region": "Europe",
+     "division": "DBL (Dutch Basketball League)", "conference": "NBB", "state": "NL",
+     "foreign_friendly": True, "acceptance_rate": "Open enrolment",
+     "scholarship_info": "Partial academic scholarship combined with professional contract at ZZ Leiden (DBL). English taught programmes.",
+     "scholarship_type": "Partial Athletic", "language_of_study": "English",
+     "ranking": None, "website": "https://www.uu.nl",
+     "image_url": "https://images.unsplash.com/photo-1583079806406-91731880e785?w=400",
+     "coaches": [{"name": "Ivan Rudez", "title": "Basketball Programme Lead", "email": "basketball@uu.nl"}]},
+
+    {"name": "Windesheim University + Landstede Hammers", "location": "Zwolle", "country": "Netherlands", "region": "Europe",
+     "division": "DBL (Dutch Basketball League)", "conference": "NBB", "state": "NL",
+     "foreign_friendly": True, "acceptance_rate": "Open enrolment",
+     "scholarship_info": "Applied sciences university with dedicated student-athlete track. Landstede Hammers (DBL). Strong English support.",
+     "scholarship_type": "Partial Athletic", "language_of_study": "English / Dutch",
+     "ranking": None, "website": "https://www.windesheim.nl",
+     "image_url": "https://images.unsplash.com/photo-1560553814-060afcd8904a?w=400",
+     "coaches": [{"name": "Henk Norel", "title": "Head Coach Landstede", "email": "basketball@windesheim.nl"}]},
+
+    # ── ITALY ──────────────────────────────────────────────────────────────
+    {"name": "Università di Bologna + Fortitudo", "location": "Bologna", "country": "Italy", "region": "Europe",
+     "division": "Serie A2", "conference": "FIP Serie A2", "state": "IT",
+     "foreign_friendly": True, "acceptance_rate": "Open enrolment",
+     "scholarship_info": "Italy's oldest university. AlmaCampus athletic scholarships. Bologna has many English-taught programmes.",
+     "scholarship_type": "Merit-Based", "language_of_study": "Italian / English",
+     "ranking": None, "website": "https://www.unibo.it",
+     "image_url": "https://images.unsplash.com/photo-1583079806406-91731880e785?w=400",
+     "coaches": [{"name": "Antimo Martino", "title": "Head Coach", "email": "sport@unibo.it"}]},
+
+    {"name": "Università degli Studi di Milano + Olimpia", "location": "Milan", "country": "Italy", "region": "Europe",
+     "division": "Serie A / EuroLeague", "conference": "EuroLeague / LBA", "state": "IT",
+     "foreign_friendly": True, "acceptance_rate": "Open enrolment",
+     "scholarship_info": "Olimpia Milano (EuroLeague). University partnership scheme. Milan is Italy's most international city.",
+     "scholarship_type": "Partial Athletic", "language_of_study": "Italian / English",
+     "ranking": None, "website": "https://www.unimi.it",
+     "image_url": "https://images.unsplash.com/photo-1560553814-060afcd8904a?w=400",
+     "coaches": [{"name": "Ettore Messina", "title": "Head Coach Olimpia", "email": "academy@olimpiamilano.com"}]},
+
+    {"name": "Università La Sapienza Roma + Virtus Roma", "location": "Rome", "country": "Italy", "region": "Europe",
+     "division": "Serie A2", "conference": "FIP Serie A2", "state": "IT",
+     "foreign_friendly": False, "acceptance_rate": "Open enrolment",
+     "scholarship_info": "Europe's largest university. Virtus Roma dual-registration for student-athletes. Italian language required.",
+     "scholarship_type": "Merit-Based", "language_of_study": "Italian",
+     "ranking": None, "website": "https://www.uniroma1.it",
+     "image_url": "https://images.unsplash.com/photo-1583079806406-91731880e785?w=400",
+     "coaches": [{"name": "Nicola Legovich", "title": "Head Coach", "email": "sport@uniroma1.it"}]},
+
+    {"name": "Università di Trieste + Pallacanestro Trieste", "location": "Trieste", "country": "Italy", "region": "Europe",
+     "division": "Serie A (LBA)", "conference": "LBA Serie A", "state": "IT",
+     "foreign_friendly": True, "acceptance_rate": "Open enrolment",
+     "scholarship_info": "Pallacanestro Trieste is one of Italy's most international programmes. Merit scholarships for student-athletes.",
+     "scholarship_type": "Merit-Based", "language_of_study": "Italian / English",
+     "ranking": None, "website": "https://www.units.it",
+     "image_url": "https://images.unsplash.com/photo-1560553814-060afcd8904a?w=400",
+     "coaches": [{"name": "Jamion Christian", "title": "Head Coach", "email": "sport@units.it"}]},
+
+    # ── CZECH REPUBLIC ─────────────────────────────────────────────────────
+    {"name": "Charles University Prague + ERA Nymburk", "location": "Prague", "country": "Czech Republic", "region": "Europe",
+     "division": "Czech Basketball League (NBL)", "conference": "NBL Czech", "state": "CZ",
+     "foreign_friendly": True, "acceptance_rate": "Open enrolment",
+     "scholarship_info": "Czech basketball's most successful club ERA Nymburk in partnership with Prague universities. English-taught programmes available.",
+     "scholarship_type": "Merit-Based", "language_of_study": "English / Czech",
+     "ranking": None, "website": "https://www.cuni.cz",
+     "image_url": "https://images.unsplash.com/photo-1583079806406-91731880e785?w=400",
+     "coaches": [{"name": "Predrag Bensi", "title": "Head Coach", "email": "basketball@cuni.cz"}]},
+
+    {"name": "Brno University of Technology + Basketball Brno", "location": "Brno", "country": "Czech Republic", "region": "Europe",
+     "division": "Czech Basketball League (NBL)", "conference": "NBL Czech", "state": "CZ",
+     "foreign_friendly": True, "acceptance_rate": "Open enrolment",
+     "scholarship_info": "International student-athlete integration with Basketball Brno. Technical university with strong English support.",
+     "scholarship_type": "Partial Athletic", "language_of_study": "English / Czech",
+     "ranking": None, "website": "https://www.vutbr.cz",
+     "image_url": "https://images.unsplash.com/photo-1560553814-060afcd8904a?w=400",
+     "coaches": [{"name": "Lubomír Pospíšil", "title": "Head Coach", "email": "sport@vutbr.cz"}]},
+
+    # ── SCANDINAVIA ────────────────────────────────────────────────────────
+    {"name": "Aalborg University + Bakken Bears", "location": "Aalborg", "country": "Denmark", "region": "Europe",
+     "division": "Basketligaen (Danish)", "conference": "Basketligaen", "state": "DK",
+     "foreign_friendly": True, "acceptance_rate": "Open enrolment",
+     "scholarship_info": "Bakken Bears is Denmark's most successful club. AAU offers full English-medium degrees. No tuition fees for EU students.",
+     "scholarship_type": "Merit-Based", "language_of_study": "English",
+     "ranking": None, "website": "https://www.en.aau.dk",
+     "image_url": "https://images.unsplash.com/photo-1583079806406-91731880e785?w=400",
+     "coaches": [{"name": "Vitor Faverani", "title": "Head Coach", "email": "basketball@aau.dk"}]},
+
+    {"name": "Copenhagen Business School + Phoenix", "location": "Copenhagen", "country": "Denmark", "region": "Europe",
+     "division": "Basketligaen (Danish)", "conference": "Basketligaen", "state": "DK",
+     "foreign_friendly": True, "acceptance_rate": "Open enrolment",
+     "scholarship_info": "CBS is highly international. Copenhagen Phoenix basketball club. Denmark has no tuition fees for EU citizens.",
+     "scholarship_type": "Merit-Based", "language_of_study": "English",
+     "ranking": None, "website": "https://www.cbs.dk",
+     "image_url": "https://images.unsplash.com/photo-1560553814-060afcd8904a?w=400",
+     "coaches": [{"name": "Andreas Hansen", "title": "Head Coach", "email": "sport@cbs.dk"}]},
+
+    {"name": "Uppsala University + Uppsala Basket", "location": "Uppsala", "country": "Sweden", "region": "Europe",
+     "division": "Basketligan (Swedish)", "conference": "SBBF Basketligan", "state": "SE",
+     "foreign_friendly": True, "acceptance_rate": "Open enrolment",
+     "scholarship_info": "Sweden's oldest university. Student-athlete programme with Uppsala Basket (Basketligan). All courses in English.",
+     "scholarship_type": "Merit-Based", "language_of_study": "English",
+     "ranking": None, "website": "https://www.uu.se",
+     "image_url": "https://images.unsplash.com/photo-1583079806406-91731880e785?w=400",
+     "coaches": [{"name": "Marcus Eriksson", "title": "Basketball Coordinator", "email": "sport@uu.se"}]},
+
+    {"name": "University of Gothenburg + Chalmers Basket", "location": "Gothenburg", "country": "Sweden", "region": "Europe",
+     "division": "Basketligan (Swedish)", "conference": "SBBF Basketligan", "state": "SE",
+     "foreign_friendly": True, "acceptance_rate": "Open enrolment",
+     "scholarship_info": "Dual-university system (GU + Chalmers). International student-athlete track. Full English programmes. Sweden's second city.",
+     "scholarship_type": "Partial Academic", "language_of_study": "English",
+     "ranking": None, "website": "https://www.gu.se",
+     "image_url": "https://images.unsplash.com/photo-1560553814-060afcd8904a?w=400",
+     "coaches": [{"name": "Erik Svensson", "title": "Head Coach", "email": "sport@gu.se"}]},
+
+    {"name": "University of Oslo + Oslo BBK", "location": "Oslo", "country": "Norway", "region": "Europe",
+     "division": "BLNO (Norwegian Basketball League)", "conference": "BLNO", "state": "NO",
+     "foreign_friendly": True, "acceptance_rate": "Open enrolment",
+     "scholarship_info": "Norway has NO tuition fees for international students. UiO student-athlete dual track with Oslo BBK.",
+     "scholarship_type": "Full Academic + Athletic", "language_of_study": "English",
+     "ranking": None, "website": "https://www.uio.no",
+     "image_url": "https://images.unsplash.com/photo-1583079806406-91731880e785?w=400",
+     "coaches": [{"name": "Christian Tande", "title": "Head Coach", "email": "sport@uio.no"}]},
+
+    {"name": "Aalto University + Torpan Pojat", "location": "Helsinki", "country": "Finland", "region": "Europe",
+     "division": "Korisliiga (Finnish)", "conference": "Finnish Basketball", "state": "FI",
+     "foreign_friendly": True, "acceptance_rate": "Competitive entry",
+     "scholarship_info": "Aalto is Finland's top technical university with strong English instruction. Torpan Pojat is Helsinki's top club.",
+     "scholarship_type": "Merit-Based", "language_of_study": "English",
+     "ranking": None, "website": "https://www.aalto.fi",
+     "image_url": "https://images.unsplash.com/photo-1583079806406-91731880e785?w=400",
+     "coaches": [{"name": "Juha Pasanen", "title": "Basketball Director", "email": "sport@aalto.fi"}]},
+]
+
+@api_router.post("/seed-european-colleges")
+async def seed_european_colleges(current_user: UserModel = Depends(get_current_user)):
+    inserted = 0
+    skipped = 0
+    for college in EUROPEAN_COLLEGES:
+        existing = await db.colleges.find_one({"name": college["name"]})
+        if existing:
+            skipped += 1
+            continue
+        college_doc = {**college, "created_at": datetime.now(timezone.utc).isoformat()}
+        await db.colleges.insert_one(college_doc)
+        inserted += 1
+    return {"inserted": inserted, "skipped": skipped, "total": len(EUROPEAN_COLLEGES)}
+
+@api_router.post("/migrate-us-region")
+async def migrate_us_region(current_user: UserModel = Depends(get_current_user)):
+    result = await db.colleges.update_many(
+        {"region": {"$exists": False}},
+        {"$set": {"region": "USA"}}
+    )
+    return {"updated": result.modified_count}
+
+
 @api_router.get("/colleges/compare")
 async def compare_colleges(ids: str, current_user: UserModel = Depends(get_current_user)):
     college_ids = [i.strip() for i in ids.split(",") if i.strip()][:3]
