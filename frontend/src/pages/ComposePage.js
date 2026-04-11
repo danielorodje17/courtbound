@@ -21,8 +21,9 @@ export default function ComposePage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [gmailSent, setGmailSent] = useState(false);
-  const [openingGmail, setOpeningGmail] = useState(false);
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState("");
 
   // Template library state
@@ -110,17 +111,19 @@ export default function ComposePage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const openInGmail = async () => {
+  const openInGmail = () => {
     if (!draft || !selectedCollege) return;
-    setOpeningGmail(true);
-
-    // Open Gmail compose in new tab
     const coachEmail = selectedCoach?.email || "";
     const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1${coachEmail ? `&to=${encodeURIComponent(coachEmail)}` : ""}&su=${encodeURIComponent(subject || "Basketball Scholarship Inquiry")}&body=${encodeURIComponent(draft)}`;
     window.open(gmailUrl, "_blank");
+    setAwaitingConfirmation(true);
+    setConfirmed(false);
+  };
 
+  const confirmEmailSent = async () => {
+    if (!selectedCollege) return;
+    setConfirming(true);
     try {
-      // Log the email
       await apiRequest("post", "/emails", {
         college_id: selectedCollege.id,
         direction: "sent",
@@ -130,27 +133,22 @@ export default function ComposePage() {
         coach_email: selectedCoach?.email || "",
         message_type: messageType,
       });
-
-      // Auto-track the college if not already tracked
       try {
         await apiRequest("post", "/my-colleges", { college_id: selectedCollege.id, notes: "" });
-      } catch {} // 400 = already tracked, fine
-
-      // Set status to contacted + follow-up in 7 days
+      } catch {} // 400 = already tracked
       const followUpDate = new Date();
       followUpDate.setDate(followUpDate.getDate() + 7);
-      const followUpStr = followUpDate.toISOString().split("T")[0];
       await apiRequest("patch", `/my-colleges/${selectedCollege.id}/status`, {
         status: "contacted",
-        follow_up_date: followUpStr,
+        follow_up_date: followUpDate.toISOString().split("T")[0],
       });
-
-      setGmailSent(true);
-      setTimeout(() => setGmailSent(false), 5000);
+      setAwaitingConfirmation(false);
+      setConfirmed(true);
+      setTimeout(() => setConfirmed(false), 6000);
     } catch (err) {
-      console.error("Failed to log or follow-up:", err);
+      console.error("Failed to log email:", err);
     } finally {
-      setOpeningGmail(false);
+      setConfirming(false);
     }
   };
 
@@ -483,32 +481,63 @@ export default function ComposePage() {
           {/* Open in Gmail — primary send action */}
           {draft && (
             <div className="mt-4 space-y-3">
+              {/* Step 1 — Open Gmail */}
               <button
                 data-testid="open-in-gmail-btn"
                 onClick={openInGmail}
-                disabled={openingGmail || !selectedCollege}
+                disabled={!selectedCollege}
                 className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-700 text-white font-bold uppercase tracking-wider rounded-lg py-3.5 text-sm transition-all disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <Mail className="w-4 h-4" />
-                {openingGmail ? "Opening Gmail..." : "Open in Gmail"}
+                Open in Gmail
                 <ExternalLink className="w-3.5 h-3.5 opacity-60" />
               </button>
 
-              {gmailSent && (
-                <div className="flex items-start gap-3 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3" data-testid="gmail-sent-confirmation">
-                  <CheckCircle className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-bold text-emerald-800">Gmail opened — email logged</p>
-                    <p className="text-xs text-emerald-600 mt-0.5">
-                      {selectedCollege?.name} marked as <strong>Contacted</strong> with a follow-up reminder set for 7 days.
-                    </p>
+              {/* Step 2 — Awaiting confirmation */}
+              {awaitingConfirmation && (
+                <div className="border border-orange-200 bg-orange-50 rounded-xl p-4 space-y-3" data-testid="gmail-confirm-card">
+                  <div className="flex items-start gap-2.5">
+                    <Mail className="w-4 h-4 text-orange-500 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-bold text-orange-900">Please confirm once you've sent the email</p>
+                      <p className="text-xs text-orange-700 mt-1 leading-relaxed">
+                        CourtBound can't detect sends from Gmail, so your confirmation lets us log this to your <strong>Sent Emails</strong> history and set a <strong>7-day follow-up reminder</strong> for {selectedCollege?.name} in Priority Actions.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      data-testid="confirm-email-sent-btn"
+                      onClick={confirmEmailSent}
+                      disabled={confirming}
+                      className="flex-1 flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-bold text-sm uppercase tracking-wider rounded-lg py-2.5 transition-colors disabled:opacity-60"
+                    >
+                      <CheckCircle className="w-4 h-4" />
+                      {confirming ? "Logging..." : "Yes, Email Sent"}
+                    </button>
+                    <button
+                      data-testid="cancel-gmail-confirm-btn"
+                      onClick={() => setAwaitingConfirmation(false)}
+                      className="px-4 py-2.5 rounded-lg border border-orange-200 text-sm font-medium text-orange-600 hover:bg-orange-100 transition-colors"
+                    >
+                      Cancel
+                    </button>
                   </div>
                 </div>
               )}
 
-              <p className="text-xs text-slate-400 text-center">
-                Gmail will open with your draft pre-filled. The email is logged automatically and a follow-up reminder will be set.
-              </p>
+              {/* Step 3 — Confirmed success */}
+              {confirmed && (
+                <div className="flex items-start gap-3 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3" data-testid="gmail-sent-confirmation">
+                  <CheckCircle className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-bold text-emerald-800">Email logged successfully</p>
+                    <p className="text-xs text-emerald-600 mt-0.5">
+                      <strong>{selectedCollege?.name}</strong> marked as Contacted. Follow-up reminder set for 7 days — check Priority Actions on your Dashboard.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
