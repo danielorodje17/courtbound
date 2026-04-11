@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiRequest } from "../context/AuthContext";
 import { Trophy, Mail, BookOpen, TrendingUp, ChevronRight, Bell, Plus, AlertTriangle, Clock, Calendar, CheckCircle, BarChart2, Newspaper, ArrowUp, ArrowDown, Minus } from "lucide-react";
+import WeeklyGoalsWidget from "../components/WeeklyGoalsWidget";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell
@@ -153,6 +154,9 @@ export default function Dashboard() {
           </div>
         ))}
       </div>
+
+      {/* Weekly Goals */}
+      <WeeklyGoalsWidget />
 
       {/* Priority Actions Widget */}
       {alerts && totalAlerts > 0 && (
