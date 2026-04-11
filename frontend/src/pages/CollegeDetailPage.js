@@ -162,7 +162,7 @@ export default function CollegeDetailPage() {
                 </span>
                 {college.foreign_friendly && (
                   <span className="px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide bg-green-500 text-white">
-                    International Friendly
+                    Euro Friendly
                   </span>
                 )}
               </div>
@@ -223,10 +223,10 @@ export default function CollegeDetailPage() {
             {college.foreign_friendly && (
               <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-3">
                 <p className="text-xs font-bold text-green-700 uppercase tracking-wide mb-1 flex items-center gap-1.5">
-                  <Globe className="w-3.5 h-3.5" /> UK / International Friendly
+                  <Globe className="w-3.5 h-3.5" /> Euro Friendly
                 </p>
                 <p className="text-xs text-green-700 leading-relaxed">
-                  This program actively recruits international players and has experience supporting UK student-athletes with visa processes, SEVIS requirements, and NCAA Eligibility Center registration. A great target for your recruitment campaign.
+                  This program actively recruits European players and has experience supporting international student-athletes with visa processes, SEVIS requirements, and NCAA Eligibility Center registration. A great target for your recruitment campaign.
                 </p>
               </div>
             )}
