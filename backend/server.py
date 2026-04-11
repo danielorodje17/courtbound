@@ -1684,7 +1684,54 @@ async def get_current_goals(current_user: UserModel = Depends(get_current_user))
     goals = goals_doc["goals"] if goals_doc else {"emails_sent": 0, "follow_ups": 0, "new_tracks": 0, "calls": 0}
     progress = await _compute_progress(uid, ws, we)
 
-    return {"week_start": ws.isoformat(), "week_label": week_label, "goals": goals, "progress": progress}
+    # ── Suggestions: avg of last 4 complete weeks + nudge of +1 ──────────────
+    four_weeks_ago = ws - timedelta(weeks=4)
+    past_emails = await db.emails.find(
+        {"user_id": uid, "direction": "sent",
+         "created_at": {"$gte": four_weeks_ago.isoformat(), "$lt": ws.isoformat()}},
+        {"_id": 0, "created_at": 1, "message_type": 1}
+    ).to_list(1000)
+    past_tracked = await db.tracked_colleges.find(
+        {"user_id": uid, "created_at": {"$gte": four_weeks_ago.isoformat(), "$lt": ws.isoformat()}},
+        {"_id": 0, "created_at": 1}
+    ).to_list(500)
+    past_calls_docs = await db.tracked_colleges.find(
+        {"user_id": uid, "call_notes": {"$exists": True, "$ne": []}},
+        {"_id": 0, "call_notes": 1}
+    ).to_list(500)
+
+    past_weeks = [(ws - timedelta(weeks=i), ws - timedelta(weeks=i - 1)) for i in range(4, 0, -1)]
+    totals = {"emails_sent": 0, "follow_ups": 0, "new_tracks": 0, "calls": 0}
+    active_weeks = 0
+    for pw, pwe in past_weeks:
+        ws_s, we_s = pw.isoformat(), pwe.isoformat()
+        e = sum(1 for x in past_emails if ws_s <= x.get("created_at", "")[:10] < we_s)
+        f = sum(1 for x in past_emails if ws_s <= x.get("created_at", "")[:10] < we_s and x.get("message_type") == "follow_up")
+        n = sum(1 for t in past_tracked if t.get("created_at") and ws_s <= t["created_at"][:10] < we_s)
+        c = sum(1 for t in past_calls_docs for cn in (t.get("call_notes") or []) if cn.get("created_at") and ws_s <= cn["created_at"][:10] < we_s)
+        totals["emails_sent"] += e
+        totals["follow_ups"] += f
+        totals["new_tracks"] += n
+        totals["calls"] += c
+        if any([e, f, n, c]):
+            active_weeks += 1
+
+    suggestions = {}
+    for k in ["emails_sent", "follow_ups", "new_tracks", "calls"]:
+        avg = totals[k] / 4
+        if avg > 0:
+            suggestions[k] = max(1, round(avg) + 1)
+        else:
+            suggestions[k] = 3 if k == "emails_sent" else (2 if k == "follow_ups" else 1)
+
+    return {
+        "week_start": ws.isoformat(),
+        "week_label": week_label,
+        "goals": goals,
+        "progress": progress,
+        "suggestions": suggestions,
+        "has_history": active_weeks > 0,
+    }
 
 
 @api_router.put("/goals/current")
