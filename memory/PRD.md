@@ -235,6 +235,15 @@ An 18-year-old student basketball player from UK (England Under-18) wants to tra
 - [x] Success banner confirms: "[College] marked as Contacted with follow-up reminder set for 7 days"
 ## Backlog
 
+### Coach Profile Photos (P2)
+- [ ] Show coach images on College Detail page
+
+### Refactoring
+- [x] server.py split into modular FastAPI routers (v1.17, Apr 2026):
+  - database.py, auth_utils.py, models.py, seed_data.py
+  - routers/auth.py, colleges.py, tracked.py, emails.py, dashboard.py, goals.py, ai.py, profile.py
+  - server.py reduced from 1,823 lines to 56-line entry point
+
 ### When ready
 - [ ] Weekly Digest email (deferred — needs Resend API key from user)
 
