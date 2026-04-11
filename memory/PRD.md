@@ -229,6 +229,10 @@ An 18-year-old student basketball player from UK (England Under-18) wants to tra
 
 ---
 
+### v1.16 - Open in Gmail + Auto Follow-Up (Apr 2026)
+- [x] "Open in Gmail" button on ComposePage — opens Gmail compose in new tab with coach email, subject, body pre-filled
+- [x] On click: logs email (POST /api/emails), auto-tracks college if not tracked, sets status=contacted + follow_up_date=today+7
+- [x] Success banner confirms: "[College] marked as Contacted with follow-up reminder set for 7 days"
 ## Backlog
 
 ### When ready
