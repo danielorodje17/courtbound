@@ -200,6 +200,16 @@ An 18-year-old student basketball player from UK (England Under-18) wants to tra
 - [x] CollegeDetailPage header: button relabeled "Add to My List" with shadow when untracked
 - [x] All sidebar features (status, progress score, checklist, call notes) only shown when tracking
 
+### v1.13 - European Scholarship Programmes + Weekly Digest (Apr 2026)
+- [x] 31 European colleges seeded: Spain, France, Germany, Netherlands, Italy, Czech Republic, Denmark, Norway, Sweden, Finland
+- [x] EU colleges include: region, country, language_of_study, scholarship_type fields
+- [x] GET /colleges projection updated to return all 4 European fields
+- [x] Auto-seeds European colleges on startup (_seed_european_colleges_startup)
+- [x] CollegesPage Region filter: USA / Europe tabs, EU cards show Country + Language + Scholarship Type
+- [x] CollegeDetailPage: European info panel (Country, Language of Study, Scholarship Type)
+- [x] In-app Weekly Digest widget on Dashboard: emails sent (vs last week trend), responses in, new colleges tracked, overdue count, top progress college, recommended action CTA
+- [x] GET /api/dashboard/weekly-digest endpoint
+
 ---
 
 ## Backlog
