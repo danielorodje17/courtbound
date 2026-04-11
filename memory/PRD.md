@@ -219,6 +219,14 @@ An 18-year-old student basketball player from UK (England Under-18) wants to tra
 - [x] 8-week achievement history (expandable): shows each week's progress vs goals, colour-coded achievement % (green=100%, amber=50-99%, red=<50%)
 - [x] GET /api/goals/current, PUT /api/goals/current, GET /api/goals/history endpoints
 
+### v1.15 - Smart Goal Suggestions (Apr 2026)
+- [x] GET /api/goals/current now returns `suggestions` (avg of last 4 weeks + 1 nudge) and `has_history` flag
+- [x] Default suggestions when no history: emails_sent=3, follow_ups=2, new_tracks=1, calls=1
+- [x] Empty state: suggestion preview chips per metric + "Use Suggestions" one-click save + "Customise" to open modal
+- [x] Modal: "Apply all" banner button + per-metric sparkle chip to fill individual inputs
+- [x] Modal auto-pre-fills with suggestions when no goals are set yet
+- [x] Active goals view: inline sparkle hint shows if suggestion exceeds current goal
+
 ---
 
 ## Backlog
