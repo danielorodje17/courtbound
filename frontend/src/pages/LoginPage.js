@@ -53,7 +53,7 @@ export default function LoginPage() {
             Your Scholarship<br />Tracker
           </h1>
           <p className="text-slate-500 text-sm mt-2">
-            Track US college basketball scholarships,<br />manage coach contacts, and draft winning emails.
+            Track US and European college basketball scholarships,<br />manage coach contacts, and draft winning emails.
           </p>
         </div>
 
@@ -80,7 +80,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-xs text-slate-400 mt-6">
-          Built for UK basketball players targeting US college scholarships
+          Built for European basketball players targeting US and European college scholarships
         </p>
       </div>
     </div>
