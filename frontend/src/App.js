@@ -14,6 +14,7 @@ import AIMatchPage from "./pages/AIMatchPage";
 import ComparePage from "./pages/ComparePage";
 import LoginPage from "./pages/LoginPage";
 import AuthCallback from "./pages/AuthCallback";
+import HelpWidget from "./components/HelpWidget";
 import { Trophy, Home, BookOpen, Mail, Wand2, Lightbulb, Menu, X, ShieldCheck, UserCircle, MessageSquare, LogOut, ChevronDown, Sparkles } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -178,21 +179,24 @@ function AppRouter() {
     return <AuthCallback />;
   }
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
-      <Route path="/dashboard" element={<ProtectedRoute><AppLayout><Dashboard /></AppLayout></ProtectedRoute>} />
-      <Route path="/colleges" element={<ProtectedRoute><AppLayout><CollegesPage /></AppLayout></ProtectedRoute>} />
-      <Route path="/colleges/:id" element={<ProtectedRoute><AppLayout><CollegeDetailPage /></AppLayout></ProtectedRoute>} />
-      <Route path="/communications" element={<ProtectedRoute><AppLayout><CommunicationsPage /></AppLayout></ProtectedRoute>} />
-      <Route path="/compose" element={<ProtectedRoute><AppLayout><ComposePage /></AppLayout></ProtectedRoute>} />
-      <Route path="/strategy" element={<ProtectedRoute><AppLayout><StrategyPage /></AppLayout></ProtectedRoute>} />
-      <Route path="/ncaa" element={<ProtectedRoute><AppLayout><NCAACHeckerPage /></AppLayout></ProtectedRoute>} />
-      <Route path="/profile" element={<ProtectedRoute><AppLayout><ProfilePage /></AppLayout></ProtectedRoute>} />
-      <Route path="/responses" element={<ProtectedRoute><AppLayout><ResponseTrackerPage /></AppLayout></ProtectedRoute>} />
-      <Route path="/ai-match" element={<ProtectedRoute><AppLayout><AIMatchPage /></AppLayout></ProtectedRoute>} />
-      <Route path="/compare" element={<ProtectedRoute><AppLayout><ComparePage /></AppLayout></ProtectedRoute>} />
-    </Routes>
+    <>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/dashboard" element={<ProtectedRoute><AppLayout><Dashboard /></AppLayout></ProtectedRoute>} />
+        <Route path="/colleges" element={<ProtectedRoute><AppLayout><CollegesPage /></AppLayout></ProtectedRoute>} />
+        <Route path="/colleges/:id" element={<ProtectedRoute><AppLayout><CollegeDetailPage /></AppLayout></ProtectedRoute>} />
+        <Route path="/communications" element={<ProtectedRoute><AppLayout><CommunicationsPage /></AppLayout></ProtectedRoute>} />
+        <Route path="/compose" element={<ProtectedRoute><AppLayout><ComposePage /></AppLayout></ProtectedRoute>} />
+        <Route path="/strategy" element={<ProtectedRoute><AppLayout><StrategyPage /></AppLayout></ProtectedRoute>} />
+        <Route path="/ncaa" element={<ProtectedRoute><AppLayout><NCAACHeckerPage /></AppLayout></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute><AppLayout><ProfilePage /></AppLayout></ProtectedRoute>} />
+        <Route path="/responses" element={<ProtectedRoute><AppLayout><ResponseTrackerPage /></AppLayout></ProtectedRoute>} />
+        <Route path="/ai-match" element={<ProtectedRoute><AppLayout><AIMatchPage /></AppLayout></ProtectedRoute>} />
+        <Route path="/compare" element={<ProtectedRoute><AppLayout><ComparePage /></AppLayout></ProtectedRoute>} />
+      </Routes>
+      <HelpWidget />
+    </>
   );
 }
 

@@ -233,6 +233,11 @@ An 18-year-old student basketball player from UK (England Under-18) wants to tra
 - [x] "Open in Gmail" button on ComposePage — opens Gmail compose in new tab with coach email, subject, body pre-filled
 - [x] On click: logs email (POST /api/emails), auto-tracks college if not tracked, sets status=contacted + follow_up_date=today+7
 - [x] Success banner confirms: "[College] marked as Contacted with follow-up reminder set for 7 days"
+### v1.18 - Help & Support Widget (Apr 2026)
+- [x] Floating `?` button fixed bottom-right, visible on every page
+- [x] Opens a 600px panel with searchable FAQ (27 questions across 7 sections)
+- [x] Sections: Getting Started, Finding Colleges, Tracking Colleges, Emails & Outreach, Weekly Goals, AI Features, Dashboard
+- [x] Search filters questions in real time; section nav pills for quick browsing
 ## Backlog
 
 ### Coach Profile Photos (P2)
