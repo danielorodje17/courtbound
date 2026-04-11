@@ -146,6 +146,7 @@ class EmailLogCreate(BaseModel):
     body: str
     coach_name: Optional[str] = ""
     coach_email: Optional[str] = ""
+    message_type: Optional[str] = ""
 
 class AIMessageRequest(BaseModel):
     college_name: str

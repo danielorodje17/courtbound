@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { apiRequest } from "../context/AuthContext";
-import { Wand2, Copy, Save, ArrowLeft, ChevronDown, Trash2, X, Plus, BookMarked, Film } from "lucide-react";
+import { Wand2, Copy, Save, ArrowLeft, ChevronDown, Trash2, X, Plus, BookMarked, Film, Mail, ExternalLink, CheckCircle } from "lucide-react";
 
 export default function ComposePage() {
   const location = useLocation();
@@ -21,6 +21,8 @@ export default function ComposePage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [gmailSent, setGmailSent] = useState(false);
+  const [openingGmail, setOpeningGmail] = useState(false);
   const [error, setError] = useState("");
 
   // Template library state
@@ -106,6 +108,50 @@ export default function ComposePage() {
     navigator.clipboard.writeText(draft);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const openInGmail = async () => {
+    if (!draft || !selectedCollege) return;
+    setOpeningGmail(true);
+
+    // Open Gmail compose in new tab
+    const coachEmail = selectedCoach?.email || "";
+    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1${coachEmail ? `&to=${encodeURIComponent(coachEmail)}` : ""}&su=${encodeURIComponent(subject || "Basketball Scholarship Inquiry")}&body=${encodeURIComponent(draft)}`;
+    window.open(gmailUrl, "_blank");
+
+    try {
+      // Log the email
+      await apiRequest("post", "/emails", {
+        college_id: selectedCollege.id,
+        direction: "sent",
+        subject: subject || "Basketball Scholarship Inquiry",
+        body: draft,
+        coach_name: selectedCoach?.name || "",
+        coach_email: selectedCoach?.email || "",
+        message_type: messageType,
+      });
+
+      // Auto-track the college if not already tracked
+      try {
+        await apiRequest("post", "/my-colleges", { college_id: selectedCollege.id, notes: "" });
+      } catch {} // 400 = already tracked, fine
+
+      // Set status to contacted + follow-up in 7 days
+      const followUpDate = new Date();
+      followUpDate.setDate(followUpDate.getDate() + 7);
+      const followUpStr = followUpDate.toISOString().split("T")[0];
+      await apiRequest("patch", `/my-colleges/${selectedCollege.id}/status`, {
+        status: "contacted",
+        follow_up_date: followUpStr,
+      });
+
+      setGmailSent(true);
+      setTimeout(() => setGmailSent(false), 5000);
+    } catch (err) {
+      console.error("Failed to log or follow-up:", err);
+    } finally {
+      setOpeningGmail(false);
+    }
   };
 
   const handleSaveTemplate = async (e) => {
@@ -433,6 +479,38 @@ export default function ComposePage() {
               className="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none resize-none"
             />
           </div>
+
+          {/* Open in Gmail — primary send action */}
+          {draft && (
+            <div className="mt-4 space-y-3">
+              <button
+                data-testid="open-in-gmail-btn"
+                onClick={openInGmail}
+                disabled={openingGmail || !selectedCollege}
+                className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-700 text-white font-bold uppercase tracking-wider rounded-lg py-3.5 text-sm transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <Mail className="w-4 h-4" />
+                {openingGmail ? "Opening Gmail..." : "Open in Gmail"}
+                <ExternalLink className="w-3.5 h-3.5 opacity-60" />
+              </button>
+
+              {gmailSent && (
+                <div className="flex items-start gap-3 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3" data-testid="gmail-sent-confirmation">
+                  <CheckCircle className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-bold text-emerald-800">Gmail opened — email logged</p>
+                    <p className="text-xs text-emerald-600 mt-0.5">
+                      {selectedCollege?.name} marked as <strong>Contacted</strong> with a follow-up reminder set for 7 days.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <p className="text-xs text-slate-400 text-center">
+                Gmail will open with your draft pre-filled. The email is logged automatically and a follow-up reminder will be set.
+              </p>
+            </div>
+          )}
 
           {!draft && !generating && (
             <div className="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
