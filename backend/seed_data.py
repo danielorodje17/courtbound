@@ -152,7 +152,10 @@ EUROPEAN_COLLEGES = [
      "scholarship_type": "Partial Athletic", "language_of_study": "English / Spanish",
      "ranking": None, "website": "https://universidadeuropea.com",
      "image_url": "https://images.unsplash.com/photo-1560553814-060afcd8904a?w=400",
-     "coaches": [{"name": "Carlos Jiménez", "title": "Head Basketball Coach", "email": "basketball@uem.es"}]},
+     "coaches": [
+         {"name": "Carlos Jiménez", "title": "Head Basketball Coach", "email": "cdu@universidadeuropea.es"},
+         {"name": "Scholarship & Admissions Office", "title": "Plan Compite Scholarships", "email": "becasadmisiones@universidadeuropea.es"},
+     ]},
 
     {"name": "CEU Cardenal Herrera University", "location": "Valencia", "country": "Spain", "region": "Europe",
      "division": "LEB Gold", "conference": "FEB Nacional", "state": "ES",
@@ -161,7 +164,9 @@ EUROPEAN_COLLEGES = [
      "scholarship_type": "Merit-Based", "language_of_study": "Spanish",
      "ranking": None, "website": "https://www.uchceu.es",
      "image_url": "https://images.unsplash.com/photo-1583079806406-91731880e785?w=400",
-     "coaches": [{"name": "Sergio Pascual", "title": "Basketball Coordinator", "email": "deportes@uchceu.es"}]},
+     "coaches": [
+         {"name": "Sergio Pascual", "title": "Basketball Coordinator", "email": "sportsarea@uchceu.es"},
+     ]},
 
     {"name": "UCAM Murcia (Universidad Católica de Murcia)", "location": "Murcia", "country": "Spain", "region": "Europe",
      "division": "ACB (Liga Endesa)", "conference": "ACB", "state": "ES",
@@ -170,7 +175,10 @@ EUROPEAN_COLLEGES = [
      "scholarship_type": "Full Academic + Athletic", "language_of_study": "Spanish / English",
      "ranking": None, "website": "https://www.ucam.edu",
      "image_url": "https://images.unsplash.com/photo-1560553814-060afcd8904a?w=400",
-     "coaches": [{"name": "Sito Alonso", "title": "Head Coach", "email": "baloncesto@ucam.edu"}]},
+     "coaches": [
+         {"name": "Sito Alonso", "title": "Head Coach UCAM Basketball", "email": "baloncesto@ucam.edu"},
+         {"name": "University Secretariat", "title": "Student Admissions", "email": "secretaria@ucam.edu"},
+     ]},
 
     {"name": "Universidad de Zaragoza + Casademont", "location": "Zaragoza", "country": "Spain", "region": "Europe",
      "division": "ACB (Liga Endesa)", "conference": "ACB", "state": "ES",
@@ -179,7 +187,10 @@ EUROPEAN_COLLEGES = [
      "scholarship_type": "Partial Athletic", "language_of_study": "Spanish",
      "ranking": None, "website": "https://www.unizar.es",
      "image_url": "https://images.unsplash.com/photo-1583079806406-91731880e785?w=400",
-     "coaches": [{"name": "Juan Barea", "title": "Player Development", "email": "deporte@unizar.es"}]},
+     "coaches": [
+         {"name": "Casademont Zaragoza Club", "title": "Club Administration (ACB)", "email": "info@basketzaragoza.net"},
+         {"name": "University Sports Dept", "title": "Sport & Athlete Support", "email": "deporte@unizar.es"},
+     ]},
 
     {"name": "Universidad de Sevilla (IUEFA)", "location": "Seville", "country": "Spain", "region": "Europe",
      "division": "División de Honor", "conference": "FEB Andalucía", "state": "ES",
@@ -188,7 +199,9 @@ EUROPEAN_COLLEGES = [
      "scholarship_type": "Merit-Based", "language_of_study": "Spanish",
      "ranking": None, "website": "https://www.us.es",
      "image_url": "https://images.unsplash.com/photo-1560553814-060afcd8904a?w=400",
-     "coaches": [{"name": "Rafael Reyes", "title": "Basketball Director", "email": "deportes@us.es"}]},
+     "coaches": [
+         {"name": "Rafael Reyes", "title": "Basketball Director IUEFA", "email": "deportes@us.es"},
+     ]},
 
     # ── FRANCE ─────────────────────────────────────────────────────────────
     {"name": "INSEP Paris", "location": "Paris", "country": "France", "region": "Europe",
@@ -198,7 +211,9 @@ EUROPEAN_COLLEGES = [
      "scholarship_type": "Full Academic + Athletic", "language_of_study": "French",
      "ranking": None, "website": "https://www.insep.fr",
      "image_url": "https://images.unsplash.com/photo-1583079806406-91731880e785?w=400",
-     "coaches": [{"name": "Frédéric Fauthoux", "title": "National Programme Director", "email": "basket@insep.fr"}]},
+     "coaches": [
+         {"name": "Frédéric Fauthoux", "title": "National Programme Director", "email": "international@insep.fr"},
+     ]},
 
     {"name": "Université Paris Nanterre + Nanterre 92", "location": "Nanterre", "country": "France", "region": "Europe",
      "division": "Betclic Élite", "conference": "Pro A", "state": "FR",
@@ -207,7 +222,9 @@ EUROPEAN_COLLEGES = [
      "scholarship_type": "Merit-Based", "language_of_study": "French / English",
      "ranking": None, "website": "https://www.parisnanterre.fr",
      "image_url": "https://images.unsplash.com/photo-1560553814-060afcd8904a?w=400",
-     "coaches": [{"name": "Laurent Legname", "title": "Elite Basketball Coordinator", "email": "sport-haut-niveau@parisnanterre.fr"}]},
+     "coaches": [
+         {"name": "Laurent Legname", "title": "Elite Basketball Coordinator", "email": "sport-haut-niveau@parisnanterre.fr"},
+     ]},
 
     {"name": "Université Claude Bernard Lyon 1 + ASVEL", "location": "Lyon", "country": "France", "region": "Europe",
      "division": "Betclic Élite / EuroLeague", "conference": "Pro A", "state": "FR",
@@ -216,7 +233,9 @@ EUROPEAN_COLLEGES = [
      "scholarship_type": "Partial Athletic", "language_of_study": "French",
      "ranking": None, "website": "https://www.univ-lyon1.fr",
      "image_url": "https://images.unsplash.com/photo-1583079806406-91731880e785?w=400",
-     "coaches": [{"name": "TJ Parker", "title": "Academy Director", "email": "sport.etudes@univ-lyon1.fr"}]},
+     "coaches": [
+         {"name": "TJ Parker", "title": "Academy Director (ASVEL)", "email": "sport.etudes@univ-lyon1.fr"},
+     ]},
 
     {"name": "Université de Strasbourg + SIG Strasbourg", "location": "Strasbourg", "country": "France", "region": "Europe",
      "division": "Pro B", "conference": "FFBB Pro B", "state": "FR",
@@ -225,7 +244,10 @@ EUROPEAN_COLLEGES = [
      "scholarship_type": "Merit-Based", "language_of_study": "French / English",
      "ranking": None, "website": "https://www.unistra.fr",
      "image_url": "https://images.unsplash.com/photo-1560553814-060afcd8904a?w=400",
-     "coaches": [{"name": "Vincent Collet", "title": "Head Coach", "email": "basket@unistra.fr"}]},
+     "coaches": [
+         {"name": "SIG Strasbourg Club", "title": "Club Contact", "email": "contact@sigstrasbourg.fr"},
+         {"name": "University Sports Dept", "title": "Sport-Études Programme", "email": "basket@unistra.fr"},
+     ]},
 
     {"name": "Université de Limoges + Limoges CSP", "location": "Limoges", "country": "France", "region": "Europe",
      "division": "Pro B", "conference": "FFBB Pro B", "state": "FR",
@@ -234,7 +256,10 @@ EUROPEAN_COLLEGES = [
      "scholarship_type": "Partial Athletic", "language_of_study": "French",
      "ranking": None, "website": "https://www.unilim.fr",
      "image_url": "https://images.unsplash.com/photo-1583079806406-91731880e785?w=400",
-     "coaches": [{"name": "Mehdy Mary", "title": "Basketball Coordinator", "email": "sport@unilim.fr"}]},
+     "coaches": [
+         {"name": "Limoges CSP Club", "title": "Club Administration", "email": "info@limogescsp.com"},
+         {"name": "University Sports Dept", "title": "Sport-Études University", "email": "sport@unilim.fr"},
+     ]},
 
     # ── GERMANY ────────────────────────────────────────────────────────────
     {"name": "Universität Tübingen + Tigers Tübingen", "location": "Tübingen", "country": "Germany", "region": "Europe",
@@ -244,7 +269,10 @@ EUROPEAN_COLLEGES = [
      "scholarship_type": "Partial Athletic", "language_of_study": "German / English",
      "ranking": None, "website": "https://uni-tuebingen.de",
      "image_url": "https://images.unsplash.com/photo-1560553814-060afcd8904a?w=400",
-     "coaches": [{"name": "Arne Woltmann", "title": "Head Coach Tigers", "email": "basketball@uni-tuebingen.de"}]},
+     "coaches": [
+         {"name": "Tigers Tübingen Club", "title": "Club Office (ProA)", "email": "basket@tigers-tuebingen.de"},
+         {"name": "Eric Detlev", "title": "Sport Director & Youth Lead", "email": "eric.detlev@tigers-tuebingen.de"},
+     ]},
 
     {"name": "Humboldt-Universität Berlin + ALBA Berlin", "location": "Berlin", "country": "Germany", "region": "Europe",
      "division": "BBL (Basketball Bundesliga)", "conference": "EuroLeague / BBL", "state": "DE",
@@ -253,7 +281,9 @@ EUROPEAN_COLLEGES = [
      "scholarship_type": "Partial Athletic", "language_of_study": "German / English",
      "ranking": None, "website": "https://www.hu-berlin.de",
      "image_url": "https://images.unsplash.com/photo-1583079806406-91731880e785?w=400",
-     "coaches": [{"name": "Israel González", "title": "Head Coach ALBA", "email": "academy@albaberlin.de"}]},
+     "coaches": [
+         {"name": "ALBA Berlin Club", "title": "Club & Academy Contact", "email": "info@albaberlin.de"},
+     ]},
 
     {"name": "Universität Ulm + Ratiopharm Ulm", "location": "Ulm", "country": "Germany", "region": "Europe",
      "division": "BBL (Basketball Bundesliga)", "conference": "BBL", "state": "DE",
@@ -262,7 +292,9 @@ EUROPEAN_COLLEGES = [
      "scholarship_type": "Merit-Based", "language_of_study": "German / English",
      "ranking": None, "website": "https://www.uni-ulm.de",
      "image_url": "https://images.unsplash.com/photo-1560553814-060afcd8904a?w=400",
-     "coaches": [{"name": "Anton Gavel", "title": "Development Coach", "email": "sport@uni-ulm.de"}]},
+     "coaches": [
+         {"name": "Ratiopharm Ulm Club", "title": "Club Administration (BBL)", "email": "info@bbu01.com"},
+     ]},
 
     {"name": "Goethe-Universität Frankfurt + Skyliners", "location": "Frankfurt", "country": "Germany", "region": "Europe",
      "division": "ProA (2. Basketball Bundesliga)", "conference": "BBL ProA", "state": "DE",
@@ -271,7 +303,10 @@ EUROPEAN_COLLEGES = [
      "scholarship_type": "Merit-Based", "language_of_study": "German / English",
      "ranking": None, "website": "https://www.goethe-university-frankfurt.de",
      "image_url": "https://images.unsplash.com/photo-1583079806406-91731880e785?w=400",
-     "coaches": [{"name": "Mario Gutierrez", "title": "Head Coach", "email": "basketball@goethe-uni.de"}]},
+     "coaches": [
+         {"name": "Frankfurt Skyliners Club", "title": "Club Contact (ProA)", "email": "info@skyliners.de"},
+         {"name": "Skyliners Youth Academy", "title": "Youth & Development", "email": "verein@skyliners.de"},
+     ]},
 
     {"name": "Hamburg Towers + Universität Hamburg", "location": "Hamburg", "country": "Germany", "region": "Europe",
      "division": "BBL (Basketball Bundesliga)", "conference": "BBL", "state": "DE",
@@ -280,7 +315,9 @@ EUROPEAN_COLLEGES = [
      "scholarship_type": "Merit-Based", "language_of_study": "German / English",
      "ranking": None, "website": "https://www.uni-hamburg.de",
      "image_url": "https://images.unsplash.com/photo-1560553814-060afcd8904a?w=400",
-     "coaches": [{"name": "Benka Barloschky", "title": "Head Coach", "email": "sport@uni-hamburg.de"}]},
+     "coaches": [
+         {"name": "Hamburg Towers Club", "title": "Club Administration (BBL)", "email": "info@hamburgtowers.de"},
+     ]},
 
     # ── NETHERLANDS ────────────────────────────────────────────────────────
     {"name": "Universiteit van Amsterdam + Heroes Den Bosch", "location": "Amsterdam", "country": "Netherlands", "region": "Europe",
@@ -290,7 +327,10 @@ EUROPEAN_COLLEGES = [
      "scholarship_type": "Partial Academic", "language_of_study": "English",
      "ranking": None, "website": "https://www.uva.nl",
      "image_url": "https://images.unsplash.com/photo-1583079806406-91731880e785?w=400",
-     "coaches": [{"name": "Toon van Helden", "title": "Head Coach", "email": "basketball@uva.nl"}]},
+     "coaches": [
+         {"name": "Heroes Den Bosch Club", "title": "Club Contact (BNXT League)", "email": "info@heroesdenbosch.com"},
+         {"name": "Basketball Academy Den Bosch", "title": "Development Academy", "email": "info@badb.nl"},
+     ]},
 
     {"name": "Rijksuniversiteit Groningen + Donar Groningen", "location": "Groningen", "country": "Netherlands", "region": "Europe",
      "division": "DBL (Dutch Basketball League)", "conference": "NBB", "state": "NL",
@@ -299,7 +339,9 @@ EUROPEAN_COLLEGES = [
      "scholarship_type": "Merit-Based", "language_of_study": "English",
      "ranking": None, "website": "https://www.rug.nl",
      "image_url": "https://images.unsplash.com/photo-1560553814-060afcd8904a?w=400",
-     "coaches": [{"name": "Lucas Bons", "title": "Head Coach Donar", "email": "sport@rug.nl"}]},
+     "coaches": [
+         {"name": "Donar Groningen Club", "title": "Club Contact (BNXT League)", "email": "info@donar.nl"},
+     ]},
 
     {"name": "Universiteit Utrecht + ZZ Leiden", "location": "Utrecht", "country": "Netherlands", "region": "Europe",
      "division": "DBL (Dutch Basketball League)", "conference": "NBB", "state": "NL",
@@ -308,7 +350,9 @@ EUROPEAN_COLLEGES = [
      "scholarship_type": "Partial Athletic", "language_of_study": "English",
      "ranking": None, "website": "https://www.uu.nl",
      "image_url": "https://images.unsplash.com/photo-1583079806406-91731880e785?w=400",
-     "coaches": [{"name": "Ivan Rudez", "title": "Basketball Programme Lead", "email": "basketball@uu.nl"}]},
+     "coaches": [
+         {"name": "ZZ Leiden Club", "title": "Club Contact (BNXT League)", "email": "info@eredivisiebasketballleiden.nl"},
+     ]},
 
     {"name": "Windesheim University + Landstede Hammers", "location": "Zwolle", "country": "Netherlands", "region": "Europe",
      "division": "DBL (Dutch Basketball League)", "conference": "NBB", "state": "NL",
@@ -317,7 +361,9 @@ EUROPEAN_COLLEGES = [
      "scholarship_type": "Partial Athletic", "language_of_study": "English / Dutch",
      "ranking": None, "website": "https://www.windesheim.nl",
      "image_url": "https://images.unsplash.com/photo-1560553814-060afcd8904a?w=400",
-     "coaches": [{"name": "Henk Norel", "title": "Head Coach Landstede", "email": "basketball@windesheim.nl"}]},
+     "coaches": [
+         {"name": "Landstede Hammers Club", "title": "Club Contact (DBL)", "email": "info@landstedehammers.nl"},
+     ]},
 
     # ── ITALY ──────────────────────────────────────────────────────────────
     {"name": "Università di Bologna + Fortitudo", "location": "Bologna", "country": "Italy", "region": "Europe",
@@ -327,7 +373,9 @@ EUROPEAN_COLLEGES = [
      "scholarship_type": "Merit-Based", "language_of_study": "Italian / English",
      "ranking": None, "website": "https://www.unibo.it",
      "image_url": "https://images.unsplash.com/photo-1583079806406-91731880e785?w=400",
-     "coaches": [{"name": "Antimo Martino", "title": "Head Coach", "email": "sport@unibo.it"}]},
+     "coaches": [
+         {"name": "Fortitudo Bologna Club", "title": "Club Contact (Serie A2)", "email": "info@fortitudopallabologna.it"},
+     ]},
 
     {"name": "Università degli Studi di Milano + Olimpia", "location": "Milan", "country": "Italy", "region": "Europe",
      "division": "Serie A / EuroLeague", "conference": "EuroLeague / LBA", "state": "IT",
@@ -336,7 +384,9 @@ EUROPEAN_COLLEGES = [
      "scholarship_type": "Partial Athletic", "language_of_study": "Italian / English",
      "ranking": None, "website": "https://www.unimi.it",
      "image_url": "https://images.unsplash.com/photo-1560553814-060afcd8904a?w=400",
-     "coaches": [{"name": "Ettore Messina", "title": "Head Coach Olimpia", "email": "academy@olimpiamilano.com"}]},
+     "coaches": [
+         {"name": "Ettore Messina", "title": "Head Coach Olimpia", "email": "olimpia@olimpiamilano.com"},
+     ]},
 
     {"name": "Università La Sapienza Roma + Virtus Roma", "location": "Rome", "country": "Italy", "region": "Europe",
      "division": "Serie A2", "conference": "FIP Serie A2", "state": "IT",
@@ -345,7 +395,9 @@ EUROPEAN_COLLEGES = [
      "scholarship_type": "Merit-Based", "language_of_study": "Italian",
      "ranking": None, "website": "https://www.uniroma1.it",
      "image_url": "https://images.unsplash.com/photo-1583079806406-91731880e785?w=400",
-     "coaches": [{"name": "Nicola Legovich", "title": "Head Coach", "email": "sport@uniroma1.it"}]},
+     "coaches": [
+         {"name": "Virtus Roma Club", "title": "Club Contact (Serie A2)", "email": "info@virtusroma1960.it"},
+     ]},
 
     {"name": "Università di Trieste + Pallacanestro Trieste", "location": "Trieste", "country": "Italy", "region": "Europe",
      "division": "Serie A (LBA)", "conference": "LBA Serie A", "state": "IT",
@@ -354,7 +406,9 @@ EUROPEAN_COLLEGES = [
      "scholarship_type": "Merit-Based", "language_of_study": "Italian / English",
      "ranking": None, "website": "https://www.units.it",
      "image_url": "https://images.unsplash.com/photo-1560553814-060afcd8904a?w=400",
-     "coaches": [{"name": "Jamion Christian", "title": "Head Coach", "email": "sport@units.it"}]},
+     "coaches": [
+         {"name": "Pallacanestro Trieste Club", "title": "Club Contact (Serie A)", "email": "info@pallacanestrotrieste.it"},
+     ]},
 
     # ── CZECH REPUBLIC ─────────────────────────────────────────────────────
     {"name": "Charles University Prague + ERA Nymburk", "location": "Prague", "country": "Czech Republic", "region": "Europe",
@@ -364,7 +418,10 @@ EUROPEAN_COLLEGES = [
      "scholarship_type": "Merit-Based", "language_of_study": "English / Czech",
      "ranking": None, "website": "https://www.cuni.cz",
      "image_url": "https://images.unsplash.com/photo-1583079806406-91731880e785?w=400",
-     "coaches": [{"name": "Predrag Bensi", "title": "Head Coach", "email": "basketball@cuni.cz"}]},
+     "coaches": [
+         {"name": "ERA Nymburk Team Office", "title": "Team Manager (NBL)", "email": "team@nymburk.basketball"},
+         {"name": "ERA Nymburk Club Office", "title": "Club Administration", "email": "office@nymburk.basketball"},
+     ]},
 
     {"name": "Brno University of Technology + Basketball Brno", "location": "Brno", "country": "Czech Republic", "region": "Europe",
      "division": "Czech Basketball League (NBL)", "conference": "NBL Czech", "state": "CZ",
@@ -373,7 +430,9 @@ EUROPEAN_COLLEGES = [
      "scholarship_type": "Partial Athletic", "language_of_study": "English / Czech",
      "ranking": None, "website": "https://www.vutbr.cz",
      "image_url": "https://images.unsplash.com/photo-1560553814-060afcd8904a?w=400",
-     "coaches": [{"name": "Lubomír Pospíšil", "title": "Head Coach", "email": "sport@vutbr.cz"}]},
+     "coaches": [
+         {"name": "Basketball Brno Club", "title": "Club Contact (NBL Czech)", "email": "info@basketbrno.cz"},
+     ]},
 
     # ── SCANDINAVIA ────────────────────────────────────────────────────────
     {"name": "Aalborg University + Bakken Bears", "location": "Aalborg", "country": "Denmark", "region": "Europe",
@@ -383,7 +442,10 @@ EUROPEAN_COLLEGES = [
      "scholarship_type": "Merit-Based", "language_of_study": "English",
      "ranking": None, "website": "https://www.en.aau.dk",
      "image_url": "https://images.unsplash.com/photo-1583079806406-91731880e785?w=400",
-     "coaches": [{"name": "Vitor Faverani", "title": "Head Coach", "email": "basketball@aau.dk"}]},
+     "coaches": [
+         {"name": "Bakken Bears Club", "title": "Club Contact (Basketligaen)", "email": "info@bakkenbears.com"},
+         {"name": "Nordjysk Elitesport (AAU)", "title": "University Elite Sport Support", "email": "rh@adm.aau.dk"},
+     ]},
 
     {"name": "Copenhagen Business School + Phoenix", "location": "Copenhagen", "country": "Denmark", "region": "Europe",
      "division": "Basketligaen (Danish)", "conference": "Basketligaen", "state": "DK",
@@ -392,7 +454,10 @@ EUROPEAN_COLLEGES = [
      "scholarship_type": "Merit-Based", "language_of_study": "English",
      "ranking": None, "website": "https://www.cbs.dk",
      "image_url": "https://images.unsplash.com/photo-1560553814-060afcd8904a?w=400",
-     "coaches": [{"name": "Andreas Hansen", "title": "Head Coach", "email": "sport@cbs.dk"}]},
+     "coaches": [
+         {"name": "CBS Sport Basketball", "title": "Basketball Coach / Try-outs", "email": "basketball@cbssport.dk"},
+         {"name": "CBS Sport Administration", "title": "Club Administration", "email": "administration@cbssport.dk"},
+     ]},
 
     {"name": "Uppsala University + Uppsala Basket", "location": "Uppsala", "country": "Sweden", "region": "Europe",
      "division": "Basketligan (Swedish)", "conference": "SBBF Basketligan", "state": "SE",
@@ -401,7 +466,10 @@ EUROPEAN_COLLEGES = [
      "scholarship_type": "Merit-Based", "language_of_study": "English",
      "ranking": None, "website": "https://www.uu.se",
      "image_url": "https://images.unsplash.com/photo-1583079806406-91731880e785?w=400",
-     "coaches": [{"name": "Marcus Eriksson", "title": "Basketball Coordinator", "email": "sport@uu.se"}]},
+     "coaches": [
+         {"name": "Uppsala Basket Club", "title": "Club Office (Basketligan)", "email": "kansli@uppsalabasket.se"},
+         {"name": "Uppsala University Sport", "title": "University Sports Dept", "email": "sport@uu.se"},
+     ]},
 
     {"name": "University of Gothenburg + Chalmers Basket", "location": "Gothenburg", "country": "Sweden", "region": "Europe",
      "division": "Basketligan (Swedish)", "conference": "SBBF Basketligan", "state": "SE",
@@ -410,7 +478,10 @@ EUROPEAN_COLLEGES = [
      "scholarship_type": "Partial Academic", "language_of_study": "English",
      "ranking": None, "website": "https://www.gu.se",
      "image_url": "https://images.unsplash.com/photo-1560553814-060afcd8904a?w=400",
-     "coaches": [{"name": "Erik Svensson", "title": "Head Coach", "email": "sport@gu.se"}]},
+     "coaches": [
+         {"name": "KFUM Göteborg Basket", "title": "Gothenburg Basketball Club", "email": "info@kfumgoteborg.se"},
+         {"name": "University of Gothenburg Sport", "title": "University Sports Dept", "email": "sport@gu.se"},
+     ]},
 
     {"name": "University of Oslo + Oslo BBK", "location": "Oslo", "country": "Norway", "region": "Europe",
      "division": "BLNO (Norwegian Basketball League)", "conference": "BLNO", "state": "NO",
@@ -419,7 +490,10 @@ EUROPEAN_COLLEGES = [
      "scholarship_type": "Full Academic + Athletic", "language_of_study": "English",
      "ranking": None, "website": "https://www.uio.no",
      "image_url": "https://images.unsplash.com/photo-1583079806406-91731880e785?w=400",
-     "coaches": [{"name": "Christian Tande", "title": "Head Coach", "email": "sport@uio.no"}]},
+     "coaches": [
+         {"name": "University of Oslo Sport", "title": "Student-Athlete Support", "email": "sport@uio.no"},
+         {"name": "Norges Basketballforbund", "title": "Norwegian Basketball Federation", "email": "basket@basket.no"},
+     ]},
 
     {"name": "Aalto University + Torpan Pojat", "location": "Helsinki", "country": "Finland", "region": "Europe",
      "division": "Korisliiga (Finnish)", "conference": "Finnish Basketball", "state": "FI",
@@ -428,5 +502,8 @@ EUROPEAN_COLLEGES = [
      "scholarship_type": "Merit-Based", "language_of_study": "English",
      "ranking": None, "website": "https://www.aalto.fi",
      "image_url": "https://images.unsplash.com/photo-1583079806406-91731880e785?w=400",
-     "coaches": [{"name": "Juha Pasanen", "title": "Basketball Director", "email": "sport@aalto.fi"}]},
+     "coaches": [
+         {"name": "Torpan Pojat Club", "title": "Club Contact (Korisliiga)", "email": "info@topo.fi"},
+         {"name": "Aalto University Services", "title": "Student & Athlete Services", "email": "studentservices@aalto.fi"},
+     ]},
 ]
