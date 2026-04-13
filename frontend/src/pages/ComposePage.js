@@ -94,7 +94,9 @@ export default function ComposePage() {
   const openInGmail = () => {
     if (!draft || !selectedCollege) return;
     const coachEmail = selectedCoach?.email || "";
-    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1${coachEmail ? `&to=${encodeURIComponent(coachEmail)}` : ""}&su=${encodeURIComponent(subject || "Basketball Scholarship Inquiry")}&body=${encodeURIComponent(draft)}`;
+    const sendingEmail = playerProfile.email || "";
+    const authParam = sendingEmail ? `&authuser=${encodeURIComponent(sendingEmail)}` : "";
+    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1${authParam}${coachEmail ? `&to=${encodeURIComponent(coachEmail)}` : ""}&su=${encodeURIComponent(subject || "Basketball Scholarship Inquiry")}&body=${encodeURIComponent(draft)}`;
     window.open(gmailUrl, "_blank");
     setAwaitingConfirmation(true);
     setConfirmed(false);
@@ -469,6 +471,15 @@ export default function ComposePage() {
                 Open in Gmail
                 <ExternalLink className="w-3.5 h-3.5 opacity-60" />
               </button>
+              {playerProfile.email ? (
+                <p className="text-xs text-slate-500 text-center">
+                  Will open as <span className="font-semibold text-slate-700">{playerProfile.email}</span> — make sure you're signed into this account in Gmail.
+                </p>
+              ) : (
+                <p className="text-xs text-amber-600 text-center">
+                  No email set in your <a href="/profile" className="underline font-semibold">Profile</a> — Gmail may open the wrong account. Add your recruiting email to fix this.
+                </p>
+              )}
 
               {/* Step 2 — Awaiting confirmation */}
               {awaitingConfirmation && (
