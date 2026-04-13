@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { apiRequest } from "../context/AuthContext";
-import { MapPin, Globe, Mail, Phone, Plus, Check, ArrowLeft, Pen, Clock, Calendar, AlertTriangle, ListChecks, MessageSquare, Trash2, Film } from "lucide-react";
+import { MapPin, Globe, Mail, Phone, Plus, Check, ArrowLeft, Pen, Clock, Calendar, AlertTriangle, ListChecks, MessageSquare, Trash2, Film, Info } from "lucide-react";
 
 export default function CollegeDetailPage() {
   const { id } = useParams();
@@ -262,6 +262,47 @@ export default function CollegeDetailPage() {
               ))}
             </div>
           </div>
+
+          {/* European Contact Tips */}
+          {college.region === "Europe" && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-5" data-testid="euro-contact-tips">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <Info className="w-4 h-4 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-blue-900 text-sm mb-2" style={{ fontFamily: "Barlow Condensed, sans-serif", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    Tips for Contacting European Clubs
+                  </h3>
+                  <ul className="space-y-1.5 text-sm text-blue-800">
+                    <li className="flex items-start gap-2">
+                      <span className="font-bold text-blue-500 flex-shrink-0">1.</span>
+                      <span><strong>These are admin/general inboxes</strong> — European clubs don't have dedicated recruitment portals like US coaches. Your email will be forwarded to the right person, so be patient.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="font-bold text-blue-500 flex-shrink-0">2.</span>
+                      <span><strong>Keep it short & professional</strong> — 3–4 sentences max. State your position, age, nationality, current club, and one stand-out stat. Attach your highlight tape link.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="font-bold text-blue-500 flex-shrink-0">3.</span>
+                      <span><strong>Reference your Player Profile</strong> — Use the AI Compose feature to auto-fill your stats, highlight tape URL, and academic info into a tailored draft.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="font-bold text-blue-500 flex-shrink-0">4.</span>
+                      <span><strong>Follow up after 2–3 weeks</strong> — European clubs are slower to respond than US coaches. A polite follow-up email significantly increases reply rates.</span>
+                    </li>
+                  </ul>
+                  <button
+                    onClick={() => navigate("/compose", { state: { college } })}
+                    className="mt-3 text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold uppercase tracking-wider hover:bg-blue-700 transition-colors flex items-center gap-1.5 w-fit"
+                    data-testid="euro-compose-btn"
+                  >
+                    <Mail className="w-3.5 h-3.5" /> Draft AI Email for This Club
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Email History */}
           <div className="bg-white border border-slate-200 rounded-lg p-5">

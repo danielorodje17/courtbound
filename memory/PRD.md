@@ -249,12 +249,13 @@ An 18-year-old student basketball player from UK (England Under-18) wants to tra
   - routers/auth.py, colleges.py, tracked.py, emails.py, dashboard.py, goals.py, ai.py, profile.py
   - server.py reduced from 1,823 lines to 56-line entry point
 
-### v1.19 - European College Email Update (Apr 2026)
+### v1.19 - European College Email Update + Contact Tips (Apr 2026)
 - [x] Researched & verified real contact emails for all 31 European colleges/clubs via web search
 - [x] Updated MongoDB coaches arrays with verified emails (club primary + university secondary where available)
 - [x] Updated seed_data.py EUROPEAN_COLLEGES list so future re-seeds use correct emails
 - [x] 18 colleges now have 2 contacts (club + university/academy); 13 have 1 verified contact
 - Notable updates: INSEP→international@insep.fr, ALBA→info@albaberlin.de, ERA Nymburk→team@nymburk.basketball, Olimpia→olimpia@olimpiamilano.com, Bakken Bears→info@bakkenbears.com, Torpan Pojat→info@topo.fi
+- [x] European Contact Tips panel added to CollegeDetailPage — shows only for European colleges, with 4 actionable tips (admin inboxes, short emails, Player Profile reference, follow-up timing) + "Draft AI Email" shortcut button
 
 ### When ready
 - [ ] Weekly Digest email (deferred — needs Resend API key from user)
