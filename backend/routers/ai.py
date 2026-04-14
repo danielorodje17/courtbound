@@ -137,6 +137,17 @@ Be specific for UK/international players. Encouraging but realistic."""
     return {"suggestion": response, "college": data.college_name}
 
 
+@router.get("/ai/match/saved")
+async def get_saved_match(current_user: UserModel = Depends(get_current_user)):
+    """Return the last saved AI match result for this user without re-running."""
+    saved = await db.ai_match_results.find_one(
+        {"user_id": current_user.user_id}, {"_id": 0}
+    )
+    if not saved:
+        return {"results": None, "run_at": None}
+    return {"results": saved["results"], "run_at": saved.get("run_at")}
+
+
 @router.get("/ai/match")
 async def ai_match(current_user: UserModel = Depends(get_current_user)):
     from emergentintegrations.llm.chat import LlmChat, UserMessage
@@ -198,4 +209,12 @@ Return ONLY valid JSON — no markdown, no explanation:
         result = json.loads(json_match.group()) if json_match else json.loads(response)
     except Exception:
         raise HTTPException(status_code=500, detail="AI response could not be parsed. Please try again.")
-    return result
+
+    # Persist results so the user sees them on next visit
+    from datetime import datetime, timezone
+    await db.ai_match_results.update_one(
+        {"user_id": current_user.user_id},
+        {"$set": {"user_id": current_user.user_id, "results": result, "run_at": datetime.now(timezone.utc).isoformat()}},
+        upsert=True,
+    )
+    return {"results": result, "run_at": datetime.now(timezone.utc).isoformat()}

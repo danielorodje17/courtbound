@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiRequest } from "../context/AuthContext";
-import { Sparkles, ChevronRight, Trophy, AlertCircle, RefreshCw } from "lucide-react";
+import { Sparkles, ChevronRight, Trophy, AlertCircle, RefreshCw, Clock } from "lucide-react";
 
 const FIT_CONFIG = {
   excellent_fit: { label: "Excellent Fit", bg: "bg-emerald-50", border: "border-emerald-200", badge: "bg-emerald-500", pctColor: "text-emerald-600", headerBg: "bg-emerald-500" },
@@ -57,15 +57,30 @@ export default function AIMatchPage() {
   const navigate = useNavigate();
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [loadingSaved, setLoadingSaved] = useState(true);
   const [error, setError] = useState("");
+  const [lastRunAt, setLastRunAt] = useState(null);
+
+  // Load persisted results on mount
+  useEffect(() => {
+    apiRequest("get", "/ai/match/saved")
+      .then(res => {
+        if (res.data?.results) {
+          setResults(res.data.results);
+          setLastRunAt(res.data.run_at);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingSaved(false));
+  }, []);
 
   const runMatch = async () => {
     setLoading(true);
     setError("");
-    setResults(null);
     try {
       const res = await apiRequest("get", "/ai/match");
-      setResults(res.data);
+      setResults(res.data.results);
+      setLastRunAt(res.data.run_at);
     } catch (err) {
       const msg = err?.response?.data?.detail || "Something went wrong. Please try again.";
       setError(msg);
@@ -95,7 +110,7 @@ export default function AIMatchPage() {
             <button
               data-testid="ai-match-run-btn"
               onClick={runMatch}
-              disabled={loading}
+              disabled={loading || loadingSaved}
               className="bg-purple-600 text-white font-bold uppercase tracking-wider rounded-lg px-6 py-2.5 hover:bg-purple-700 transition-all text-sm flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {loading ? (
@@ -111,6 +126,12 @@ export default function AIMatchPage() {
               Update Profile
             </button>
           </div>
+          {lastRunAt && !loading && (
+            <div className="flex items-center gap-1.5 mt-3 text-white/40 text-xs">
+              <Clock className="w-3.5 h-3.5" />
+              Last analysed: {new Date(lastRunAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+            </div>
+          )}
         </div>
       </div>
 
