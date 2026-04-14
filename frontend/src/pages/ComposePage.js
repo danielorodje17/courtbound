@@ -325,6 +325,7 @@ export default function ComposePage() {
                 >
                   <option value="point guard">Point Guard</option>
                   <option value="shooting guard">Shooting Guard</option>
+                  <option value="combo guard">Combo Guard</option>
                   <option value="small forward">Small Forward</option>
                   <option value="power forward">Power Forward</option>
                   <option value="center">Center</option>
