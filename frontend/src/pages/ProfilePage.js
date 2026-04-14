@@ -6,7 +6,7 @@ import {
   ChevronDown, Ruler, Weight
 } from "lucide-react";
 
-const POSITIONS = ["Point Guard", "Shooting Guard", "Small Forward", "Power Forward", "Center"];
+const POSITIONS = ["Point Guard", "Shooting Guard", "Combo Guard", "Small Forward", "Power Forward", "Center"];
 const HANDS = ["Right", "Left", "Both"];
 const DIVISIONS = ["Division I", "Division II", "Division III", "NAIA", "JUCO"];
 const YEARS = ["2025", "2026", "2027", "2028"];
