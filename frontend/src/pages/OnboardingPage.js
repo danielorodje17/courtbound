@@ -7,20 +7,13 @@ const STEP_IMAGES = [
   "https://images.unsplash.com/photo-1759694423710-8e8defcfefd3?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzB8MHwxfHNlYXJjaHw0fHxiYXNrZXRiYWxsJTIwcGxheWVyJTIwZHVuayUyMGR1bmtpbmclMjBnYW1lfGVufDB8fHx8MTc3NjM3MDE2OHww&ixlib=rb-4.1.0&q=85",
   "https://images.unsplash.com/photo-1677617586882-2b494292ebbe?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzR8MHwxfHNlYXJjaHwyfHxlbXB0eSUyMGluZG9vciUyMGJhc2tldGJhbGwlMjBjb3VydCUyMGRhcmt8ZW58MHx8fHwxNzc2MzcwMTc4fDA&ixlib=rb-4.1.0&q=85",
   "https://images.unsplash.com/photo-1763770449161-eb1cd5596415?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxNzV8MHwxfHNlYXJjaHwzfHx1bml2ZXJzaXR5JTIwY2FtcHVzJTIwYnVpbGRpbmclMjBuaWdodHxlbnwwfHx8fDE3NzYzNzAxNzh8MA&ixlib=rb-4.1.0&q=85",
-  "https://images.unsplash.com/photo-1759694423710-8e8defcfefd3?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzB8MHwxfHNlYXJjaHw0fHxiYXNrZXRiYWxsJTIwcGxheWVyJTIwZHVuayUyMGR1bmtpbmclMjBnYW1lfGVufDB8fHx8MTc3NjM3MDE2OHww&ixlib=rb-4.1.0&q=85",
 ];
 
-const STEP_LABELS = ["Who Are You?", "How Do You Play?", "Your Goals", "First Matches"];
+const STEP_LABELS = ["Who Are You?", "How Do You Play?", "Your Goals"];
 
 const POSITIONS = ["Point Guard", "Shooting Guard", "Combo Guard", "Small Forward", "Power Forward", "Center"];
 const DIVISIONS = ["Division I", "Division II", "NAIA", "JUCO"];
 const YEARS = ["2025", "2026", "2027", "2028"];
-
-const FIT_COLORS = {
-  excellent_fit: { bg: "bg-green-900/30 border-green-500/40", badge: "bg-green-500", label: "Excellent Fit" },
-  good_fit:      { bg: "bg-orange-900/20 border-orange-500/40", badge: "bg-orange-500", label: "Good Fit" },
-  possible_fit:  { bg: "bg-slate-800/60 border-slate-600/40", badge: "bg-slate-500", label: "Possible Fit" },
-};
 
 function Field({ label, children }) {
   return (
@@ -63,8 +56,6 @@ export default function OnboardingPage({ onComplete }) {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
-  const [matches, setMatches] = useState(null);
-  const [matchLoading, setMatchLoading] = useState(false);
 
   const [form, setForm] = useState({
     full_name: "", primary_position: "", secondary_position: "",
@@ -82,29 +73,11 @@ export default function OnboardingPage({ onComplete }) {
     setSaving(false);
   };
 
-  const runMatch = async () => {
-    setMatchLoading(true);
-    try {
-      const { data } = await apiRequest("get", "/ai/match");
-      const topMatches = [
-        ...(data.excellent_fit || []).slice(0, 2),
-        ...(data.good_fit || []).slice(0, 1),
-      ].slice(0, 3);
-      setMatches(topMatches.map(m => ({ ...m, tier: data.excellent_fit?.find(c => c.id === m.id) ? "excellent_fit" : "good_fit" })));
-    } catch {
-      setMatches([]);
-    }
-    setMatchLoading(false);
-  };
-
   const next = async () => {
     if (step === 3) {
       await saveProfile();
-      setStep(4);
-      runMatch();
-    } else if (step === 4) {
-      if (onComplete) onComplete();
       localStorage.setItem("cb_onboarded", "1");
+      if (onComplete) onComplete();
       navigate("/dashboard");
     } else {
       setStep(s => s + 1);
@@ -117,7 +90,7 @@ export default function OnboardingPage({ onComplete }) {
     navigate("/dashboard");
   };
 
-  const progress = ((step - 1) / 4) * 100;
+  const progress = ((step - 1) / 3) * 100;
 
   return (
     <div className="min-h-screen flex" style={{ background: "#0A0A0A", fontFamily: "Manrope, sans-serif" }}>
@@ -143,7 +116,7 @@ export default function OnboardingPage({ onComplete }) {
           </span>
         </div>
         <div className="relative z-10 p-10">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-400 mb-3">Step {step} of 4</p>
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-400 mb-3">Step {step} of 3</p>
           <h2
             className="text-5xl font-black uppercase text-white leading-none"
             style={{ fontFamily: "Barlow Condensed, sans-serif" }}
@@ -171,7 +144,7 @@ export default function OnboardingPage({ onComplete }) {
             </div>
             <span className="font-black text-white text-xs uppercase tracking-widest" style={{ fontFamily: "Barlow Condensed, sans-serif" }}>CourtBound</span>
           </div>
-          <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Step {step}/4</p>
+          <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Step {step}/3</p>
         </div>
 
         {/* Step indicators */}
@@ -280,58 +253,10 @@ export default function OnboardingPage({ onComplete }) {
               </>
             )}
 
-            {/* ── STEP 4 ── */}
-            {step === 4 && (
-              <div data-testid="onboarding-matches-step">
-                <div className="mb-6">
-                  <h3 className="text-2xl font-black uppercase text-white mb-1" style={{ fontFamily: "Barlow Condensed, sans-serif" }}>Your First Matches</h3>
-                  <p className="text-sm text-slate-500">AI is scanning 274 colleges against your profile right now.</p>
-                </div>
-                {matchLoading && (
-                  <div className="space-y-3">
-                    {[0, 1, 2].map(i => (
-                      <div key={i} className="h-24 rounded bg-white/5 animate-pulse" style={{ animationDelay: `${i * 0.15}s` }} />
-                    ))}
-                    <p className="text-xs text-center text-slate-600 pt-2 animate-pulse">Analysing your profile...</p>
-                  </div>
-                )}
-                {matches && matches.length > 0 && (
-                  <div className="space-y-3">
-                    {matches.map((m, i) => {
-                      const cfg = FIT_COLORS[m.tier] || FIT_COLORS.good_fit;
-                      return (
-                        <div key={i} data-testid={`ob-match-${i}`}
-                          className={`border rounded p-4 flex items-start justify-between gap-3 ${cfg.bg} transition-all`}
-                          style={{ animationDelay: `${i * 0.1}s` }}>
-                          <div className="min-w-0">
-                            <p className="font-bold text-white text-sm truncate">{m.name}</p>
-                            <p className="text-xs text-slate-400 mt-0.5">{m.division}</p>
-                            {m.why && <p className="text-xs text-slate-400 mt-1.5 leading-snug line-clamp-2">{m.why}</p>}
-                          </div>
-                          <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                            <span className={`${cfg.badge} text-white text-xs font-black px-2 py-0.5 rounded-full`}>{Math.min(m.pct, 86)}%</span>
-                            <span className="text-xs text-slate-500">{cfg.label}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                    <div className="bg-green-900/20 border border-green-500/30 rounded p-4 mt-4 flex gap-2.5">
-                      <CheckCircle2 className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
-                      <p className="text-xs text-slate-300 leading-relaxed">
-                        <strong className="text-green-400">Profile saved.</strong> You can run a full AI match at any time from the AI Match page to see all 30 colleges ranked.
-                      </p>
-                    </div>
-                  </div>
-                )}
-                {matches && matches.length === 0 && (
-                  <div className="bg-orange-900/20 border border-orange-500/30 rounded p-4 text-sm text-slate-400">
-                    Complete your profile with more detail to get AI match results. Head to the Profile page to fill in your stats.
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+          {/* ── STEP 4 — removed (was "Your First Matches") */}
+
         </div>
+      </div>
 
         {/* Bottom nav */}
         <div className="px-8 py-5 border-t border-white/10 flex items-center justify-between flex-shrink-0">
@@ -350,10 +275,9 @@ export default function OnboardingPage({ onComplete }) {
             style={{ fontFamily: "Barlow Condensed, sans-serif" }}
           >
             {saving ? "Saving..." :
-              step === 4 ? "Go to Dashboard" :
-              step === 3 ? "Save & See My Matches" :
+              step === 3 ? "Save & Go to Dashboard" :
               "Next"}
-            {!saving && step !== 4 && <ArrowRight className="w-4 h-4" />}
+            {!saving && step !== 3 && <ArrowRight className="w-4 h-4" />}
           </button>
         </div>
       </div>

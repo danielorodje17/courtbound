@@ -304,15 +304,10 @@ export default function CollegesPage() {
                     <Users className="w-3 h-3" />
                     <span>{college.coaches?.length || 0} coaches</span>
                   </div>
-                  {college.region === "Europe" ? (
+                  {college.region === "Europe" && (
                     <div className="flex items-center gap-1 font-semibold text-blue-600">
                       <Globe className="w-3 h-3" />
                       <span>{college.language_of_study || "—"}</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-1">
-                      <Globe className="w-3 h-3" />
-                      <span>{college.acceptance_rate} accept</span>
                     </div>
                   )}
                   {college.foreign_friendly && (

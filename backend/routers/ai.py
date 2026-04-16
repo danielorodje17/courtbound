@@ -29,7 +29,7 @@ async def draft_message(data: AIMessageRequest):
     position_line = data.user_position
     if data.user_secondary_position:
         position_line = f"{data.user_position} / {data.user_secondary_position} (versatile, can play both)"
-    prompt = f"""Write a professional {msg_type_label} email from a UK basketball player to a college coach.
+    prompt = f"""Write a professional {msg_type_label} email from an international basketball player to a college coach.
 
 Player: {data.user_name}
 Position: {position_line}
@@ -58,7 +58,7 @@ Format: Subject: [subject line]\\n\\n[email body]"""
 async def get_strategy(data: AIStrategyRequest):
     from emergentintegrations.llm.chat import LlmChat, UserMessage
     api_key = os.environ.get("EMERGENT_LLM_KEY")
-    prompt = f"""You are an expert college basketball recruitment strategist helping an 18-year-old UK player get a US college scholarship.
+    prompt = f"""You are an expert college basketball recruitment strategist helping a player get a US college scholarship.
 
 Provide specific, actionable recruitment strategy advice for:
 - College: {data.college_name}
@@ -84,9 +84,9 @@ Format as clear numbered action items. Be specific and practical."""
 async def ncaa_eligibility_check(data: NCAACHeckRequest):
     from emergentintegrations.llm.chat import LlmChat, UserMessage
     api_key = os.environ.get("EMERGENT_LLM_KEY")
-    prompt = f"""You are an NCAA eligibility expert specifically helping a UK/international basketball player understand their eligibility status for US college basketball.
+    prompt = f"""You are an NCAA eligibility expert specifically helping an international basketball player understand their eligibility status for US college basketball.
 
-Analyse the following profile for an 18-year-old UK basketball player (England Under-18 national team) and provide a detailed NCAA eligibility assessment:
+Analyse the following profile and provide a detailed NCAA eligibility assessment:
 
 ACADEMIC PROFILE:
 - GCSE Grades: {data.gcse_grades or 'Not specified'}
@@ -154,7 +154,7 @@ async def reply_next_steps(data: ReplyNextStepsRequest, current_user: UserModel 
         "scholarship_offered": "The coach has made a formal scholarship offer — critical decision point",
         "rejected":            "The coach has politely declined — not interested at this time",
     }.get(data.outcome, "The outcome of this reply is unclear and needs your assessment")
-    prompt = f"""You are a college basketball recruitment advisor for a UK/European player.
+    prompt = f"""You are a college basketball recruitment advisor for an international player.
 
 CONTEXT:
 - College: {data.college_name} ({data.division})
@@ -237,7 +237,7 @@ Contact: Email {'set' if p.get('email') else 'NOT set'} | Phone {'set' if p.get(
 Social: Instagram {'set' if p.get('instagram') else 'not set'} | Twitter {'set' if p.get('twitter') else 'not set'}
 Colleges emailed: {len(sent_ids)} | Colleges that replied: {len(replied_ids)}{response_context}
 """
-    prompt = f"""You are a college basketball recruitment expert analysing a UK/European player's recruitment readiness.
+    prompt = f"""You are a college basketball recruitment expert analysing a player's recruitment readiness.
 
 PLAYER PROFILE:
 {profile_text}
@@ -262,7 +262,7 @@ Return ONLY valid JSON:
     {{"item": "Academic results (GCSEs + A-Levels)", "completed": <bool>, "importance": "high", "tip": "Academic eligibility is non-negotiable — coaches need this early."}},
     {{"item": "Physical measurements (height/weight)", "completed": <bool>, "importance": "high", "tip": "Coaches have positional size requirements — missing this raises doubts."}},
     {{"item": "Personal bio / statement", "completed": <bool>, "importance": "medium", "tip": "Coaches recruit the person, not just the player. Tell your story."}},
-    {{"item": "National or club team credentials", "completed": <bool>, "importance": "high", "tip": "England U18 / top club tells coaches your competitive level instantly."}},
+    {{"item": "National or club team credentials", "completed": <bool>, "importance": "high", "tip": "Your national/club team tells coaches your competitive level instantly."}},
     {{"item": "Target division(s) selected", "completed": <bool>, "importance": "medium", "tip": "Targeting the right division saves time and improves response rates."}},
     {{"item": "Contact details (email + phone)", "completed": <bool>, "importance": "medium", "tip": "Coaches need a direct line to reach you after initial interest."}},
     {{"item": "Social media (clean, basketball-focused)", "completed": <bool>, "importance": "low", "tip": "Many coaches check social media — make sure it reflects well on you."}}
@@ -324,7 +324,10 @@ async def ai_match(current_user: UserModel = Depends(get_current_user)):
     gcse = profile.get("gcse_results", "N/A")
     predicted = profile.get("predicted_grades", profile.get("a_level_grades", "N/A"))
     bio = profile.get("bio", "")
-    prompt = f"""You are a college basketball recruitment AI. Analyse this UK player profile and categorize ALL the colleges listed.
+    current_team = profile.get("current_team", "")
+    club_team = profile.get("club_team", "")
+    team_line = " / ".join(t for t in [current_team, club_team] if t) or "Not specified"
+    prompt = f"""You are a college basketball recruitment AI. Analyse this player profile and categorize ALL the colleges listed.
 
 PLAYER PROFILE:
 - Name: {name}
@@ -333,7 +336,7 @@ PLAYER PROFILE:
 - Stats: PPG {ppg} | RPG {rpg} | APG {apg}
 - Target Division: {target_div}
 - Academic: GCSEs {gcse} | Predicted {predicted}
-- Background: England Under-18 national team player{', ' + bio[:120] if bio else ''}
+- Current Team(s): {team_line}{(', ' + bio[:120]) if bio else ''}
 
 COLLEGES (format: id|name|division|UK-Friendly|acceptance_rate):
 {chr(10).join(college_lines)}

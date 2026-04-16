@@ -312,7 +312,11 @@ An 18-year-old student basketball player from UK (England Under-18) wants to tra
 - [x] Hover tooltip: date + email count
 - [x] GET /api/dashboard/heatmap endpoint — 365-day dataset with week/day structure
 
-### v1.28 - Diverse College Images + Coach Avatars + Onboarding Flow Fix (Feb 2026)
+### v1.29 - AI Assumption Fixes + Onboarding Step 4 Removed (Feb 2026)
+- [x] Removed hardcoded "England Under-18" from all AI prompts (match, profile review, ncaa check, strategy, email draft) — now uses player's actual `current_team` / `club_team` fields from profile
+- [x] AI email draft changed from "UK basketball player" to "international basketball player" — no nationality assumed
+- [x] College cards: removed "% accept" display for US colleges — no more confusing acceptance rate %
+- [x] Onboarding Step 4 ("Your First Matches / AI is scanning...") removed — wizard now 3 steps, saves profile and goes to dashboard on step 3
 - [x] College cards (CollegesPage) use deterministic hash-based images from 20-image pool — no more repeated stock images
 - [x] College detail hero images also use same pool — each college always shows its own unique image
 - [x] Coach cards on CollegeDetailPage show colored initials avatars (e.g. "JD" circle) — color deterministic by name hash
