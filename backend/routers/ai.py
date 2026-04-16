@@ -271,12 +271,14 @@ Return ONLY valid JSON:
         api_key=api_key, session_id=str(uuid.uuid4()),
         system_message="You are a college basketball recruitment expert. Return only valid JSON."
     ).with_model("openai", "gpt-4.1-mini")
-    response = await chat.send_message(UserMessage(text=prompt))
-    try:
-        json_match = re.search(r'\{.*\}', response, re.DOTALL)
-        return json.loads(json_match.group()) if json_match else json.loads(response)
-    except Exception:
-        raise HTTPException(status_code=500, detail="Could not parse AI response. Please try again.")
+    for attempt in range(2):
+        response = await chat.send_message(UserMessage(text=prompt))
+        try:
+            json_match = re.search(r'\{.*\}', response, re.DOTALL)
+            return json.loads(json_match.group()) if json_match else json.loads(response)
+        except Exception:
+            if attempt == 1:
+                raise HTTPException(status_code=500, detail="Could not parse AI response. Please try again.")
 
 
 @router.get("/ai/match/saved")

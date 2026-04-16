@@ -264,6 +264,12 @@ An 18-year-old student basketball player from UK (England Under-18) wants to tra
 - [x] Synced all changes to seed_data.py (foreign_friendly flags + new college entries)
 - [x] Cleanup script: /app/backend/euro_audit_and_expand.py (executed, data persisted)
 
+### v1.25 - AI Recruitment Intelligence (Apr 2026)
+- [x] GET /api/ai/profile-review — returns score (0-100), grade, 3 strengths, 3 prioritised improvements, 10-item coaches checklist, response insights, top 3 actions. Retry on JSON parse failure
+- [x] POST /api/ai/reply-next-steps — given reply + outcome, returns urgency (immediate/soon/low), headline, 3 numbered steps, what-to-avoid list, UK player tip
+- [x] RecruitmentScore.js component on ProfilePage — SVG score gauge, grade, top-priority actions panel, strengths/improvements side-by-side, response insights, collapsible coaches checklist with progress bar
+- [x] ResponseTrackerPage — "AI Next Steps" button on ALL replied colleges (replaces outcome-specific buttons); modal shows urgency banner, numbered steps, avoid list, UK tip, compose shortcut
+
 ### v1.24 - Primary & Secondary Position (Apr 2026)
 - [x] ProfilePage: "Position" split into "Primary Position" + "Secondary Position" dropdowns; sidebar card shows both (e.g. "Point Guard / Shooting Guard")
 - [x] ComposePage: two position selectors; secondary is optional with a hint note; both passed to AI draft API
