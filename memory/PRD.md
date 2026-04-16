@@ -312,8 +312,15 @@ An 18-year-old student basketball player from UK (England Under-18) wants to tra
 - [x] Hover tooltip: date + email count
 - [x] GET /api/dashboard/heatmap endpoint — 365-day dataset with week/day structure
 
+### v1.28 - Diverse College Images + Coach Avatars + Onboarding Flow Fix (Feb 2026)
+- [x] College cards (CollegesPage) use deterministic hash-based images from 20-image pool — no more repeated stock images
+- [x] College detail hero images also use same pool — each college always shows its own unique image
+- [x] Coach cards on CollegeDetailPage show colored initials avatars (e.g. "JD" circle) — color deterministic by name hash
+- [x] Onboarding redirect applies to ALL protected routes (not just /dashboard) — new users forced through /onboarding on any page
+
 ### When ready
 - [ ] Weekly Digest email (deferred — needs Resend API key from user)
 
 ### P2
-- [ ] Coach profile photos
+- [ ] Stats Counter on Landing Page (social proof: "412 coaches contacted this month")
+- [ ] Important Deadlines / Calendar alerts on Dashboard
