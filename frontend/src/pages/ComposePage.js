@@ -32,6 +32,23 @@ export default function ComposePage() {
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [templateSaved, setTemplateSaved] = useState(false);
 
+  // Prior outreach detection
+  const [alreadyContacted, setAlreadyContacted] = useState(false);
+
+  // When college changes, check if initial outreach was already sent
+  useEffect(() => {
+    if (!selectedCollege?.id) { setAlreadyContacted(false); return; }
+    apiRequest("get", `/emails?college_id=${selectedCollege.id}`)
+      .then(r => {
+        const sentInitial = (r.data || []).some(
+          e => e.direction === "sent" && e.message_type === "initial_outreach"
+        );
+        setAlreadyContacted(sentInitial);
+        if (sentInitial) setMessageType("follow_up");
+      })
+      .catch(() => {});
+  }, [selectedCollege?.id]);
+
   useEffect(() => {
     apiRequest("get", "/colleges").then(r => setColleges(r.data)).catch(() => {});
     apiRequest("get", "/profile").then(r => {
@@ -292,6 +309,17 @@ export default function ComposePage() {
                     {selectedCollege.coaches.map(c => <option key={c.name} value={c.name}>{c.name} - {c.title}</option>)}
                   </select>
                   <ChevronDown className="absolute right-3 top-3.5 w-4 h-4 text-slate-400 pointer-events-none" />
+                </div>
+              </div>
+            )}
+
+            {/* Prior outreach warning */}
+            {alreadyContacted && (
+              <div className="mb-4 flex items-start gap-2.5 bg-amber-50 border border-amber-300 rounded-lg px-4 py-3" data-testid="already-contacted-warning">
+                <span className="text-amber-500 mt-0.5 flex-shrink-0">⚠</span>
+                <div>
+                  <p className="text-sm font-bold text-amber-800">Initial outreach already sent to {selectedCollege?.name}</p>
+                  <p className="text-xs text-amber-700 mt-0.5">Switched to <strong>Follow-Up</strong> automatically. You can change this below if needed.</p>
                 </div>
               </div>
             )}
