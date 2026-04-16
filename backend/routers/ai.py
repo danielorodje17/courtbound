@@ -15,10 +15,14 @@ async def draft_message(data: AIMessageRequest):
     from emergentintegrations.llm.chat import LlmChat, UserMessage
     api_key = os.environ.get("EMERGENT_LLM_KEY")
     type_map = {
-        "initial_outreach": "initial scholarship inquiry",
-        "follow_up": "follow-up after no response",
-        "thank_you": "thank you after a call/visit",
-        "update": "athletic/academic update",
+        "initial_outreach":  "initial scholarship inquiry",
+        "follow_up":         "follow-up after no response to an initial email",
+        "second_follow_up":  "second follow-up after still no response — polite, brief, shows continued interest",
+        "reply_to_interest": "reply to a coach who has expressed genuine interest in the player — enthusiastic, builds on their interest, proposes next steps",
+        "reply_to_offer":    "reply to a formal scholarship offer — grateful and professional, asks key questions about the offer terms, timeline and next steps",
+        "after_call":        "thank you email written SPECIFICALLY after a phone or video call with the coach — must reference that a call just took place, recap key points discussed on the call, and confirm any agreed next steps",
+        "after_visit":       "thank you email written SPECIFICALLY after a campus visit — must reference that the player recently visited the campus, mention genuine impressions of the facilities and the programme, and confirm enthusiasm for the school",
+        "thank_you":         "thank you after a call or visit",
     }
     msg_type_label = type_map.get(data.message_type, data.message_type)
     highlight_section = f"\n\nHighlight Tape: {data.highlight_tape_url}" if data.highlight_tape_url else ""

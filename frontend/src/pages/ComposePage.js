@@ -93,10 +93,14 @@ export default function ComposePage() {
       if (!subject) {
         const playerName = playerProfile.full_name || "England U18 Player";
         const subjectMap = {
-          initial_outreach: `Basketball Scholarship Inquiry - ${playerName} | England Under-18`,
-          follow_up: `Follow-Up: Basketball Scholarship Inquiry - ${selectedCollege.name}`,
-          thank_you: `Thank You - ${playerName} | ${selectedCollege.name}`,
-          thank_you: `Thank You - ${selectedCollege.name} Basketball`
+          initial_outreach:  `Basketball Scholarship Inquiry - ${playerName} | England Under-18`,
+          follow_up:         `Follow-Up: Basketball Scholarship Inquiry - ${selectedCollege.name}`,
+          second_follow_up:  `Second Follow-Up: Basketball Scholarship - ${playerName}`,
+          reply_to_interest: `Re: Your Interest — ${playerName} | Basketball`,
+          reply_to_offer:    `Re: Scholarship Offer — ${playerName} | ${selectedCollege.name}`,
+          after_call:        `Following Our Call — ${playerName} | ${selectedCollege.name} Basketball`,
+          after_visit:       `Following My Campus Visit — ${playerName} | ${selectedCollege.name}`,
+          thank_you:         `Thank You - ${playerName} | ${selectedCollege.name}`,
         };
         setSubject(subjectMap[messageType] || "Basketball Scholarship Inquiry");
       }
@@ -192,9 +196,13 @@ export default function ComposePage() {
   };
 
   const messageTypes = [
-    { value: "initial_outreach", label: "Initial Outreach" },
-    { value: "follow_up", label: "Follow-Up" },
-    { value: "thank_you", label: "Thank You" }
+    { value: "initial_outreach",  label: "Initial Outreach"   },
+    { value: "follow_up",         label: "Follow-Up"          },
+    { value: "second_follow_up",  label: "2nd Follow Up"      },
+    { value: "reply_to_interest", label: "Reply to Interest"  },
+    { value: "reply_to_offer",    label: "Reply to Offer"     },
+    { value: "after_call",        label: "After Call"         },
+    { value: "after_visit",       label: "After Visit"        },
   ];
 
   return (

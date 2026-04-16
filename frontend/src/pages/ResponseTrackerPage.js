@@ -16,6 +16,8 @@ const OUTCOME_CONFIG = {
   scholarship_offered: { label: "Offer Received",  color: "bg-amber-100 text-amber-700",   Icon: Trophy },
   second_follow_up:    { label: "2nd Follow Up",   color: "bg-purple-100 text-purple-700", Icon: RefreshCw },
   no_interest:         { label: "No Interest",     color: "bg-slate-100 text-slate-600",   Icon: MinusCircle },
+  after_call:          { label: "After Call",      color: "bg-teal-100 text-teal-700",     Icon: PhoneCall },
+  after_visit:         { label: "After Visit",     color: "bg-indigo-100 text-indigo-700", Icon: CheckCircle2 },
 };
 
 function daysSince(dateStr) {
@@ -295,12 +297,40 @@ export default function ResponseTrackerPage() {
                           <Wand2 className="w-3.5 h-3.5 text-orange-400" /> Next Steps
                         </button>
                         {/* Outcome-specific shortcut */}
-                        {(c.reply_outcome === "rejected" || c.reply_outcome === "scholarship_offered" || c.reply_outcome === "no_interest") && (                          <button
+                        {(c.reply_outcome === "rejected" || c.reply_outcome === "no_interest") && (
+                          <button
                             data-testid={`draft-thanks-btn-${c.college_id}`}
-                            onClick={() => navigate("/compose", { state: { college: c.college, messageType: "thank_you" } })}
+                            onClick={() => navigate("/compose", { state: { college: c.college, messageType: "after_call" } })}
                             className="bg-slate-100 text-slate-700 font-bold uppercase tracking-wider rounded-lg px-4 py-2 text-xs hover:bg-slate-200 transition-all flex items-center justify-center gap-1.5"
                           >
-                            <Heart className="w-3.5 h-3.5" /> Thank You
+                            <Heart className="w-3.5 h-3.5" /> Draft Reply
+                          </button>
+                        )}
+                        {c.reply_outcome === "scholarship_offered" && (
+                          <button
+                            data-testid={`draft-offer-btn-${c.college_id}`}
+                            onClick={() => navigate("/compose", { state: { college: c.college, messageType: "reply_to_offer" } })}
+                            className="bg-amber-50 text-amber-700 border border-amber-200 font-bold uppercase tracking-wider rounded-lg px-4 py-2 text-xs hover:bg-amber-100 transition-all flex items-center justify-center gap-1.5"
+                          >
+                            <Trophy className="w-3.5 h-3.5" /> Reply to Offer
+                          </button>
+                        )}
+                        {c.reply_outcome === "after_call" && (
+                          <button
+                            data-testid={`draft-after-call-btn-${c.college_id}`}
+                            onClick={() => navigate("/compose", { state: { college: c.college, messageType: "after_call" } })}
+                            className="bg-teal-50 text-teal-700 border border-teal-200 font-bold uppercase tracking-wider rounded-lg px-4 py-2 text-xs hover:bg-teal-100 transition-all flex items-center justify-center gap-1.5"
+                          >
+                            <Wand2 className="w-3.5 h-3.5" /> Draft After Call
+                          </button>
+                        )}
+                        {c.reply_outcome === "after_visit" && (
+                          <button
+                            data-testid={`draft-after-visit-btn-${c.college_id}`}
+                            onClick={() => navigate("/compose", { state: { college: c.college, messageType: "after_visit" } })}
+                            className="bg-indigo-50 text-indigo-700 border border-indigo-200 font-bold uppercase tracking-wider rounded-lg px-4 py-2 text-xs hover:bg-indigo-100 transition-all flex items-center justify-center gap-1.5"
+                          >
+                            <Wand2 className="w-3.5 h-3.5" /> Draft After Visit
                           </button>
                         )}
                         {(c.reply_outcome === "interested" || c.reply_outcome === "schedule_call" || c.reply_outcome === "second_follow_up") && (
@@ -490,10 +520,12 @@ export default function ResponseTrackerPage() {
                 <div className="grid grid-cols-2 gap-2" data-testid="outcome-selector">
                   {[
                     { value: "interested",          label: "Interested",             color: "border-green-400 bg-green-50 text-green-800" },
-                    { value: "schedule_call",        label: "Call / Visit Requested", color: "border-blue-400 bg-blue-50 text-blue-800" },
+                    { value: "schedule_call",        label: "Call Requested",         color: "border-blue-400 bg-blue-50 text-blue-800" },
                     { value: "scholarship_offered",  label: "Scholarship Offered",    color: "border-amber-400 bg-amber-50 text-amber-800" },
                     { value: "second_follow_up",     label: "2nd Follow Up",          color: "border-purple-400 bg-purple-50 text-purple-800" },
                     { value: "no_interest",          label: "No Interest",            color: "border-slate-400 bg-slate-100 text-slate-700" },
+                    { value: "after_call",           label: "After Call",             color: "border-teal-400 bg-teal-50 text-teal-800" },
+                    { value: "after_visit",          label: "After Visit",            color: "border-indigo-400 bg-indigo-50 text-indigo-800" },
                   ].map(o => (
                     <button
                       key={o.value}
