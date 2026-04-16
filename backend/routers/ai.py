@@ -220,11 +220,25 @@ async def ai_profile_review(current_user: UserModel = Depends(get_current_user))
     position = f"{primary_pos} / {secondary_pos}" if secondary_pos and secondary_pos != "None" else primary_pos
 
     p = profile
+
+    def stat_line(prefix):
+        fields = [
+            (f"{prefix}_ppg", "PPG"), (f"{prefix}_apg", "APG"), (f"{prefix}_rpg", "RPG"),
+            (f"{prefix}_spg", "SPG"), (f"{prefix}_fg_percent", "FG%"), (f"{prefix}_three_pt_percent", "3PT%"),
+        ]
+        vals = [(label, p.get(key, "")) for key, label in fields]
+        set_vals = [(lbl, v) for lbl, v in vals if v]
+        if not set_vals:
+            return "Not set"
+        return " | ".join(f"{lbl} {v}" for lbl, v in set_vals)
+
     profile_text = f"""
 Name: {p.get('full_name', 'Not set')}
 Position: {position}
 Height: {p.get('height_ft', 'Not set')} / {p.get('height_cm', 'Not set')}cm | Weight: {p.get('weight_kg', 'Not set')}kg | Wingspan: {p.get('wingspan_cm', 'Not set')}cm
-Stats: PPG {p.get('ppg','Not set')} | APG {p.get('apg','Not set')} | RPG {p.get('rpg','Not set')} | SPG {p.get('spg','Not set')} | FG% {p.get('fg_percent','Not set')} | 3PT% {p.get('three_pt_percent','Not set')}
+College/School Stats: {stat_line('college')}
+Academy/Club Stats: {stat_line('academy')}
+National Team Stats: {stat_line('country')}
 National Team: {p.get('current_team', 'Not set')} | Club Team: {p.get('club_team', 'Not set')}
 Highlight Tape: {'SET — ' + p['highlight_tape_url'] if p.get('highlight_tape_url') else 'NOT SET — critical missing item'}
 Bio: {'Set (' + str(len(p.get('bio',''))) + ' chars)' if p.get('bio') else 'Not set'}
@@ -314,9 +328,10 @@ async def ai_match(current_user: UserModel = Depends(get_current_user)):
     primary_pos = profile.get("primary_position") or profile.get("position", "Not specified")
     secondary_pos = profile.get("secondary_position", "")
     position = f"{primary_pos} / {secondary_pos} (versatile)" if secondary_pos else primary_pos
-    ppg = profile.get("ppg", "N/A")
-    rpg = profile.get("rpg", "N/A")
-    apg = profile.get("apg", "N/A")
+    # Use best available stats: prefer college stats, fallback to legacy ppg/apg/rpg
+    ppg = profile.get("college_ppg") or profile.get("academy_ppg") or profile.get("ppg", "N/A")
+    rpg = profile.get("college_rpg") or profile.get("academy_rpg") or profile.get("rpg", "N/A")
+    apg = profile.get("college_apg") or profile.get("academy_apg") or profile.get("apg", "N/A")
     height_ft = profile.get("height_ft", "")
     height_cm = profile.get("height_cm", "")
     height = f"{height_ft} / {height_cm}cm" if height_ft or height_cm else "Not specified"

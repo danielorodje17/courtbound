@@ -111,7 +111,7 @@ export default function ProfilePage() {
   );
 
   const initials = (p.full_name || "DO").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
-  const completionFields = ["full_name", "date_of_birth", "email", "height_ft", "primary_position", "current_school", "school_year", "gcse_grades", "a_level_subjects", "highlight_tape_url", "ppg", "bio"];
+  const completionFields = ["full_name", "date_of_birth", "email", "height_ft", "primary_position", "current_school", "school_year", "gcse_grades", "a_level_subjects", "highlight_tape_url", "college_ppg", "bio"];
   const filled = completionFields.filter(f => p[f] && String(p[f]).trim()).length;
   const completion = Math.round((filled / completionFields.length) * 100);
 
@@ -168,16 +168,17 @@ export default function ProfilePage() {
               )}
             </p>
             <div className="flex flex-wrap gap-1.5 justify-center mt-3">
-              <span className="bg-orange-50 text-orange-700 text-xs font-bold px-2 py-0.5 rounded-full border border-orange-200">
-                {p.nationality || "British"}
-              </span>
-              <span className="bg-blue-50 text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full border border-blue-200">
-                England U18
-              </span>
+              {p.nationality && (
+                <span className="bg-orange-50 text-orange-700 text-xs font-bold px-2 py-0.5 rounded-full border border-orange-200">
+                  {p.nationality}
+                </span>
+              )}
+              {p.current_team && (
+                <span className="bg-blue-50 text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full border border-blue-200">
+                  {p.current_team}
+                </span>
+              )}
             </div>
-            {p.current_team && (
-              <p className="text-xs text-slate-400 mt-2">{p.current_team}</p>
-            )}
           </div>
 
           {/* Profile Completion */}
@@ -347,34 +348,47 @@ export default function ProfilePage() {
               </Field>
             </div>
 
-            {/* Stats row */}
+            {/* Stats by Competition Level */}
             <div>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Season Statistics</p>
-              {editing ? (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {[
-                    { label: "Points Per Game", key: "ppg", placeholder: "e.g. 18.5" },
-                    { label: "Assists Per Game", key: "apg", placeholder: "e.g. 6.2" },
-                    { label: "Rebounds Per Game", key: "rpg", placeholder: "e.g. 4.1" },
-                    { label: "Steals Per Game", key: "spg", placeholder: "e.g. 2.0" },
-                    { label: "FG%", key: "fg_percent", placeholder: "e.g. 46%" },
-                    { label: "3PT%", key: "three_pt_percent", placeholder: "e.g. 38%" },
-                  ].map(s => (
-                    <Field key={s.key} label={s.label}>
-                      <Input value={p[s.key]} onChange={v => set(s.key, v)} placeholder={s.placeholder} testId={`profile-${s.key}`} />
-                    </Field>
-                  ))}
-                </div>
-              ) : (
-                <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
-                  <Stat label="PPG" value={p.ppg} />
-                  <Stat label="APG" value={p.apg} />
-                  <Stat label="RPG" value={p.rpg} />
-                  <Stat label="SPG" value={p.spg} />
-                  <Stat label="FG%" value={p.fg_percent} />
-                  <Stat label="3PT%" value={p.three_pt_percent} />
-                </div>
-              )}
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Statistics by Competition Level</p>
+              <div className="space-y-4">
+                {[
+                  { label: "College / School Team", prefix: "college", color: "bg-orange-50 border-orange-200 text-orange-700" },
+                  { label: "Academy / Club Team",   prefix: "academy", color: "bg-blue-50 border-blue-200 text-blue-700" },
+                  { label: "Country / National Team", prefix: "country", color: "bg-green-50 border-green-200 text-green-700" },
+                ].map(({ label, prefix, color }) => (
+                  <div key={prefix} className={`border rounded-lg overflow-hidden`}>
+                    <div className={`px-4 py-2 ${color} flex items-center`}>
+                      <span className="text-xs font-bold uppercase tracking-wider">{label}</span>
+                    </div>
+                    {editing ? (
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 p-4">
+                        {[
+                          { label: "PPG", key: `${prefix}_ppg`, placeholder: "e.g. 18.5" },
+                          { label: "APG", key: `${prefix}_apg`, placeholder: "e.g. 6.2" },
+                          { label: "RPG", key: `${prefix}_rpg`, placeholder: "e.g. 4.1" },
+                          { label: "SPG", key: `${prefix}_spg`, placeholder: "e.g. 2.0" },
+                          { label: "FG%", key: `${prefix}_fg_percent`, placeholder: "e.g. 46%" },
+                          { label: "3PT%", key: `${prefix}_three_pt_percent`, placeholder: "e.g. 38%" },
+                        ].map(s => (
+                          <Field key={s.key} label={s.label}>
+                            <Input value={p[s.key]} onChange={v => set(s.key, v)} placeholder={s.placeholder} testId={`profile-${s.key}`} />
+                          </Field>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-3 md:grid-cols-6 gap-3 p-4">
+                        <Stat label="PPG" value={p[`${prefix}_ppg`]} />
+                        <Stat label="APG" value={p[`${prefix}_apg`]} />
+                        <Stat label="RPG" value={p[`${prefix}_rpg`]} />
+                        <Stat label="SPG" value={p[`${prefix}_spg`]} />
+                        <Stat label="FG%" value={p[`${prefix}_fg_percent`]} />
+                        <Stat label="3PT%" value={p[`${prefix}_three_pt_percent`]} />
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           </Section>
 
