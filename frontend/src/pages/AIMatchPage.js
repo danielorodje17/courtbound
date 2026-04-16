@@ -9,8 +9,22 @@ const FIT_CONFIG = {
   possible_fit:  { label: "Possible Fit",  bg: "bg-blue-50",    border: "border-blue-200",    badge: "bg-blue-500",    pctColor: "text-blue-600",    headerBg: "bg-blue-500"    },
 };
 
+const REALITY_CHECK = [
+  { min: 82, label: "Strong Target",   color: "bg-emerald-100 text-emerald-700" },
+  { min: 72, label: "Good Target",     color: "bg-teal-100 text-teal-700"       },
+  { min: 63, label: "Realistic Reach", color: "bg-orange-100 text-orange-700"   },
+  { min: 50, label: "Worth Trying",    color: "bg-blue-100 text-blue-700"       },
+  { min: 40, label: "Long Shot",       color: "bg-slate-100 text-slate-600"     },
+  { min: 0,  label: "Ambitious",       color: "bg-red-100 text-red-600"         },
+];
+
+function getRealityCheck(pct) {
+  return REALITY_CHECK.find(r => pct >= r.min);
+}
+
 function CollegeCard({ college, config, navigate }) {
-  const pct = Math.min(college.pct ?? 0, 86); // safety clamp — no score should exceed 86%
+  const pct = Math.min(college.pct ?? 0, 86);
+  const reality = getRealityCheck(pct);
   return (
     <div
       data-testid={`ai-match-card-${college.name?.toLowerCase().replace(/\s+/g, "-")}`}
@@ -23,7 +37,14 @@ function CollegeCard({ college, config, navigate }) {
           {pct}%
         </span>
       </div>
-      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">{college.division}</p>
+      <div className="flex items-center gap-2 mb-2">
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{college.division}</p>
+        {reality && (
+          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${reality.color}`}>
+            {reality.label}
+          </span>
+        )}
+      </div>
       <p className="text-xs text-slate-600 leading-relaxed">{college.why}</p>
       <div className="mt-3 flex items-center gap-1 text-xs text-slate-400 hover:text-orange-500 transition-colors">
         View college <ChevronRight className="w-3 h-3" />
@@ -215,6 +236,16 @@ export default function AIMatchPage() {
                 <p className="text-xs text-slate-600 font-semibold">{cfg.label}</p>
               </div>
             ))}
+          </div>
+          <div className="mt-5 max-w-md mx-auto">
+            <p className="text-xs text-slate-400 font-semibold uppercase tracking-widest mb-2">Reality Check Labels</p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {REALITY_CHECK.map(r => (
+                <span key={r.label} className={`text-xs font-bold px-2.5 py-1 rounded-full ${r.color}`}>
+                  {r.label}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
       )}

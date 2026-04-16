@@ -264,6 +264,10 @@ An 18-year-old student basketball player from UK (England Under-18) wants to tra
 - [x] Synced all changes to seed_data.py (foreign_friendly flags + new college entries)
 - [x] Cleanup script: /app/backend/euro_audit_and_expand.py (executed, data persisted)
 
+### v1.23 - Reality Check Labels on AI Match Cards (Apr 2026)
+- [x] Added plain-English badge alongside match %: Strong Target (82-86%), Good Target (72-79%), Realistic Reach (63-71%), Worth Trying (50-62%), Long Shot (40-49%), Ambitious (30-39%)
+- [x] Legend shown on intro/empty state so users understand labels before running analysis
+
 ### v1.22 - AI Match Score Tightening (Apr 2026)
 - [x] Lowered score bands: excellent_fit 72-86% (was 88-100%), good_fit 50-71% (was 65-87%), possible_fit 30-49% (was 45-64%)
 - [x] Added explicit prompt guardrails: never exceed 86%, be conservative, note one real challenge in each "why" field
