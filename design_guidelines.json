@@ -1,111 +1,156 @@
 {
-  "theme": "light",
-  "archetype": "Archetype 4: Swiss & High-Contrast (Light Mode) with Athletic Twist",
-  "brand_name": "CourtBound",
-  "typography": {
-    "heading_font": "Barlow Condensed",
-    "body_font": "Manrope",
-    "hierarchy": {
-      "h1": "text-5xl sm:text-6xl tracking-tight font-bold uppercase",
-      "h2": "text-3xl sm:text-4xl tracking-tight font-semibold uppercase",
-      "h3": "text-xl sm:text-2xl font-semibold",
-      "h4": "text-lg sm:text-xl font-medium",
-      "body": "text-base leading-relaxed text-slate-700",
-      "small": "text-sm text-slate-500",
-      "overline": "text-xs tracking-[0.2em] uppercase font-bold text-orange-600"
-    },
-    "notes": "Use 'Barlow Condensed' for all major headings to evoke a sports/athletic feel. 'Manrope' for all body text, UI elements, and data tables for maximum legibility. Never use Inter."
+  "project_name": "CourtBound",
+  "theme": "dark",
+  "archetype": "2 (The Performance Pro)",
+  "color_palette": {
+    "background_primary": "#0A0A0A",
+    "background_secondary": "#0f172a",
+    "accent_primary": "#f97316",
+    "accent_primary_hover": "#fb923c",
+    "text_primary": "#FFFFFF",
+    "text_secondary": "#94A3B8",
+    "border_color": "rgba(255, 255, 255, 0.1)"
   },
-  "colors": {
-    "background": {
-      "primary": "#FFFFFF",
-      "secondary": "#F8FAFC",
-      "tertiary": "#F1F5F9",
-      "overlay": "bg-white/70 backdrop-blur-xl"
-    },
-    "text": {
-      "primary": "#0F172A",
-      "secondary": "#475569",
-      "muted": "#94A3B8",
-      "inverse": "#FFFFFF"
-    },
-    "accent": {
-      "primary": "#FF5722",
-      "primary_hover": "#E64A19",
-      "primary_light": "#FFF7ED",
-      "secondary": "#0A2540"
-    },
-    "status": {
-      "success": "#10B981",
-      "success_bg": "#D1FAE5",
-      "warning": "#F59E0B",
-      "warning_bg": "#FEF3C7",
-      "error": "#EF4444",
-      "error_bg": "#FEE2E2"
+  "typography": {
+    "headings_font": "Barlow Condensed, sans-serif",
+    "body_font": "Manrope, sans-serif",
+    "styling_rules": {
+      "h1": "text-5xl md:text-6xl font-black uppercase tracking-tighter leading-none text-white",
+      "h2": "text-4xl md:text-5xl font-black uppercase tracking-tighter leading-none text-white",
+      "h3": "text-2xl md:text-3xl font-bold uppercase tracking-tight text-white",
+      "body": "text-base font-medium tracking-normal leading-relaxed text-slate-400",
+      "labels": "text-xs font-bold uppercase tracking-[0.2em] text-slate-500"
     }
   },
-  "spacing_and_layout": {
-    "container_padding": "p-6 md:p-8 lg:p-12",
-    "gap_standard": "gap-6",
-    "gap_large": "gap-12",
-    "border_radius": "rounded-lg",
-    "grid_modes": {
-      "dashboard": "grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6",
-      "bento_marketing": "grid-cols-1 md:grid-cols-8 lg:grid-cols-12 gap-8"
-    },
-    "surface_strategy": "Cards should have a flat solid background (bg-white), a 1px subtle border (border-slate-200), and NO shadow by default. On hover, add a slight lift (-translate-y-1) and a subtle shadow (shadow-lg)."
+  "layout_and_spacing": {
+    "container_padding": "px-6 md:px-12 lg:px-24",
+    "section_spacing": "py-24 md:py-32",
+    "bento_grid": "grid grid-cols-1 md:grid-cols-4 lg:grid-cols-8 gap-6 md:gap-8",
+    "border_radius": "rounded-sm md:rounded-md",
+    "surfaces": {
+      "header": "fixed top-0 w-full z-50 bg-slate-900/60 backdrop-blur-xl border-b border-white/10",
+      "cards": "bg-slate-900/40 border border-white/10 hover:border-orange-500/50 transition-colors duration-300",
+      "buttons": {
+        "primary": "bg-orange-500 text-white font-bold uppercase tracking-wide hover:bg-orange-400 transition-colors px-6 py-3 rounded-sm",
+        "secondary": "bg-transparent border border-white/20 text-white font-bold uppercase tracking-wide hover:bg-white/10 transition-colors px-6 py-3 rounded-sm"
+      }
+    }
+  },
+  "motion_and_interaction": {
+    "hover_states": "hover:-translate-y-1 hover:shadow-[0_8px_30px_rgba(249,115,22,0.15)] transition-all duration-300",
+    "page_transitions": "opacity-0 animate-fade-in",
+    "staggered_lists": "animate-slide-up-fade"
   },
   "components": {
-    "buttons": {
-      "primary": "bg-orange-500 text-white hover:bg-orange-600 font-bold uppercase tracking-wider rounded-lg px-6 py-3 transition-transform hover:-translate-y-0.5",
-      "secondary": "bg-slate-100 text-slate-900 hover:bg-slate-200 font-bold uppercase tracking-wider rounded-lg px-6 py-3 border border-slate-200",
-      "outline": "border-2 border-slate-200 text-slate-700 hover:border-orange-500 hover:text-orange-500 font-bold uppercase tracking-wider rounded-lg px-6 py-3"
+    "forms": "Use Shadcn customized with flat inputs, bg-black/50, border-white/20, focus:ring-1 focus:ring-orange-500",
+    "stepper": "Linear progress bar at top of onboarding: bg-white/10 with bg-orange-500 fill",
+    "icons": "lucide-react"
+  },
+  "pages": {
+    "landing_page": {
+      "hero": {
+        "layout": "min-h-screen flex items-center justify-center relative pt-24",
+        "background": "dark indoor court image with bg-black/60 overlay and bottom-to-top gradient fade to #0A0A0A",
+        "content": "Centered. Huge H1: 'CROSS THE POND. DOMINATE THE PAINT.', Subtitle: 'The AI recruitment engine for European basketball players.', CTA: 'Sign In with Google' (orange button with Google icon)"
+      },
+      "stats_marquee": {
+        "layout": "py-12 border-y border-white/10 bg-slate-900/50",
+        "content": "Slow moving ticker using react-fast-marquee: '274 US COLLEGES // 43 EURO-FRIENDLY PROGRAMS // $1.2B SCHOLARSHIPS AVAILABLE'"
+      },
+      "features_bento": {
+        "layout": "py-24 bento grid",
+        "items": [
+          {
+            "span": "col-span-1 md:col-span-8 lg:col-span-4 row-span-2",
+            "title": "AI College Matching",
+            "desc": "Analyzes your stats and playstyle to find the perfect fit."
+          },
+          {
+            "span": "col-span-1 md:col-span-4 lg:col-span-4 row-span-1",
+            "title": "AI Email Drafting",
+            "desc": "Write perfect outreach emails to US coaches instantly."
+          },
+          {
+            "span": "col-span-1 md:col-span-4 lg:col-span-2 row-span-1",
+            "title": "Response Tracker",
+            "desc": "Know when coaches open your emails."
+          },
+          {
+            "span": "col-span-1 md:col-span-4 lg:col-span-2 row-span-1",
+            "title": "Recruitment Score",
+            "desc": "See how ready you are for NCAA D1/D2/D3."
+          }
+        ]
+      },
+      "how_it_works": {
+        "layout": "py-24 flex flex-col items-center",
+        "steps": [
+          "1. Build your athletic & academic profile",
+          "2. Let AI match you with target programs",
+          "3. Connect directly with coaches"
+        ]
+      }
     },
-    "inputs": "bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 p-3 text-slate-900",
-    "cards": "bg-white border border-slate-200 rounded-lg p-6 hover:shadow-md transition-all duration-200",
-    "badges": "px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide",
-    "navigation": "Sticky top header with glassmorphism (bg-white/80 backdrop-blur-xl border-b border-slate-200). Must include visible links on desktop."
+    "onboarding_flow": {
+      "layout": "Split-screen layout. Left side (hidden on mobile): Atmospheric imagery, changing per step, huge typography overlay. Right side: Minimalist Shadcn form container, max-w-md w-full.",
+      "steps": [
+        {
+          "step": 1,
+          "title": "Basic Info",
+          "fields": "Name, Primary Position (Select), Secondary Position (Select), Height (Input)",
+          "left_image": "action_shot"
+        },
+        {
+          "step": 2,
+          "title": "Athletic Profile",
+          "fields": "PPG, APG, RPG (Inputs), Current Team/Club, Highlight Tape URL",
+          "left_image": "hero_background"
+        },
+        {
+          "step": 3,
+          "title": "Academic & Goals",
+          "fields": "GCSE Grades (Select/Input), A-Level Subjects, Target US Division (NCAA D1, D2, D3, NAIA), Enrolment Year",
+          "left_image": "campus_night"
+        },
+        {
+          "step": 4,
+          "title": "Your First Matches",
+          "description": "The Aha Moment: Auto-runs AI match with skeleton loader, then reveals 3 matched colleges.",
+          "left_image": "action_shot"
+        }
+      ]
+    }
   },
   "media": {
     "images": [
       {
-        "id": "hero_basketball_players",
-        "url": "https://images.unsplash.com/photo-1638569774366-e221b95e3512?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjV8MHwxfHNlYXJjaHwzfHxiYXNrZXRiYWxsJTIwY29sbGVnZSUyMHBsYXllcnxlbnwwfHx8fDE3NzUyNDU5MTd8MA&ixlib=rb-4.1.0&q=85",
-        "description": "Group of young basketball players playing a game. Use for login page background or marketing hero section.",
-        "usage": "overlay with bg-white/40 or bg-slate-900/60 depending on text contrast needs. Given light mode, if text is dark, use bg-white/60 over it."
+        "category": "hero_background",
+        "url": "https://images.unsplash.com/photo-1677617586882-2b494292ebbe?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzR8MHwxfHNlYXJjaHwyfHxlbXB0eSUyMGluZG9vciUyMGJhc2tldGJhbGwlMjBjb3VydCUyMGRhcmt8ZW58MHx8fHwxNzc2MzcwMTc4fDA&ixlib=rb-4.1.0&q=85",
+        "description": "Empty dark indoor basketball court for hero background and onboarding step 2"
       },
       {
-        "id": "empty_court_background",
-        "url": "https://images.unsplash.com/photo-1768554630751-6448593749eb?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDR8MHwxfHNlYXJjaHwyfHxlbXB0eSUyMGluZG9vciUyMGJhc2tldGJhbGwlMjBjb3VydHxlbnwwfHx8fDE3NzUyNDU5MjF8MA&ixlib=rb-4.1.0&q=85",
-        "description": "Empty indoor basketball court. Use for dashboard welcome banners or strategy page headers.",
-        "usage": "Use as a card background with a heavy white gradient overlay (from-white to-white/20) to keep text readable."
+        "category": "action_shot",
+        "url": "https://images.unsplash.com/photo-1759694423710-8e8defcfefd3?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzB8MHwxfHNlYXJjaHw0fHxiYXNrZXRiYWxsJTIwcGxheWVyJTIwZHVuayUyMGR1bmtpbmclMjBnYW1lfGVufDB8fHx8MTc3NjM3MDE2OHww&ixlib=rb-4.1.0&q=85",
+        "description": "Basketball player jumping for dunk, use for onboarding step 1 and step 4"
       },
       {
-        "id": "abstract_light_pattern",
-        "url": "https://images.unsplash.com/photo-1769541607705-3b3c5095679b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHwyfHx3aGl0ZSUyMG1pbmltYWwlMjBhYnN0cmFjdCUyMGxpZ2h0JTIwcGF0dGVybnxlbnwwfHx8fDE3NzUyNDU5MzF8MA&ixlib=rb-4.1.0&q=85",
-        "description": "Abstract white geometric background.",
-        "usage": "Use for section backgrounds where a plain white feels too empty, especially around the AI Message Composer or Communication Log."
+        "category": "campus_night",
+        "url": "https://images.unsplash.com/photo-1763770449161-eb1cd5596415?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxNzV8MHwxfHNlYXJjaHwzfHx1bml2ZXJzaXR5JTIwY2FtcHVzJTIwYnVpbGRpbmclMjBuaWdodHxlbnwwfHx8fDE3NzYzNzAxNzh8MA&ixlib=rb-4.1.0&q=85",
+        "description": "University campus building at dusk, use for onboarding step 3 (Academics)"
       }
     ]
   },
-  "iconography": {
-    "library": "@phosphor-icons/react",
-    "style": "duotone or regular weights. Maintain a precise, technical look to match the high-contrast aesthetic."
+  "testing_attributes": {
+    "guideline": "All interactive and key informational elements MUST include a data-testid attribute using kebab-case role-based naming."
   },
-  "animations": {
-    "hover": "Fast and snappy transitions (duration-150 ease-out).",
-    "page_load": "Staggered fade-up for grid items. Use framer-motion with stiff spring animations to reflect athletic energy."
-  },
-  "specific_page_guidelines": {
-    "login_page": "Split screen layout. Left side: Login form with minimalist inputs and sharp orange primary button. Right side: The 'hero_basketball_players' image covering the full height, no text over it.",
-    "dashboard": "Bento 'Control Room' Grid (grid-cols-4). Use solid flat cards with 1px border. Top section should have an overarching 'Season Goals' or 'Recruitment Status' summary.",
-    "college_directory": "Dense list or bento grid. Use badges for 'Division I/II/III' and 'Foreign-Friendly'. Provide strong visual hierarchy for college names vs locations.",
-    "ai_message_composer": "Clean, distraction-free writing interface. The AI suggestions panel should be distinct (maybe with a subtle orange or blue tint background) to separate it from the user's draft area.",
-    "communication_log": "Table layout with clear status badges (Sent, Replied, Draft). Left-align all textual data.",
-    "strategy_follow_up": "Use timeline views or step-by-step vertical layouts. Highlight AI actionable insights with the accent color (orange)."
-  },
-  "accessibility_and_testing": {
-    "contrast": "Ensure text over any image has sufficient contrast or uses backdrop blur/overlay.",
-    "testing_attributes": "All interactive elements MUST have 'data-testid' attributes (e.g., data-testid='login-submit-button', data-testid='college-filter-select')."
-  }
+  "instructions_to_main_agent": [
+    "Use Tailwind CSS for all styling.",
+    "Install and use lucide-react for icons.",
+    "Implement Barlow Condensed via Google Fonts for headings, Manrope for body text.",
+    "Build the Landing Page in pure HTML/Tailwind without Shadcn card component wrappers, allowing overlapping and asymmetrical bento grids.",
+    "Build the Onboarding Flow forms using customized Shadcn components (strip borders to 1px white/10, bg-transparent).",
+    "Ensure the hero background has a max overlay opacity of bg-black/50 or bg-gradient overlay to let the image breathe.",
+    "Do NOT use 'Inter' font anywhere.",
+    "Use the exact media URLs provided in the media section, never use placeholder services."
+  ]
 }
