@@ -110,7 +110,7 @@ export default function ProfilePage() {
   );
 
   const initials = (p.full_name || "DO").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
-  const completionFields = ["full_name", "date_of_birth", "email", "height_ft", "position", "current_school", "school_year", "gcse_grades", "a_level_subjects", "highlight_tape_url", "ppg", "bio"];
+  const completionFields = ["full_name", "date_of_birth", "email", "height_ft", "primary_position", "current_school", "school_year", "gcse_grades", "a_level_subjects", "highlight_tape_url", "ppg", "bio"];
   const filled = completionFields.filter(f => p[f] && String(p[f]).trim()).length;
   const completion = Math.round((filled / completionFields.length) * 100);
 
@@ -160,7 +160,12 @@ export default function ProfilePage() {
             <h2 className="font-bold text-slate-900 text-lg" style={{ fontFamily: "Barlow Condensed, sans-serif", textTransform: "uppercase" }}>
               {p.full_name || "Your Name"}
             </h2>
-            <p className="text-sm text-orange-600 font-semibold mt-0.5">{p.position || "Position"}</p>
+            <p className="text-sm text-orange-600 font-semibold mt-0.5">
+              {p.primary_position || p.position || "Position"}
+              {(p.secondary_position) && (
+                <span className="text-slate-400 font-normal"> / {p.secondary_position}</span>
+              )}
+            </p>
             <div className="flex flex-wrap gap-1.5 justify-center mt-3">
               <span className="bg-orange-50 text-orange-700 text-xs font-bold px-2 py-0.5 rounded-full border border-orange-200">
                 {p.nationality || "British"}
@@ -301,9 +306,15 @@ export default function ProfilePage() {
           {/* ATHLETIC PROFILE */}
           <Section title="Athletic Profile" icon={Activity} color="bg-orange-50 text-orange-700">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
-              <Field label="Position">
-                {editing ? <Select value={p.position} onChange={v => set("position", v)} options={POSITIONS} testId="profile-position" />
-                  : <div className="py-2.5 px-3 bg-slate-50 rounded-lg text-sm font-semibold text-slate-800">{p.position || "—"}</div>}
+              <Field label="Primary Position">
+                {editing
+                  ? <Select value={p.primary_position || p.position} onChange={v => set("primary_position", v)} options={POSITIONS} testId="profile-primary-position" />
+                  : <div className="py-2.5 px-3 bg-slate-50 rounded-lg text-sm font-semibold text-slate-800">{p.primary_position || p.position || "—"}</div>}
+              </Field>
+              <Field label="Secondary Position">
+                {editing
+                  ? <Select value={p.secondary_position} onChange={v => set("secondary_position", v)} options={["None", ...POSITIONS]} testId="profile-secondary-position" />
+                  : <div className="py-2.5 px-3 bg-slate-50 rounded-lg text-sm font-semibold text-slate-800">{p.secondary_position || <span className="text-slate-400 italic text-xs">Not set</span>}</div>}
               </Field>
               <Field label="Dominant Hand">
                 {editing ? <Select value={p.dominant_hand} onChange={v => set("dominant_hand", v)} options={HANDS} testId="profile-hand" />

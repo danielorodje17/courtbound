@@ -22,17 +22,20 @@ async def draft_message(data: AIMessageRequest):
     }
     msg_type_label = type_map.get(data.message_type, data.message_type)
     highlight_section = f"\n\nHighlight Tape: {data.highlight_tape_url}" if data.highlight_tape_url else ""
+    position_line = data.user_position
+    if data.user_secondary_position:
+        position_line = f"{data.user_position} / {data.user_secondary_position} (versatile, can play both)"
     prompt = f"""Write a professional {msg_type_label} email from a UK basketball player to a college coach.
 
 Player: {data.user_name}
-Position: {data.user_position}
+Position: {position_line}
 Stats: {data.user_stats or 'Not specified'}
 Contact: {data.user_email or 'N/A'} | {data.user_phone or 'N/A'}{highlight_section}
 
 College: {data.college_name} ({data.division})
 Coach: {data.coach_name}
 
-Write a compelling, personalised email. Reference the specific college and division. Keep it under 300 words.
+Write a compelling, personalised email. Reference the specific college and division. If the player has a secondary position, mention their positional versatility — this is a genuine selling point for college coaches. Keep it under 300 words.
 Format: Subject: [subject line]\\n\\n[email body]"""
     chat = LlmChat(
         api_key=api_key, session_id=str(uuid.uuid4()),
@@ -163,7 +166,9 @@ async def ai_match(current_user: UserModel = Depends(get_current_user)):
         ff = "UK-Friendly" if c.get("foreign_friendly") else "Standard"
         college_lines.append(f"{str(c['_id'])}|{c.get('name','?')}|{c.get('division','?')}|{ff}|{c.get('acceptance_rate','?')}")
     name = profile.get("full_name", current_user.name or "Player")
-    position = profile.get("position", "Not specified")
+    primary_pos = profile.get("primary_position") or profile.get("position", "Not specified")
+    secondary_pos = profile.get("secondary_position", "")
+    position = f"{primary_pos} / {secondary_pos} (versatile)" if secondary_pos else primary_pos
     ppg = profile.get("ppg", "N/A")
     rpg = profile.get("rpg", "N/A")
     apg = profile.get("apg", "N/A")

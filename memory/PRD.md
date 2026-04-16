@@ -264,6 +264,13 @@ An 18-year-old student basketball player from UK (England Under-18) wants to tra
 - [x] Synced all changes to seed_data.py (foreign_friendly flags + new college entries)
 - [x] Cleanup script: /app/backend/euro_audit_and_expand.py (executed, data persisted)
 
+### v1.24 - Primary & Secondary Position (Apr 2026)
+- [x] ProfilePage: "Position" split into "Primary Position" + "Secondary Position" dropdowns; sidebar card shows both (e.g. "Point Guard / Shooting Guard")
+- [x] ComposePage: two position selectors; secondary is optional with a hint note; both passed to AI draft API
+- [x] AI email draft: position line becomes "Point Guard / Shooting Guard (versatile, can play both)" — positional versatility highlighted as a selling point
+- [x] AI match prompt: uses primary_position with secondary_position fallback; shown as combined string to LLM
+- [x] Backward compat: existing profiles with only `position` field still load/display correctly
+
 ### v1.23 - Reality Check Labels on AI Match Cards (Apr 2026)
 - [x] Added plain-English badge alongside match %: Strong Target (82-86%), Good Target (72-79%), Realistic Reach (63-71%), Worth Trying (50-62%), Long Shot (40-49%), Ambitious (30-39%)
 - [x] Legend shown on intro/empty state so users understand labels before running analysis

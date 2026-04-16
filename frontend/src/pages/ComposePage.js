@@ -14,6 +14,7 @@ export default function ComposePage() {
   const [selectedCoach, setSelectedCoach] = useState(preloaded?.coach || null);
   const [messageType, setMessageType] = useState(preloaded?.messageType || "initial_outreach");
   const [position, setPosition] = useState("point guard");
+  const [secondaryPosition, setSecondaryPosition] = useState("");
   const [stats, setStats] = useState("");
   const [subject, setSubject] = useState("");
   const [draft, setDraft] = useState("");
@@ -54,7 +55,9 @@ export default function ComposePage() {
     apiRequest("get", "/profile").then(r => {
       const p = r.data || {};
       setPlayerProfile(p);
-      if (p.position) setPosition(p.position.toLowerCase());
+      if (p.primary_position) setPosition(p.primary_position.toLowerCase());
+      else if (p.position) setPosition(p.position.toLowerCase());
+      if (p.secondary_position && p.secondary_position !== "None") setSecondaryPosition(p.secondary_position.toLowerCase());
       if (p.ppg && p.apg) setStats(`${p.ppg} PPG, ${p.apg} APG${p.rpg ? `, ${p.rpg} RPG` : ""}${p.current_team ? ` — ${p.current_team}` : ""}`);
     }).catch(() => {});
     loadTemplates();
@@ -79,6 +82,7 @@ export default function ComposePage() {
         division: selectedCollege.division || "Division I",
         user_name: playerProfile.full_name || "England U18 Player",
         user_position: position,
+        user_secondary_position: secondaryPosition || "",
         user_stats: stats,
         user_email: playerProfile.email || "",
         user_phone: playerProfile.phone || "",
@@ -344,7 +348,7 @@ export default function ComposePage() {
 
             {/* Position */}
             <div className="mb-4">
-              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1.5">Your Position</label>
+              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1.5">Primary Position</label>
               <div className="relative">
                 <select
                   data-testid="compose-position-select"
@@ -352,6 +356,26 @@ export default function ComposePage() {
                   onChange={e => setPosition(e.target.value)}
                   className="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none appearance-none bg-white pr-8 text-slate-900"
                 >
+                  <option value="point guard">Point Guard</option>
+                  <option value="shooting guard">Shooting Guard</option>
+                  <option value="combo guard">Combo Guard</option>
+                  <option value="small forward">Small Forward</option>
+                  <option value="power forward">Power Forward</option>
+                  <option value="center">Center</option>
+                </select>
+                <ChevronDown className="absolute right-3 top-3.5 w-4 h-4 text-slate-400 pointer-events-none" />
+              </div>
+            </div>
+            <div className="mb-4">
+              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1.5">Secondary Position <span className="text-slate-400 normal-case font-normal">(optional — adds versatility to your email)</span></label>
+              <div className="relative">
+                <select
+                  data-testid="compose-secondary-position-select"
+                  value={secondaryPosition}
+                  onChange={e => setSecondaryPosition(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none appearance-none bg-white pr-8 text-slate-900"
+                >
+                  <option value="">None</option>
                   <option value="point guard">Point Guard</option>
                   <option value="shooting guard">Shooting Guard</option>
                   <option value="combo guard">Combo Guard</option>

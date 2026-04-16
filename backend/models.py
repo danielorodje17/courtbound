@@ -23,6 +23,7 @@ class AIMessageRequest(BaseModel):
     division: str
     user_name: str = "Player"
     user_position: str = "point guard"
+    user_secondary_position: Optional[str] = ""
     user_stats: Optional[str] = ""
     user_email: Optional[str] = ""
     user_phone: Optional[str] = ""
@@ -75,6 +76,8 @@ class PlayerProfile(BaseModel):
     weight_kg: Optional[str] = ""
     wingspan_cm: Optional[str] = ""
     position: Optional[str] = "Point Guard"
+    primary_position: Optional[str] = ""
+    secondary_position: Optional[str] = ""
     dominant_hand: Optional[str] = "Right"
     current_team: Optional[str] = "England Under-18"
     club_team: Optional[str] = ""
