@@ -264,6 +264,18 @@ An 18-year-old student basketball player from UK (England Under-18) wants to tra
 - [x] Synced all changes to seed_data.py (foreign_friendly flags + new college entries)
 - [x] Cleanup script: /app/backend/euro_audit_and_expand.py (executed, data persisted)
 
+### v1.27 - Landing Page Redesign (Apr 2026)
+- [x] Full rewrite based on user's conversion copy
+- [x] Hero: "The System That Gets You Replies From US College Coaches" + pain point line
+- [x] Process bar: Build Profile → AI Matching → Send Outreach → Get Replies → Land Offers
+- [x] Social proof section with real testimonial quotes
+- [x] Why athletes fail (4-point problem list + fix statement)
+- [x] Stats grid: 274 colleges, 43 Euro-friendly, 7 email types, 5min to first match
+- [x] Features in plain English (4 cards)
+- [x] Agency comparison: £3,000-£10,000+ vs CourtBound
+- [x] Real story section (built by a UK parent)
+- [x] Final CTA: "Start Free Trial"
+
 ### v1.26 - Landing Page + Onboarding Flow (Apr 2026)
 - [x] LandingPage.js — dark basketball arena hero, ticker bar, feature bento grid, how-it-works 3 steps, final CTA. Shown at `/` for unauthenticated users
 - [x] OnboardingPage.js — 4-step split-screen wizard (left: changing image, right: form). Step 1: name/positions, Step 2: stats/teams/tape, Step 3: academics/goals, Step 4: auto-runs AI match and shows 3 matched colleges as the "aha moment"
