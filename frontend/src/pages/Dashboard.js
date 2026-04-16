@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { apiRequest } from "../context/AuthContext";
 import { Trophy, Mail, BookOpen, TrendingUp, ChevronRight, Bell, Plus, AlertTriangle, Clock, Calendar, CheckCircle, BarChart2, Newspaper, ArrowUp, ArrowDown, Minus } from "lucide-react";
 import WeeklyGoalsWidget from "../components/WeeklyGoalsWidget";
+import ActivityHeatmap from "../components/ActivityHeatmap";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell
@@ -45,24 +46,27 @@ export default function Dashboard() {
   const [alerts, setAlerts] = useState(null);
   const [analytics, setAnalytics] = useState(null);
   const [digest, setDigest] = useState(null);
+  const [heatmap, setHeatmap] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => { fetchData(); }, []);
 
   const fetchData = async () => {
     try {
-      const [statsRes, trackedRes, alertsRes, analyticsRes, digestRes] = await Promise.all([
+      const [statsRes, trackedRes, alertsRes, analyticsRes, digestRes, heatmapRes] = await Promise.all([
         apiRequest("get", "/dashboard/stats"),
         apiRequest("get", "/my-colleges"),
         apiRequest("get", "/dashboard/alerts"),
         apiRequest("get", "/dashboard/analytics"),
         apiRequest("get", "/dashboard/weekly-digest"),
+        apiRequest("get", "/dashboard/heatmap"),
       ]);
       setStats(statsRes.data);
       setTracked(trackedRes.data);
       setAlerts(alertsRes.data);
       setAnalytics(analyticsRes.data);
       setDigest(digestRes.data);
+      setHeatmap(heatmapRes.data);
     } catch (err) {
       console.error(err);
     } finally {
@@ -506,6 +510,9 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* Recruiting Activity Heatmap */}
+      <ActivityHeatmap data={heatmap} />
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

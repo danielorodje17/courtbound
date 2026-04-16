@@ -99,6 +99,60 @@ async def get_analytics(current_user: UserModel = Depends(get_current_user)):
     }
 
 
+@router.get("/dashboard/heatmap")
+async def get_activity_heatmap(current_user: UserModel = Depends(get_current_user)):
+    one_year_ago = (datetime.now(timezone.utc) - timedelta(days=365)).isoformat()
+    emails = await db.emails.find(
+        {"user_id": current_user.user_id, "direction": "sent", "created_at": {"$gte": one_year_ago}},
+        {"_id": 0, "created_at": 1}
+    ).to_list(5000)
+
+    daily_counts = defaultdict(int)
+    for email in emails:
+        date_str = str(email.get("created_at", ""))[:10]
+        if date_str:
+            daily_counts[date_str] += 1
+
+    today = datetime.now(timezone.utc).date()
+    days_since_monday = today.weekday()
+    start_of_current_week = today - timedelta(days=days_since_monday)
+    start_date = start_of_current_week - timedelta(weeks=51)
+
+    weeks = []
+    current_date = start_date
+    while current_date <= today:
+        week_data = []
+        for dow in range(7):
+            d = current_date + timedelta(days=dow)
+            date_str = d.isoformat() if d <= today else None
+            week_data.append({
+                "date": date_str,
+                "count": daily_counts.get(date_str, 0) if date_str else 0,
+                "day_of_week": dow
+            })
+        weeks.append({"week_start": current_date.isoformat(), "days": week_data})
+        current_date += timedelta(weeks=1)
+
+    all_counts = [d["count"] for w in weeks for d in w["days"] if d["date"]]
+    max_count = max(all_counts) if all_counts else 1
+    total_emails = sum(daily_counts.values())
+    active_days = sum(1 for v in daily_counts.values() if v > 0)
+
+    streak = 0
+    check_date = today
+    while daily_counts.get(check_date.isoformat(), 0) > 0:
+        streak += 1
+        check_date -= timedelta(days=1)
+
+    return {
+        "weeks": weeks,
+        "max_count": max(max_count, 1),
+        "total_emails": total_emails,
+        "active_days": active_days,
+        "streak": streak,
+    }
+
+
 @router.get("/dashboard/weekly-digest")
 async def get_weekly_digest(current_user: UserModel = Depends(get_current_user)):
     uid = current_user.user_id
