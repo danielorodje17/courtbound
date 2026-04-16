@@ -264,6 +264,12 @@ An 18-year-old student basketball player from UK (England Under-18) wants to tra
 - [x] Synced all changes to seed_data.py (foreign_friendly flags + new college entries)
 - [x] Cleanup script: /app/backend/euro_audit_and_expand.py (executed, data persisted)
 
+### v1.22 - AI Match Score Tightening (Apr 2026)
+- [x] Lowered score bands: excellent_fit 72-86% (was 88-100%), good_fit 50-71% (was 65-87%), possible_fit 30-49% (was 45-64%)
+- [x] Added explicit prompt guardrails: never exceed 86%, be conservative, note one real challenge in each "why" field
+- [x] Frontend safety clamp: `Math.min(pct, 86)` on CollegeCard
+- [x] Updated page description to show honest score ranges (72-86%, 50-71%, 30-49%)
+
 ### v1.21 - Recruiting Activity Heatmap (Apr 2026)
 - [x] GitHub-style activity heatmap on Dashboard — 52-week grid of email outreach activity
 - [x] 3 summary stats: Emails sent (year), Active days, Current streak

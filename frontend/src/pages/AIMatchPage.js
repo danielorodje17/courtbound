@@ -10,6 +10,7 @@ const FIT_CONFIG = {
 };
 
 function CollegeCard({ college, config, navigate }) {
+  const pct = Math.min(college.pct ?? 0, 86); // safety clamp — no score should exceed 86%
   return (
     <div
       data-testid={`ai-match-card-${college.name?.toLowerCase().replace(/\s+/g, "-")}`}
@@ -19,7 +20,7 @@ function CollegeCard({ college, config, navigate }) {
       <div className="flex items-start justify-between gap-2 mb-2">
         <p className="font-bold text-slate-900 text-sm leading-tight">{college.name}</p>
         <span className={`${config.badge} text-white text-xs font-black px-2.5 py-1 rounded-full flex-shrink-0`}>
-          {college.pct}%
+          {pct}%
         </span>
       </div>
       <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">{college.division}</p>
@@ -104,7 +105,7 @@ export default function AIMatchPage() {
             AI College Match
           </h1>
           <p className="text-white/60 mt-1 max-w-xl">
-            Your saved player profile is analysed against all 90+ colleges in our database. Get personalised Excellent, Good, and Possible fit ratings with AI reasoning.
+            Your saved player profile is analysed against all 274 colleges in our database. Get personalised Excellent (72-86%), Good (50-71%), and Possible (30-49%) fit ratings with honest AI reasoning — including real challenges you'll face at each school.
           </p>
           <div className="flex flex-wrap gap-3 mt-5">
             <button

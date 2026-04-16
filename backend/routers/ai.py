@@ -190,15 +190,21 @@ COLLEGES (format: id|name|division|UK-Friendly|acceptance_rate):
 
 Categorise each college as excellent_fit, good_fit, or possible_fit.
 
-Rules:
-- excellent_fit (88-100%): UK-Friendly + division matches target + feasible for player level
-- good_fit (65-87%): UK-Friendly OR division is close match + reasonable path
-- possible_fit (45-64%): Achievable with effort, different division or less UK-friendly
+SCORING RULES — BE CONSERVATIVE AND REALISTIC:
+- A European player always faces real barriers: visa/immigration hurdles, stiff scholarship competition from US players, cultural adjustment, athletic level differences, and distance. No college is ever a perfect match.
+- NEVER assign a score above 86%. Scores of 84-86% should be rare and reserved for genuinely exceptional alignment.
+- Vary scores meaningfully within each band — do not cluster scores together. If two colleges are both "excellent", one might be 83% and another 77%.
+
+BANDS:
+- excellent_fit (72-86%): UK-Friendly + division matches target + realistic for player level. Hard ceiling 86%.
+- good_fit (50-71%): UK-Friendly OR division is close match + reasonable path forward
+- possible_fit (30-49%): Achievable but significant work required — different division, not UK-friendly, or academic uncertainty
 
 Include at most 10 per category. Prioritise UK-Friendly colleges.
+The "why" field must be honest — mention at least one realistic challenge the player will face at that college.
 
 Return ONLY valid JSON — no markdown, no explanation:
-{{"excellent_fit":[{{"id":"...","name":"...","division":"...","pct":92,"why":"One sentence max 20 words"}}],"good_fit":[...],"possible_fit":[...]}}"""
+{{"excellent_fit":[{{"id":"...","name":"...","division":"...","pct":79,"why":"One sentence max 25 words, noting one challenge"}}],"good_fit":[...],"possible_fit":[...]}}"""
     chat = LlmChat(
         api_key=api_key, session_id=str(uuid.uuid4()),
         system_message="You are a college basketball recruitment AI. Return only valid JSON."
