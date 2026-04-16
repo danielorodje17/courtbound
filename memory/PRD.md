@@ -264,6 +264,12 @@ An 18-year-old student basketball player from UK (England Under-18) wants to tra
 - [x] Synced all changes to seed_data.py (foreign_friendly flags + new college entries)
 - [x] Cleanup script: /app/backend/euro_audit_and_expand.py (executed, data persisted)
 
+### v1.26 - Landing Page + Onboarding Flow (Apr 2026)
+- [x] LandingPage.js — dark basketball arena hero, ticker bar, feature bento grid, how-it-works 3 steps, final CTA. Shown at `/` for unauthenticated users
+- [x] OnboardingPage.js — 4-step split-screen wizard (left: changing image, right: form). Step 1: name/positions, Step 2: stats/teams/tape, Step 3: academics/goals, Step 4: auto-runs AI match and shows 3 matched colleges as the "aha moment"
+- [x] First-time user detection: checks localStorage + profile API; new users redirected to `/onboarding` after Google login
+- [x] Existing users land directly on Dashboard (no disruption)
+
 ### v1.25 - AI Recruitment Intelligence (Apr 2026)
 - [x] GET /api/ai/profile-review — returns score (0-100), grade, 3 strengths, 3 prioritised improvements, 10-item coaches checklist, response insights, top 3 actions. Retry on JSON parse failure
 - [x] POST /api/ai/reply-next-steps — given reply + outcome, returns urgency (immediate/soon/low), headline, 3 numbered steps, what-to-avoid list, UK player tip

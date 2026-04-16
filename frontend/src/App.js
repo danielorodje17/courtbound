@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { useState } from "react";
-import { AuthProvider, useAuth } from "./context/AuthContext";
+import { useState, useEffect } from "react";
+import { AuthProvider, useAuth, apiRequest } from "./context/AuthContext";
 import Dashboard from "./pages/Dashboard";
 import CollegesPage from "./pages/CollegesPage";
 import CollegeDetailPage from "./pages/CollegeDetailPage";
@@ -14,6 +14,8 @@ import AIMatchPage from "./pages/AIMatchPage";
 import ComparePage from "./pages/ComparePage";
 import LoginPage from "./pages/LoginPage";
 import AuthCallback from "./pages/AuthCallback";
+import LandingPage from "./pages/LandingPage";
+import OnboardingPage from "./pages/OnboardingPage";
 import HelpWidget from "./components/HelpWidget";
 import { Trophy, Home, BookOpen, Mail, Wand2, Lightbulb, Menu, X, ShieldCheck, UserCircle, MessageSquare, LogOut, ChevronDown, Sparkles } from "lucide-react";
 
@@ -173,17 +175,44 @@ function App() {
 }
 
 function AppRouter() {
+  const { user, loading } = useAuth();
   const location = useLocation();
-  // Synchronously detect OAuth callback BEFORE routes render (prevents race condition with ProtectedRoute)
-  if (location.hash?.includes("session_id=")) {
-    return <AuthCallback />;
-  }
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
+
+  useEffect(() => {
+    if (location.hash?.includes("session_id=")) return;
+    if (!user) { setNeedsOnboarding(false); return; }
+    if (localStorage.getItem("cb_onboarded")) { setNeedsOnboarding(false); return; }
+    apiRequest("get", "/profile")
+      .then(r => {
+        if (!r.data?.full_name) setNeedsOnboarding(true);
+        else { localStorage.setItem("cb_onboarded", "1"); setNeedsOnboarding(false); }
+      })
+      .catch(() => setNeedsOnboarding(false));
+  }, [user?.user_id]); // eslint-disable-line
+
+  if (location.hash?.includes("session_id=")) return <AuthCallback />;
+
+  const onboardingDone = () => setNeedsOnboarding(false);
+
   return (
     <>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/dashboard" element={<ProtectedRoute><AppLayout><Dashboard /></AppLayout></ProtectedRoute>} />
+        <Route path="/" element={
+          loading ? null :
+          user ? <Navigate to="/dashboard" replace /> : <LandingPage />
+        } />
+        <Route path="/onboarding" element={
+          <ProtectedRoute>
+            <OnboardingPage onComplete={onboardingDone} />
+          </ProtectedRoute>
+        } />
+        <Route path="/dashboard" element={
+          <ProtectedRoute>
+            {needsOnboarding ? <Navigate to="/onboarding" replace /> : <AppLayout><Dashboard /></AppLayout>}
+          </ProtectedRoute>
+        } />
         <Route path="/colleges" element={<ProtectedRoute><AppLayout><CollegesPage /></AppLayout></ProtectedRoute>} />
         <Route path="/colleges/:id" element={<ProtectedRoute><AppLayout><CollegeDetailPage /></AppLayout></ProtectedRoute>} />
         <Route path="/communications" element={<ProtectedRoute><AppLayout><CommunicationsPage /></AppLayout></ProtectedRoute>} />
