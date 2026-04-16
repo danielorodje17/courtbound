@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { apiRequest } from "../context/AuthContext";
-import { MessageSquare, Clock, CheckCircle2, TrendingUp, MailOpen, Wand2, Send, X, AlertCircle, Heart, XCircle, Trophy, PhoneCall } from "lucide-react";
+import { MessageSquare, Clock, CheckCircle2, TrendingUp, MailOpen, Wand2, Send, X, AlertCircle, Heart, XCircle, Trophy, PhoneCall, Zap, AlertTriangle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const DIV_BADGE = {
@@ -38,6 +38,11 @@ export default function ResponseTrackerPage() {
   const [aiModal, setAiModal] = useState(null);
   const [aiResult, setAiResult] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
+
+  // AI Next Steps modal
+  const [nextStepsModal, setNextStepsModal] = useState(null);
+  const [nextStepsResult, setNextStepsResult] = useState(null);
+  const [nextStepsLoading, setNextStepsLoading] = useState(false);
 
   useEffect(() => { fetchData(); }, []);
 
@@ -93,6 +98,26 @@ export default function ResponseTrackerPage() {
       setAiResult("Could not generate suggestion. Please try again.");
     }
     setAiLoading(false);
+  };
+
+  const getNextSteps = async (c) => {
+    const coachName = c.received?.last_coach || c.college.coaches?.[0]?.name || "Coach";
+    setNextStepsModal({ college: c.college, coachName, outcome: c.reply_outcome });
+    setNextStepsResult(null);
+    setNextStepsLoading(true);
+    try {
+      const { data } = await apiRequest("post", "/ai/reply-next-steps", {
+        college_name: c.college.name,
+        reply_body: c.received?.last_body || "",
+        outcome: c.reply_outcome || "",
+        coach_name: coachName,
+        division: c.college.division || "",
+      });
+      setNextStepsResult(data);
+    } catch {
+      setNextStepsResult({ headline: "Could not generate next steps. Please try again.", next_steps: [] });
+    }
+    setNextStepsLoading(false);
   };
 
   const contacted = colleges.filter(c => c.sent?.count > 0 || ["contacted", "replied"].includes(c.status));
@@ -238,41 +263,31 @@ export default function ResponseTrackerPage() {
                       </button>
                     ) : (
                       <>
-                        {/* Next-step button based on outcome */}
-                        {c.reply_outcome === "rejected" && (
+                        {/* AI Next Steps — always shown for all replied colleges */}
+                        <button
+                          data-testid={`ai-next-steps-btn-${c.college_id}`}
+                          onClick={() => getNextSteps(c)}
+                          className="bg-slate-900 text-white font-bold uppercase tracking-wider rounded-lg px-4 py-2 text-xs hover:bg-slate-800 transition-all flex items-center justify-center gap-1.5"
+                        >
+                          <Zap className="w-3.5 h-3.5 text-orange-400" /> AI Next Steps
+                        </button>
+                        {/* Outcome-specific shortcut */}
+                        {(c.reply_outcome === "rejected" || c.reply_outcome === "scholarship_offered") && (
                           <button
                             data-testid={`draft-thanks-btn-${c.college_id}`}
                             onClick={() => navigate("/compose", { state: { college: c.college, messageType: "thank_you" } })}
-                            className="bg-slate-700 text-white font-bold uppercase tracking-wider rounded-lg px-4 py-2 text-xs hover:bg-slate-800 transition-all flex items-center justify-center gap-1.5"
+                            className="bg-slate-100 text-slate-700 font-bold uppercase tracking-wider rounded-lg px-4 py-2 text-xs hover:bg-slate-200 transition-all flex items-center justify-center gap-1.5"
                           >
-                            <Heart className="w-3.5 h-3.5" /> Draft Thank You
-                          </button>
-                        )}
-                        {c.reply_outcome === "scholarship_offered" && (
-                          <button
-                            data-testid={`draft-thanks-btn-${c.college_id}`}
-                            onClick={() => navigate("/compose", { state: { college: c.college, messageType: "thank_you" } })}
-                            className="bg-amber-500 text-white font-bold uppercase tracking-wider rounded-lg px-4 py-2 text-xs hover:bg-amber-600 transition-all flex items-center justify-center gap-1.5"
-                          >
-                            <Trophy className="w-3.5 h-3.5" /> Draft Thank You
+                            <Heart className="w-3.5 h-3.5" /> Thank You
                           </button>
                         )}
                         {(c.reply_outcome === "interested" || c.reply_outcome === "schedule_call") && (
                           <button
                             data-testid={`ai-followup-btn-${c.college_id}`}
                             onClick={() => getFollowUp(c)}
-                            className="bg-green-600 text-white font-bold uppercase tracking-wider rounded-lg px-4 py-2 text-xs hover:bg-green-700 transition-all flex items-center justify-center gap-1.5"
+                            className="bg-green-50 text-green-700 border border-green-200 font-bold uppercase tracking-wider rounded-lg px-4 py-2 text-xs hover:bg-green-100 transition-all flex items-center justify-center gap-1.5"
                           >
-                            <Wand2 className="w-3.5 h-3.5" /> AI Follow-up
-                          </button>
-                        )}
-                        {!c.reply_outcome && (
-                          <button
-                            data-testid={`ai-followup-btn-${c.college_id}`}
-                            onClick={() => getFollowUp(c)}
-                            className="bg-slate-900 text-white font-bold uppercase tracking-wider rounded-lg px-4 py-2 text-xs hover:bg-slate-800 transition-all flex items-center justify-center gap-1.5"
-                          >
-                            <Wand2 className="w-3.5 h-3.5" /> AI Follow-up
+                            <Wand2 className="w-3.5 h-3.5" /> AI Strategy
                           </button>
                         )}
                       </>
@@ -289,6 +304,103 @@ export default function ResponseTrackerPage() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* ── AI NEXT STEPS MODAL ──────────────────────────────────────────────── */}
+      {nextStepsModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" data-testid="ai-next-steps-modal">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="font-black text-slate-900 text-lg" style={{ fontFamily: "Barlow Condensed, sans-serif", textTransform: "uppercase" }}>
+                  AI Next Steps
+                </h2>
+                <p className="text-sm text-slate-500 mt-0.5">{nextStepsModal.college.name}</p>
+              </div>
+              <button onClick={() => setNextStepsModal(null)} className="text-slate-400 hover:text-slate-600 p-1">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {nextStepsLoading ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-10 w-10 border-4 border-orange-500 border-t-transparent mb-4" />
+                <p className="text-slate-500 text-sm">Generating your next steps...</p>
+              </div>
+            ) : nextStepsResult && (
+              <div className="space-y-4">
+                {/* Urgency + headline */}
+                <div className={`rounded-xl p-4 ${
+                  nextStepsResult.urgency_colour === "red" ? "bg-red-50 border border-red-200" :
+                  nextStepsResult.urgency_colour === "orange" ? "bg-orange-50 border border-orange-200" :
+                  "bg-green-50 border border-green-200"
+                }`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    {nextStepsResult.urgency_colour === "red"
+                      ? <AlertTriangle className="w-4 h-4 text-red-500" />
+                      : nextStepsResult.urgency_colour === "orange"
+                      ? <AlertTriangle className="w-4 h-4 text-orange-500" />
+                      : <CheckCircle2 className="w-4 h-4 text-green-500" />}
+                    <span className={`text-xs font-bold uppercase tracking-wider ${
+                      nextStepsResult.urgency_colour === "red" ? "text-red-600" :
+                      nextStepsResult.urgency_colour === "orange" ? "text-orange-600" : "text-green-600"
+                    }`}>{nextStepsResult.urgency_label}</span>
+                  </div>
+                  <p className="text-sm font-semibold text-slate-800 leading-snug">{nextStepsResult.headline}</p>
+                </div>
+
+                {/* Numbered steps */}
+                <div>
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2.5">What to do now</p>
+                  <div className="space-y-3">
+                    {nextStepsResult.next_steps?.map((s, i) => (
+                      <div key={i} className="flex gap-3">
+                        <span className="bg-slate-900 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0">{s.step}</span>
+                        <div>
+                          <p className="text-sm font-bold text-slate-800">{s.action}</p>
+                          <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{s.detail}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* What to avoid */}
+                {nextStepsResult.what_to_avoid?.length > 0 && (
+                  <div className="bg-slate-50 rounded-xl p-4">
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Avoid These Mistakes</p>
+                    <ul className="space-y-1.5">
+                      {nextStepsResult.what_to_avoid.map((w, i) => (
+                        <li key={i} className="flex items-start gap-2 text-xs text-slate-600">
+                          <XCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0 mt-0.5" />{w}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* UK player tip */}
+                {nextStepsResult.uk_player_tip && (
+                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-3.5 flex gap-2.5">
+                    <Zap className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-xs font-bold text-blue-700 uppercase tracking-wider mb-0.5">UK Player Tip</p>
+                      <p className="text-xs text-slate-600 leading-relaxed">{nextStepsResult.uk_player_tip}</p>
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  data-testid="next-steps-compose-btn"
+                  onClick={() => { setNextStepsModal(null); navigate("/compose", { state: { college: nextStepsModal.college } }); }}
+                  className="w-full bg-orange-500 text-white font-bold uppercase tracking-wider rounded-lg py-3 text-sm hover:bg-orange-600 transition-all flex items-center justify-center gap-2"
+                >
+                  <Send className="w-4 h-4" /> Draft Email to {nextStepsModal.college.name}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

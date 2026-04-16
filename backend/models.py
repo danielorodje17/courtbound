@@ -64,6 +64,14 @@ class FollowUpRequest(BaseModel):
     original_subject: Optional[str] = ""
 
 
+class ReplyNextStepsRequest(BaseModel):
+    college_name: str
+    reply_body: Optional[str] = ""
+    outcome: Optional[str] = ""
+    coach_name: Optional[str] = "Coach"
+    division: Optional[str] = ""
+
+
 class PlayerProfile(BaseModel):
     full_name: Optional[str] = "Daniel Orodje"
     date_of_birth: Optional[str] = ""

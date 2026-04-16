@@ -5,7 +5,7 @@ import re
 from fastapi import APIRouter, Depends, HTTPException
 from database import db
 from auth_utils import UserModel, get_current_user
-from models import AIMessageRequest, AIStrategyRequest, NCAACHeckRequest, FollowUpRequest
+from models import AIMessageRequest, AIStrategyRequest, NCAACHeckRequest, FollowUpRequest, ReplyNextStepsRequest
 
 router = APIRouter(tags=["ai"])
 
@@ -138,6 +138,145 @@ Be specific for UK/international players. Encouraging but realistic."""
     chat = LlmChat(api_key=api_key, session_id=str(uuid.uuid4()), system_message="You are an expert college basketball recruitment advisor.").with_model("openai", "gpt-4.1-mini")
     response = await chat.send_message(UserMessage(text=prompt))
     return {"suggestion": response, "college": data.college_name}
+
+
+@router.post("/ai/reply-next-steps")
+async def reply_next_steps(data: ReplyNextStepsRequest, current_user: UserModel = Depends(get_current_user)):
+    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    api_key = os.environ.get("EMERGENT_LLM_KEY")
+    outcome_context = {
+        "interested":          "The coach has expressed genuine interest in the player",
+        "schedule_call":       "The coach has requested a call or campus visit — this is a strong signal",
+        "scholarship_offered": "The coach has made a formal scholarship offer — critical decision point",
+        "rejected":            "The coach has politely declined — not interested at this time",
+    }.get(data.outcome, "The outcome of this reply is unclear and needs your assessment")
+    prompt = f"""You are a college basketball recruitment advisor for a UK/European player.
+
+CONTEXT:
+- College: {data.college_name} ({data.division})
+- Coach: {data.coach_name}
+- Outcome: {outcome_context}
+- Coach's reply: "{data.reply_body[:500] if data.reply_body else 'No reply text provided'}"
+
+Provide structured, specific next steps. Return ONLY valid JSON:
+{{
+  "urgency": "<immediate|soon|low>",
+  "urgency_label": "<e.g. Reply within 24 hours>",
+  "urgency_colour": "<red|orange|green>",
+  "headline": "<One punchy sentence summarising the situation and opportunity>",
+  "next_steps": [
+    {{"step": 1, "action": "<short action title>", "detail": "<specific advice 1-2 sentences>"}},
+    {{"step": 2, "action": "<short action title>", "detail": "<specific advice>"}},
+    {{"step": 3, "action": "<short action title>", "detail": "<specific advice>"}}
+  ],
+  "what_to_avoid": ["<common mistake 1>", "<common mistake 2>"],
+  "uk_player_tip": "<One specific tip for UK/European players in exactly this situation>"
+}}"""
+    chat = LlmChat(
+        api_key=api_key, session_id=str(uuid.uuid4()),
+        system_message="You are a college basketball recruitment advisor. Return only valid JSON."
+    ).with_model("openai", "gpt-4.1-mini")
+    response = await chat.send_message(UserMessage(text=prompt))
+    try:
+        json_match = re.search(r'\{.*\}', response, re.DOTALL)
+        return json.loads(json_match.group()) if json_match else json.loads(response)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Could not parse AI response. Please try again.")
+
+
+@router.get("/ai/profile-review")
+async def ai_profile_review(current_user: UserModel = Depends(get_current_user)):
+    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    from bson import ObjectId
+    api_key = os.environ.get("EMERGENT_LLM_KEY")
+    profile = await db.profiles.find_one({"user_id": current_user.user_id}, {"_id": 0})
+    if not profile:
+        raise HTTPException(status_code=400, detail="Please complete your player profile first")
+
+    emails = await db.emails.find(
+        {"user_id": current_user.user_id}, {"_id": 0, "direction": 1, "college_id": 1}
+    ).to_list(1000)
+    sent_ids = list({e["college_id"] for e in emails if e.get("direction") == "sent"})
+    replied_ids = list({e["college_id"] for e in emails if e.get("direction") == "received"})
+
+    response_context = ""
+    if replied_ids:
+        try:
+            resp_colleges = await db.colleges.find(
+                {"_id": {"$in": [ObjectId(i) for i in replied_ids[:10]]}},
+                {"_id": 0, "name": 1, "division": 1}
+            ).to_list(10)
+            names = [f"{c['name']} ({c.get('division','')})" for c in resp_colleges]
+            response_context = f"\nColleges that replied: {', '.join(names)}"
+        except Exception:
+            pass
+
+    primary_pos = profile.get("primary_position") or profile.get("position", "Not set")
+    secondary_pos = profile.get("secondary_position", "")
+    position = f"{primary_pos} / {secondary_pos}" if secondary_pos and secondary_pos != "None" else primary_pos
+
+    p = profile
+    profile_text = f"""
+Name: {p.get('full_name', 'Not set')}
+Position: {position}
+Height: {p.get('height_ft', 'Not set')} / {p.get('height_cm', 'Not set')}cm | Weight: {p.get('weight_kg', 'Not set')}kg | Wingspan: {p.get('wingspan_cm', 'Not set')}cm
+Stats: PPG {p.get('ppg','Not set')} | APG {p.get('apg','Not set')} | RPG {p.get('rpg','Not set')} | SPG {p.get('spg','Not set')} | FG% {p.get('fg_percent','Not set')} | 3PT% {p.get('three_pt_percent','Not set')}
+National Team: {p.get('current_team', 'Not set')} | Club Team: {p.get('club_team', 'Not set')}
+Highlight Tape: {'SET — ' + p['highlight_tape_url'] if p.get('highlight_tape_url') else 'NOT SET — critical missing item'}
+Bio: {'Set (' + str(len(p.get('bio',''))) + ' chars)' if p.get('bio') else 'Not set'}
+Academic — GCSEs: {p.get('gcse_grades', 'Not set')}
+Academic — A-Levels: {p.get('a_level_subjects', 'Not set')} | Predicted: {p.get('predicted_grades', 'Not set')}
+Intended Major: {p.get('intended_major', 'Not set')}
+Target Division: {p.get('target_division', 'Not set')} | Target Year: {p.get('target_start_year', 'Not set')}
+NCAA EC Registered: {'YES' if p.get('ncaa_registered') else 'NO — action needed'} | NCAA ID: {p.get('ncaa_id', 'Not set')}
+Contact: Email {'set' if p.get('email') else 'NOT set'} | Phone {'set' if p.get('phone') else 'NOT set'}
+Social: Instagram {'set' if p.get('instagram') else 'not set'} | Twitter {'set' if p.get('twitter') else 'not set'}
+Colleges emailed: {len(sent_ids)} | Colleges that replied: {len(replied_ids)}{response_context}
+"""
+    prompt = f"""You are a college basketball recruitment expert analysing a UK/European player's recruitment readiness.
+
+PLAYER PROFILE:
+{profile_text}
+
+Score this player's recruitment readiness 0-100. Be honest and critical — a 100 is impossible, 85+ means genuinely outstanding.
+
+Return ONLY valid JSON:
+{{
+  "score": <integer 0-100>,
+  "grade": "<A+|A|A-|B+|B|B-|C+|C|C-|D>",
+  "summary": "<2 sentences: current standing and single biggest opportunity>",
+  "strengths": ["<strength 1>", "<strength 2>", "<strength 3>"],
+  "improvements": [
+    {{"priority": "critical", "label": "<short label>", "suggestion": "<specific actionable advice>"}},
+    {{"priority": "high",     "label": "<short label>", "suggestion": "<specific actionable advice>"}},
+    {{"priority": "medium",   "label": "<short label>", "suggestion": "<specific actionable advice>"}}
+  ],
+  "coach_checklist": [
+    {{"item": "Highlight tape (YouTube/Hudl)", "completed": <bool>, "importance": "critical", "tip": "Coaches will not pursue a player they have not seen. Upload today."}},
+    {{"item": "NCAA Eligibility Center registration", "completed": <bool>, "importance": "critical", "tip": "Must be done before any scholarship can be formally offered."}},
+    {{"item": "Season statistics (PPG/APG/RPG)", "completed": <bool>, "importance": "high", "tip": "Numbers give coaches an instant read on your output level."}},
+    {{"item": "Academic results (GCSEs + A-Levels)", "completed": <bool>, "importance": "high", "tip": "Academic eligibility is non-negotiable — coaches need this early."}},
+    {{"item": "Physical measurements (height/weight)", "completed": <bool>, "importance": "high", "tip": "Coaches have positional size requirements — missing this raises doubts."}},
+    {{"item": "Personal bio / statement", "completed": <bool>, "importance": "medium", "tip": "Coaches recruit the person, not just the player. Tell your story."}},
+    {{"item": "National or club team credentials", "completed": <bool>, "importance": "high", "tip": "England U18 / top club tells coaches your competitive level instantly."}},
+    {{"item": "Target division(s) selected", "completed": <bool>, "importance": "medium", "tip": "Targeting the right division saves time and improves response rates."}},
+    {{"item": "Contact details (email + phone)", "completed": <bool>, "importance": "medium", "tip": "Coaches need a direct line to reach you after initial interest."}},
+    {{"item": "Social media (clean, basketball-focused)", "completed": <bool>, "importance": "low", "tip": "Many coaches check social media — make sure it reflects well on you."}}
+  ],
+  "response_insights": "<2-3 sentences: based on the response data and profile, what patterns exist and what should the player focus on next. Be specific.>",
+  "top_actions": ["<most urgent action>", "<second action>", "<third action>"]
+}}"""
+
+    chat = LlmChat(
+        api_key=api_key, session_id=str(uuid.uuid4()),
+        system_message="You are a college basketball recruitment expert. Return only valid JSON."
+    ).with_model("openai", "gpt-4.1-mini")
+    response = await chat.send_message(UserMessage(text=prompt))
+    try:
+        json_match = re.search(r'\{.*\}', response, re.DOTALL)
+        return json.loads(json_match.group()) if json_match else json.loads(response)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Could not parse AI response. Please try again.")
 
 
 @router.get("/ai/match/saved")

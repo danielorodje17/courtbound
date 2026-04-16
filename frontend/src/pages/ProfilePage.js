@@ -5,6 +5,7 @@ import {
   Youtube, Instagram, Twitter, Link, CheckCircle, AlertCircle,
   ChevronDown, Ruler, Weight
 } from "lucide-react";
+import RecruitmentScore from "../components/RecruitmentScore";
 
 const POSITIONS = ["Point Guard", "Shooting Guard", "Combo Guard", "Small Forward", "Power Forward", "Center"];
 const HANDS = ["Right", "Left", "Both"];
@@ -449,6 +450,9 @@ export default function ProfilePage() {
               </Field>
             </div>
           </Section>
+
+          {/* RECRUITMENT READY SCORE */}
+          <RecruitmentScore />
         </div>
       </div>
     </div>
