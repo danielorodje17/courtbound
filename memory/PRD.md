@@ -257,6 +257,13 @@ An 18-year-old student basketball player from UK (England Under-18) wants to tra
 - Notable updates: INSEP→international@insep.fr, ALBA→info@albaberlin.de, ERA Nymburk→team@nymburk.basketball, Olimpia→olimpia@olimpiamilano.com, Bakken Bears→info@bakkenbears.com, Torpan Pojat→info@topo.fi
 - [x] European Contact Tips panel added to CollegeDetailPage — shows only for European colleges, with 4 actionable tips (admin inboxes, short emails, Player Profile reference, follow-up timing) + "Draft AI Email" shortcut button
 
+### v1.20 - Euro Friendly Audit + D2/NAIA/JUCO Expansion (Apr 2026)
+- [x] Removed Euro Friendly badge from 34 colleges (14 DII, 13 NAIA, 6 JUCO) — rural/isolated/religious schools with no international infrastructure
+- [x] Added 50 new colleges: 18 Division II, 17 NAIA, 15 JUCO
+- [x] Grand total: 274 colleges (55 D1, 74 DII, 53 NAIA, 48 JUCO, 43 European)
+- [x] Synced all changes to seed_data.py (foreign_friendly flags + new college entries)
+- [x] Cleanup script: /app/backend/euro_audit_and_expand.py (executed, data persisted)
+
 ### When ready
 - [ ] Weekly Digest email (deferred — needs Resend API key from user)
 
