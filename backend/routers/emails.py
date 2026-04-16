@@ -199,13 +199,25 @@ async def log_reply(data: ReplyLogRequest, current_user: UserModel = Depends(get
         "subject": data.subject or "Reply from coach",
         "body": data.body, "coach_name": data.coach_name,
         "coach_email": data.coach_email, "created_at": received_at,
+        "outcome": data.outcome or "",
     }
     result = await db.emails.insert_one(doc)
     doc["id"] = str(result.inserted_id)
     doc.pop("_id", None)
+
+    # Map outcome to tracked_college status
+    outcome_status_map = {
+        "interested": "replied",
+        "schedule_call": "replied",
+        "rejected": "not_interested",
+        "scholarship_offered": "offer_received",
+    }
+    new_status = outcome_status_map.get(data.outcome, "replied")
     await db.tracked_colleges.update_one(
-        {"user_id": current_user.user_id, "college_id": data.college_id, "status": {"$in": ["interested", "contacted"]}},
-        {"$set": {"status": "replied", "updated_at": datetime.now(timezone.utc).isoformat()}},
+        {"user_id": current_user.user_id, "college_id": data.college_id,
+         "status": {"$in": ["interested", "contacted", "replied"]}},
+        {"$set": {"status": new_status, "reply_outcome": data.outcome,
+                  "updated_at": datetime.now(timezone.utc).isoformat()}},
     )
     return doc
 
@@ -261,6 +273,7 @@ async def get_response_summary(current_user: UserModel = Depends(get_current_use
                 "coaches": college.get("coaches", []),
             },
             "status": t.get("status", "interested"),
+            "reply_outcome": t.get("reply_outcome", ""),
             "notes": t.get("notes", ""),
             "sent": email_stats.get(t["college_id"], {}).get("sent"),
             "received": email_stats.get(t["college_id"], {}).get("received"),

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { apiRequest } from "../context/AuthContext";
-import { MessageSquare, Clock, CheckCircle2, TrendingUp, MailOpen, Wand2, Send, X, AlertCircle } from "lucide-react";
+import { MessageSquare, Clock, CheckCircle2, TrendingUp, MailOpen, Wand2, Send, X, AlertCircle, Heart, XCircle, Trophy, PhoneCall } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const DIV_BADGE = {
@@ -8,6 +8,13 @@ const DIV_BADGE = {
   "Division II": "bg-blue-100 text-blue-700",
   "NAIA": "bg-purple-100 text-purple-700",
   "JUCO": "bg-green-100 text-green-700",
+};
+
+const OUTCOME_CONFIG = {
+  interested:          { label: "Interested",         color: "bg-green-100 text-green-700",  Icon: Heart },
+  schedule_call:       { label: "Call Requested",     color: "bg-blue-100 text-blue-700",    Icon: PhoneCall },
+  rejected:            { label: "Not Interested",     color: "bg-red-100 text-red-600",      Icon: XCircle },
+  scholarship_offered: { label: "Offer Received",     color: "bg-amber-100 text-amber-700",  Icon: Trophy },
 };
 
 function daysSince(dateStr) {
@@ -23,7 +30,7 @@ export default function ResponseTrackerPage() {
 
   // Log reply modal
   const [logModal, setLogModal] = useState(null);
-  const [logForm, setLogForm] = useState({ subject: "", body: "", coach_name: "", received_date: "" });
+  const [logForm, setLogForm] = useState({ subject: "", body: "", coach_name: "", received_date: "", outcome: "" });
   const [logSubmitting, setLogSubmitting] = useState(false);
   const [logSuccess, setLogSuccess] = useState("");
 
@@ -45,7 +52,7 @@ export default function ResponseTrackerPage() {
 
   const openLogModal = (c) => {
     setLogModal(c);
-    setLogForm({ subject: "", body: "", coach_name: c.college.coaches?.[0]?.name || "", received_date: "" });
+    setLogForm({ subject: "", body: "", coach_name: c.college.coaches?.[0]?.name || "", received_date: "", outcome: "" });
     setLogSuccess("");
   };
 
@@ -59,9 +66,10 @@ export default function ResponseTrackerPage() {
         body: logForm.body,
         coach_name: logForm.coach_name,
         received_date: logForm.received_date ? new Date(logForm.received_date).toISOString() : "",
+        outcome: logForm.outcome,
       });
       setLogModal(null);
-      setLogForm({ subject: "", body: "", coach_name: "", received_date: "" });
+      setLogForm({ subject: "", body: "", coach_name: "", received_date: "", outcome: "" });
       fetchData();
     } catch {}
     setLogSubmitting(false);
@@ -168,9 +176,16 @@ export default function ResponseTrackerPage() {
                         {c.college.division?.replace("Division ", "D") || "—"}
                       </span>
                       {hasReply ? (
-                        <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3" /> Replied
-                        </span>
+                        c.reply_outcome && OUTCOME_CONFIG[c.reply_outcome] ? (
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-bold flex items-center gap-1 ${OUTCOME_CONFIG[c.reply_outcome].color}`}>
+                            {(() => { const Ic = OUTCOME_CONFIG[c.reply_outcome].Icon; return <Ic className="w-3 h-3" />; })()}
+                            {OUTCOME_CONFIG[c.reply_outcome].label}
+                          </span>
+                        ) : (
+                          <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3" /> Replied
+                          </span>
+                        )
                       ) : (
                         <span className="bg-orange-50 text-orange-600 text-xs px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
                           <Clock className="w-3 h-3" /> Awaiting
@@ -212,7 +227,7 @@ export default function ResponseTrackerPage() {
                   </div>
 
                   {/* Actions */}
-                  <div className="flex flex-col gap-2 flex-shrink-0 min-w-[120px]">
+                  <div className="flex flex-col gap-2 flex-shrink-0 min-w-[140px]">
                     {!hasReply ? (
                       <button
                         data-testid={`log-reply-btn-${c.college_id}`}
@@ -222,13 +237,45 @@ export default function ResponseTrackerPage() {
                         <MessageSquare className="w-3.5 h-3.5" /> Log Reply
                       </button>
                     ) : (
-                      <button
-                        data-testid={`ai-followup-btn-${c.college_id}`}
-                        onClick={() => getFollowUp(c)}
-                        className="bg-slate-900 text-white font-bold uppercase tracking-wider rounded-lg px-4 py-2 text-xs hover:bg-slate-800 transition-all flex items-center justify-center gap-1.5"
-                      >
-                        <Wand2 className="w-3.5 h-3.5" /> AI Follow-up
-                      </button>
+                      <>
+                        {/* Next-step button based on outcome */}
+                        {c.reply_outcome === "rejected" && (
+                          <button
+                            data-testid={`draft-thanks-btn-${c.college_id}`}
+                            onClick={() => navigate("/compose", { state: { college: c.college, messageType: "thank_you" } })}
+                            className="bg-slate-700 text-white font-bold uppercase tracking-wider rounded-lg px-4 py-2 text-xs hover:bg-slate-800 transition-all flex items-center justify-center gap-1.5"
+                          >
+                            <Heart className="w-3.5 h-3.5" /> Draft Thank You
+                          </button>
+                        )}
+                        {c.reply_outcome === "scholarship_offered" && (
+                          <button
+                            data-testid={`draft-thanks-btn-${c.college_id}`}
+                            onClick={() => navigate("/compose", { state: { college: c.college, messageType: "thank_you" } })}
+                            className="bg-amber-500 text-white font-bold uppercase tracking-wider rounded-lg px-4 py-2 text-xs hover:bg-amber-600 transition-all flex items-center justify-center gap-1.5"
+                          >
+                            <Trophy className="w-3.5 h-3.5" /> Draft Thank You
+                          </button>
+                        )}
+                        {(c.reply_outcome === "interested" || c.reply_outcome === "schedule_call") && (
+                          <button
+                            data-testid={`ai-followup-btn-${c.college_id}`}
+                            onClick={() => getFollowUp(c)}
+                            className="bg-green-600 text-white font-bold uppercase tracking-wider rounded-lg px-4 py-2 text-xs hover:bg-green-700 transition-all flex items-center justify-center gap-1.5"
+                          >
+                            <Wand2 className="w-3.5 h-3.5" /> AI Follow-up
+                          </button>
+                        )}
+                        {!c.reply_outcome && (
+                          <button
+                            data-testid={`ai-followup-btn-${c.college_id}`}
+                            onClick={() => getFollowUp(c)}
+                            className="bg-slate-900 text-white font-bold uppercase tracking-wider rounded-lg px-4 py-2 text-xs hover:bg-slate-800 transition-all flex items-center justify-center gap-1.5"
+                          >
+                            <Wand2 className="w-3.5 h-3.5" /> AI Follow-up
+                          </button>
+                        )}
+                      </>
                     )}
                     <button
                       data-testid={`compose-btn-${c.college_id}`}
@@ -302,6 +349,28 @@ export default function ResponseTrackerPage() {
                   placeholder="Paste or type the coach's reply here..."
                   className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 outline-none resize-none"
                 />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1.5">Reply Outcome</label>
+                <div className="grid grid-cols-2 gap-2" data-testid="outcome-selector">
+                  {[
+                    { value: "interested",          label: "Interested",          color: "border-green-400 bg-green-50 text-green-800" },
+                    { value: "schedule_call",        label: "Call / Visit Requested", color: "border-blue-400 bg-blue-50 text-blue-800" },
+                    { value: "rejected",             label: "Not Interested",      color: "border-red-400 bg-red-50 text-red-700" },
+                    { value: "scholarship_offered",  label: "Scholarship Offered", color: "border-amber-400 bg-amber-50 text-amber-800" },
+                  ].map(o => (
+                    <button
+                      key={o.value}
+                      type="button"
+                      data-testid={`outcome-${o.value}`}
+                      onClick={() => setLogForm({ ...logForm, outcome: logForm.outcome === o.value ? "" : o.value })}
+                      className={`px-3 py-2 rounded-lg text-xs font-bold border transition-all text-center ${logForm.outcome === o.value ? o.color + " ring-2 ring-offset-1 ring-current" : "border-slate-200 text-slate-500 hover:bg-slate-50"}`}
+                    >
+                      {o.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 

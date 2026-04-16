@@ -12,7 +12,7 @@ export default function ComposePage() {
   const [colleges, setColleges] = useState([]);
   const [selectedCollege, setSelectedCollege] = useState(preloaded?.college || null);
   const [selectedCoach, setSelectedCoach] = useState(preloaded?.coach || null);
-  const [messageType, setMessageType] = useState("initial_outreach");
+  const [messageType, setMessageType] = useState(preloaded?.messageType || "initial_outreach");
   const [position, setPosition] = useState("point guard");
   const [stats, setStats] = useState("");
   const [subject, setSubject] = useState("");
@@ -91,6 +91,7 @@ export default function ComposePage() {
         const subjectMap = {
           initial_outreach: `Basketball Scholarship Inquiry - ${playerName} | England Under-18`,
           follow_up: `Follow-Up: Basketball Scholarship Inquiry - ${selectedCollege.name}`,
+          thank_you: `Thank You - ${playerName} | ${selectedCollege.name}`,
           thank_you: `Thank You - ${selectedCollege.name} Basketball`
         };
         setSubject(subjectMap[messageType] || "Basketball Scholarship Inquiry");

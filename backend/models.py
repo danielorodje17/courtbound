@@ -53,6 +53,7 @@ class ReplyLogRequest(BaseModel):
     coach_name: Optional[str] = ""
     coach_email: Optional[str] = ""
     received_date: Optional[str] = ""
+    outcome: Optional[str] = ""  # interested | schedule_call | rejected | scholarship_offered
 
 
 class FollowUpRequest(BaseModel):
