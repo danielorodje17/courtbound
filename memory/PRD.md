@@ -312,6 +312,13 @@ An 18-year-old student basketball player from UK (England Under-18) wants to tra
 - [x] Hover tooltip: date + email count
 - [x] GET /api/dashboard/heatmap endpoint — 365-day dataset with week/day structure
 
+### v1.30 - Per-Competition Stats on Profile + Model Defaults Fix (Feb 2026)
+- [x] Athletic Profile: 3 separate stat blocks (College/School Team, Academy/Club, Country/National) each with PPG/APG/RPG/SPG/FG%/3PT%
+- [x] New DB fields: college_ppg/apg/rpg/spg/fg_percent/three_pt_percent, academy_*, country_*
+- [x] AI prompts (profile review, AI match) use all 3 stat contexts with graceful fallback to legacy fields
+- [x] PlayerProfile model defaults cleared: full_name, nationality, current_team, target_division etc no longer hardcoded to specific user's data
+- [x] Profile sidebar badges only show nationality/current_team when user has actually set them
+
 ### v1.29 - AI Assumption Fixes + Onboarding Step 4 Removed (Feb 2026)
 - [x] Removed hardcoded "England Under-18" from all AI prompts (match, profile review, ncaa check, strategy, email draft) — now uses player's actual `current_team` / `club_team` fields from profile
 - [x] AI email draft changed from "UK basketball player" to "international basketball player" — no nationality assumed
