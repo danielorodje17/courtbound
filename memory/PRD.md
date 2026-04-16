@@ -264,6 +264,13 @@ An 18-year-old student basketball player from UK (England Under-18) wants to tra
 - [x] Synced all changes to seed_data.py (foreign_friendly flags + new college entries)
 - [x] Cleanup script: /app/backend/euro_audit_and_expand.py (executed, data persisted)
 
+### v1.21 - Recruiting Activity Heatmap (Apr 2026)
+- [x] GitHub-style activity heatmap on Dashboard — 52-week grid of email outreach activity
+- [x] 3 summary stats: Emails sent (year), Active days, Current streak
+- [x] Day labels (Mon/Wed/Fri), month labels, orange intensity color scale, today border highlight
+- [x] Hover tooltip: date + email count
+- [x] GET /api/dashboard/heatmap endpoint — 365-day dataset with week/day structure
+
 ### When ready
 - [ ] Weekly Digest email (deferred — needs Resend API key from user)
 
