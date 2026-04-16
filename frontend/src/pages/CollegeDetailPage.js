@@ -1,7 +1,24 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { apiRequest } from "../context/AuthContext";
+import { getCollegeImage } from "../utils/collegeImages";
 import { MapPin, Globe, Mail, Phone, Plus, Check, ArrowLeft, Pen, Clock, Calendar, AlertTriangle, ListChecks, MessageSquare, Trash2, Film, Info } from "lucide-react";
+
+const AVATAR_COLORS = [
+  "bg-orange-500", "bg-blue-500", "bg-green-600", "bg-purple-500",
+  "bg-red-500", "bg-teal-600", "bg-indigo-500", "bg-pink-500",
+];
+function coachInitials(name = "") {
+  const parts = name.trim().split(" ").filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0][0].toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+function coachAvatarColor(name = "") {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = ((h << 5) - h) + name.charCodeAt(i);
+  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
+}
 
 export default function CollegeDetailPage() {
   const { id } = useParams();
@@ -151,7 +168,7 @@ export default function CollegeDetailPage() {
 
       {/* Hero */}
       <div className="relative rounded-xl overflow-hidden h-52 mb-6">
-        <img src={college.image_url} alt={college.name} className="w-full h-full object-cover" onError={e => { e.target.src = "https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=400"; }} />
+        <img src={getCollegeImage(college.name)} alt={college.name} className="w-full h-full object-cover" onError={e => { e.target.src = getCollegeImage("default"); }} />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 to-slate-900/20" />
         <div className="absolute bottom-0 left-0 p-6 right-0">
           <div className="flex items-end justify-between">
@@ -238,9 +255,14 @@ export default function CollegeDetailPage() {
             <div className="space-y-3">
               {college.coaches?.map((coach, i) => (
                 <div key={i} data-testid={`coach-card-${coach.name}`} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                  <div>
-                    <p className="font-semibold text-slate-800 text-sm">{coach.name}</p>
-                    <p className="text-xs text-slate-500">{coach.title}</p>
+                  <div className="flex items-center gap-3">
+                    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-black flex-shrink-0 ${coachAvatarColor(coach.name)}`}>
+                      {coachInitials(coach.name)}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-800 text-sm">{coach.name}</p>
+                      <p className="text-xs text-slate-500">{coach.title}</p>
+                    </div>
                   </div>
                   <div className="flex gap-2">
                     {coach.email && (

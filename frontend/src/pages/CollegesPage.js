@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { apiRequest } from "../context/AuthContext";
+import { getCollegeImage } from "../utils/collegeImages";
 import { Search, MapPin, Users, Globe, Plus, Check, Flag, BarChart2, ArrowLeft } from "lucide-react";
 
 export default function CollegesPage() {
@@ -244,10 +245,10 @@ export default function CollegesPage() {
             >
               <div className="h-32 relative overflow-hidden">
                 <img
-                  src={college.image_url}
+                  src={getCollegeImage(college.name)}
                   alt={college.name}
                   className="w-full h-full object-cover"
-                  onError={e => { e.target.src = "https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=400"; }}
+                  onError={e => { e.target.src = getCollegeImage("default"); }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent" />
                 <div className="absolute top-3 right-3 flex gap-1.5 flex-wrap justify-end">

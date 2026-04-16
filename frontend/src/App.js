@@ -164,6 +164,20 @@ function ProtectedRoute({ children }) {
   return children;
 }
 
+function ProtectedAppRoute({ children, needsOnboarding }) {
+  const { user, loading } = useAuth();
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-10 w-10 border-4 border-orange-500 border-t-transparent" />
+      </div>
+    );
+  }
+  if (!user) return <Navigate to="/login" replace />;
+  if (needsOnboarding) return <Navigate to="/onboarding" replace />;
+  return <AppLayout>{children}</AppLayout>;
+}
+
 function App() {
   return (
     <BrowserRouter>
@@ -208,21 +222,17 @@ function AppRouter() {
             <OnboardingPage onComplete={onboardingDone} />
           </ProtectedRoute>
         } />
-        <Route path="/dashboard" element={
-          <ProtectedRoute>
-            {needsOnboarding ? <Navigate to="/onboarding" replace /> : <AppLayout><Dashboard /></AppLayout>}
-          </ProtectedRoute>
-        } />
-        <Route path="/colleges" element={<ProtectedRoute><AppLayout><CollegesPage /></AppLayout></ProtectedRoute>} />
-        <Route path="/colleges/:id" element={<ProtectedRoute><AppLayout><CollegeDetailPage /></AppLayout></ProtectedRoute>} />
-        <Route path="/communications" element={<ProtectedRoute><AppLayout><CommunicationsPage /></AppLayout></ProtectedRoute>} />
-        <Route path="/compose" element={<ProtectedRoute><AppLayout><ComposePage /></AppLayout></ProtectedRoute>} />
-        <Route path="/strategy" element={<ProtectedRoute><AppLayout><StrategyPage /></AppLayout></ProtectedRoute>} />
-        <Route path="/ncaa" element={<ProtectedRoute><AppLayout><NCAACHeckerPage /></AppLayout></ProtectedRoute>} />
-        <Route path="/profile" element={<ProtectedRoute><AppLayout><ProfilePage /></AppLayout></ProtectedRoute>} />
-        <Route path="/responses" element={<ProtectedRoute><AppLayout><ResponseTrackerPage /></AppLayout></ProtectedRoute>} />
-        <Route path="/ai-match" element={<ProtectedRoute><AppLayout><AIMatchPage /></AppLayout></ProtectedRoute>} />
-        <Route path="/compare" element={<ProtectedRoute><AppLayout><ComparePage /></AppLayout></ProtectedRoute>} />
+        <Route path="/dashboard" element={<ProtectedAppRoute needsOnboarding={needsOnboarding}><Dashboard /></ProtectedAppRoute>} />
+        <Route path="/colleges" element={<ProtectedAppRoute needsOnboarding={needsOnboarding}><CollegesPage /></ProtectedAppRoute>} />
+        <Route path="/colleges/:id" element={<ProtectedAppRoute needsOnboarding={needsOnboarding}><CollegeDetailPage /></ProtectedAppRoute>} />
+        <Route path="/communications" element={<ProtectedAppRoute needsOnboarding={needsOnboarding}><CommunicationsPage /></ProtectedAppRoute>} />
+        <Route path="/compose" element={<ProtectedAppRoute needsOnboarding={needsOnboarding}><ComposePage /></ProtectedAppRoute>} />
+        <Route path="/strategy" element={<ProtectedAppRoute needsOnboarding={needsOnboarding}><StrategyPage /></ProtectedAppRoute>} />
+        <Route path="/ncaa" element={<ProtectedAppRoute needsOnboarding={needsOnboarding}><NCAACHeckerPage /></ProtectedAppRoute>} />
+        <Route path="/profile" element={<ProtectedAppRoute needsOnboarding={needsOnboarding}><ProfilePage /></ProtectedAppRoute>} />
+        <Route path="/responses" element={<ProtectedAppRoute needsOnboarding={needsOnboarding}><ResponseTrackerPage /></ProtectedAppRoute>} />
+        <Route path="/ai-match" element={<ProtectedAppRoute needsOnboarding={needsOnboarding}><AIMatchPage /></ProtectedAppRoute>} />
+        <Route path="/compare" element={<ProtectedAppRoute needsOnboarding={needsOnboarding}><ComparePage /></ProtectedAppRoute>} />
       </Routes>
       <HelpWidget />
     </>
