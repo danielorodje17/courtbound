@@ -13,7 +13,6 @@ const DIV_BADGE = {
 const OUTCOME_CONFIG = {
   interested:          { label: "Interested",      color: "bg-green-100 text-green-700",   Icon: Heart },
   schedule_call:       { label: "Call Requested",  color: "bg-blue-100 text-blue-700",     Icon: PhoneCall },
-  rejected:            { label: "Not Interested",  color: "bg-red-100 text-red-600",       Icon: XCircle },
   scholarship_offered: { label: "Offer Received",  color: "bg-amber-100 text-amber-700",   Icon: Trophy },
   second_follow_up:    { label: "2nd Follow Up",   color: "bg-purple-100 text-purple-700", Icon: RefreshCw },
   no_interest:         { label: "No Interest",     color: "bg-slate-100 text-slate-600",   Icon: MinusCircle },
@@ -29,6 +28,7 @@ export default function ResponseTrackerPage() {
   const [colleges, setColleges] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
+  const [search, setSearch] = useState("");
 
   // Log reply modal
   const [logModal, setLogModal] = useState(null);
@@ -127,7 +127,8 @@ export default function ResponseTrackerPage() {
   const replied = contacted.filter(c => c.received?.count > 0);
   const responseRate = contacted.length > 0 ? Math.round((replied.length / contacted.length) * 100) : 0;
 
-  const displayed = filter === "awaiting" ? awaiting : filter === "replied" ? replied : contacted;
+  const displayed = (filter === "awaiting" ? awaiting : filter === "replied" ? replied : contacted)
+    .filter(c => !search || c.college?.name?.toLowerCase().includes(search.toLowerCase()));
 
   return (
     <div style={{ fontFamily: "Manrope, sans-serif" }}>
@@ -158,18 +159,38 @@ export default function ResponseTrackerPage() {
         ))}
       </div>
 
-      {/* Filter tabs */}
-      <div className="flex gap-2 mb-5 flex-wrap">
-        {[["all", "All Contacted", contacted.length], ["awaiting", "Awaiting Reply", awaiting.length], ["replied", "Received Reply", replied.length]].map(([val, label, count]) => (
-          <button
-            key={val}
-            data-testid={`filter-tab-${val}`}
-            onClick={() => setFilter(val)}
-            className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${filter === val ? "bg-slate-900 text-white" : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"}`}
-          >
-            {label} ({count})
-          </button>
-        ))}
+      {/* Filter tabs + Search */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-5">
+        <div className="flex gap-2 flex-wrap">
+          {[["all", "All Contacted", contacted.length], ["awaiting", "Awaiting Reply", awaiting.length], ["replied", "Received Reply", replied.length]].map(([val, label, count]) => (
+            <button
+              key={val}
+              data-testid={`filter-tab-${val}`}
+              onClick={() => setFilter(val)}
+              className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${filter === val ? "bg-slate-900 text-white" : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"}`}
+            >
+              {label} ({count})
+            </button>
+          ))}
+        </div>
+        <div className="relative sm:ml-auto">
+          <input
+            data-testid="response-search"
+            type="text"
+            placeholder="Search colleges..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full sm:w-64 border border-slate-200 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+          />
+          <svg className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+          </svg>
+          {search && (
+            <button onClick={() => setSearch("")} className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600">
+              <XCircle className="w-4 h-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* List */}
@@ -274,8 +295,7 @@ export default function ResponseTrackerPage() {
                           <Wand2 className="w-3.5 h-3.5 text-orange-400" /> Next Steps
                         </button>
                         {/* Outcome-specific shortcut */}
-                        {(c.reply_outcome === "rejected" || c.reply_outcome === "scholarship_offered" || c.reply_outcome === "no_interest") && (
-                          <button
+                        {(c.reply_outcome === "rejected" || c.reply_outcome === "scholarship_offered" || c.reply_outcome === "no_interest") && (                          <button
                             data-testid={`draft-thanks-btn-${c.college_id}`}
                             onClick={() => navigate("/compose", { state: { college: c.college, messageType: "thank_you" } })}
                             className="bg-slate-100 text-slate-700 font-bold uppercase tracking-wider rounded-lg px-4 py-2 text-xs hover:bg-slate-200 transition-all flex items-center justify-center gap-1.5"
@@ -471,7 +491,6 @@ export default function ResponseTrackerPage() {
                   {[
                     { value: "interested",          label: "Interested",             color: "border-green-400 bg-green-50 text-green-800" },
                     { value: "schedule_call",        label: "Call / Visit Requested", color: "border-blue-400 bg-blue-50 text-blue-800" },
-                    { value: "rejected",             label: "Not Interested",         color: "border-red-400 bg-red-50 text-red-700" },
                     { value: "scholarship_offered",  label: "Scholarship Offered",    color: "border-amber-400 bg-amber-50 text-amber-800" },
                     { value: "second_follow_up",     label: "2nd Follow Up",          color: "border-purple-400 bg-purple-50 text-purple-800" },
                     { value: "no_interest",          label: "No Interest",            color: "border-slate-400 bg-slate-100 text-slate-700" },
