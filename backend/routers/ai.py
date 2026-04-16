@@ -33,13 +33,14 @@ async def draft_message(data: AIMessageRequest):
 
 Player: {data.user_name}
 Position: {position_line}
-Stats: {data.user_stats or 'Not specified'}
+Statistics across competition levels:
+{data.user_stats or 'Not specified'}
 Contact: {data.user_email or 'N/A'} | {data.user_phone or 'N/A'}{highlight_section}
 
 College: {data.college_name} ({data.division})
 Coach: {data.coach_name}
 
-Write a compelling, personalised email. Reference the specific college and division. If the player has a secondary position, mention their positional versatility — this is a genuine selling point for college coaches. Keep it under 300 words.
+Write a compelling, personalised email. Reference the specific college and division. If multiple stat contexts are provided (College/School, Academy/Club, Country/National), weave the most impressive numbers naturally into the email — do not list them as a table. If the player has a secondary position, mention their positional versatility. Keep it under 300 words.
 Format: Subject: [subject line]\\n\\n[email body]"""
     chat = LlmChat(
         api_key=api_key, session_id=str(uuid.uuid4()),

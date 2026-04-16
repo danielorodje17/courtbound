@@ -58,7 +58,27 @@ export default function ComposePage() {
       if (p.primary_position) setPosition(p.primary_position.toLowerCase());
       else if (p.position) setPosition(p.position.toLowerCase());
       if (p.secondary_position && p.secondary_position !== "None") setSecondaryPosition(p.secondary_position.toLowerCase());
-      if (p.ppg && p.apg) setStats(`${p.ppg} PPG, ${p.apg} APG${p.rpg ? `, ${p.rpg} RPG` : ""}${p.current_team ? ` — ${p.current_team}` : ""}`);
+
+      // Build rich multi-context stats string
+      const statContexts = [
+        { label: "College/School", keys: ["college_ppg","college_apg","college_rpg","college_spg","college_fg_percent","college_three_pt_percent"] },
+        { label: "Academy/Club",   keys: ["academy_ppg","academy_apg","academy_rpg","academy_spg","academy_fg_percent","academy_three_pt_percent"] },
+        { label: "Country/National",keys: ["country_ppg","country_apg","country_rpg","country_spg","country_fg_percent","country_three_pt_percent"] },
+      ];
+      const statLabels = ["PPG","APG","RPG","SPG","FG%","3PT%"];
+      const lines = [];
+      statContexts.forEach(ctx => {
+        const parts = ctx.keys.map((k, i) => p[k] ? `${p[k]} ${statLabels[i]}` : null).filter(Boolean);
+        if (parts.length > 0) lines.push(`${ctx.label}: ${parts.join(", ")}`);
+      });
+      // Fallback to legacy single stats
+      if (lines.length === 0 && p.ppg) {
+        const legacy = [`${p.ppg} PPG`, p.apg && `${p.apg} APG`, p.rpg && `${p.rpg} RPG`].filter(Boolean);
+        lines.push(legacy.join(", "));
+      }
+      if (p.current_team) lines.push(`National Team: ${p.current_team}`);
+      if (p.club_team) lines.push(`Club: ${p.club_team}`);
+      setStats(lines.join("\n"));
     }).catch(() => {});
     loadTemplates();
   }, []);
@@ -80,7 +100,7 @@ export default function ComposePage() {
         college_name: selectedCollege.name,
         coach_name: selectedCoach?.name || "Coach",
         division: selectedCollege.division || "Division I",
-        user_name: playerProfile.full_name || "England U18 Player",
+        user_name: playerProfile.full_name || "Player",
         user_position: position,
         user_secondary_position: secondaryPosition || "",
         user_stats: stats,
@@ -91,16 +111,16 @@ export default function ComposePage() {
       });
       setDraft(data.draft);
       if (!subject) {
-        const playerName = playerProfile.full_name || "England U18 Player";
+        const playerName = playerProfile.full_name || "Player";
         const subjectMap = {
-          initial_outreach:  `Basketball Scholarship Inquiry - ${playerName} | England Under-18`,
-          follow_up:         `Follow-Up: Basketball Scholarship Inquiry - ${selectedCollege.name}`,
-          second_follow_up:  `Second Follow-Up: Basketball Scholarship - ${playerName}`,
+          initial_outreach:  `Basketball Scholarship Inquiry — ${playerName}`,
+          follow_up:         `Follow-Up: Basketball Scholarship Inquiry — ${selectedCollege.name}`,
+          second_follow_up:  `Second Follow-Up: Basketball Scholarship — ${playerName}`,
           reply_to_interest: `Re: Your Interest — ${playerName} | Basketball`,
           reply_to_offer:    `Re: Scholarship Offer — ${playerName} | ${selectedCollege.name}`,
           after_call:        `Following Our Call — ${playerName} | ${selectedCollege.name} Basketball`,
           after_visit:       `Following My Campus Visit — ${playerName} | ${selectedCollege.name}`,
-          thank_you:         `Thank You - ${playerName} | ${selectedCollege.name}`,
+          thank_you:         `Thank You — ${playerName} | ${selectedCollege.name}`,
         };
         setSubject(subjectMap[messageType] || "Basketball Scholarship Inquiry");
       }
@@ -397,14 +417,14 @@ export default function ComposePage() {
 
             {/* Stats */}
             <div className="mb-4">
-              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1.5">Key Stats / Highlights (optional)</label>
+              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1.5">Stats (auto-filled from your profile)</label>
               <textarea
                 data-testid="compose-stats-input"
                 value={stats}
                 onChange={e => setStats(e.target.value)}
-                rows={3}
-                placeholder="e.g. 18 PPG, 7 APG for England U18. Led team to European Championships..."
-                className="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none resize-none"
+                rows={4}
+                placeholder={"College/School: 18.5 PPG, 6.2 APG\nAcademy/Club: 22.0 PPG, 8.0 APG\nCountry/National: 15.0 PPG, 4.5 APG"}
+                className="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none resize-none font-mono"
               />
             </div>
 

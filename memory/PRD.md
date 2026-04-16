@@ -312,6 +312,12 @@ An 18-year-old student basketball player from UK (England Under-18) wants to tra
 - [x] Hover tooltip: date + email count
 - [x] GET /api/dashboard/heatmap endpoint — 365-day dataset with week/day structure
 
+### v1.31 - All 3 Stats Contexts in AI Emails (Feb 2026)
+- [x] ComposePage auto-populates stats field from all 3 profile contexts: College/School, Academy/Club, Country/National — each on its own line
+- [x] Falls back to legacy ppg/apg/rpg if new fields are empty; also appends National Team + Club names
+- [x] AI draft prompt updated to instruct model to weave the most impressive numbers naturally rather than listing them as a table
+- [x] Removed hardcoded "England U18 Player" / "England Under-18" from subject lines and user_name defaults in ComposePage
+
 ### v1.30 - Per-Competition Stats on Profile + Model Defaults Fix (Feb 2026)
 - [x] Athletic Profile: 3 separate stat blocks (College/School Team, Academy/Club, Country/National) each with PPG/APG/RPG/SPG/FG%/3PT%
 - [x] New DB fields: college_ppg/apg/rpg/spg/fg_percent/three_pt_percent, academy_*, country_*
