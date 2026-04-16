@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { apiRequest } from "../context/AuthContext";
-import { MessageSquare, Clock, CheckCircle2, TrendingUp, MailOpen, Wand2, Send, X, AlertCircle, Heart, XCircle, Trophy, PhoneCall, Zap, AlertTriangle } from "lucide-react";
+import { MessageSquare, Clock, CheckCircle2, TrendingUp, MailOpen, Wand2, Send, X, AlertCircle, Heart, XCircle, Trophy, PhoneCall, RefreshCw, MinusCircle, Zap, AlertTriangle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const DIV_BADGE = {
@@ -11,10 +11,12 @@ const DIV_BADGE = {
 };
 
 const OUTCOME_CONFIG = {
-  interested:          { label: "Interested",         color: "bg-green-100 text-green-700",  Icon: Heart },
-  schedule_call:       { label: "Call Requested",     color: "bg-blue-100 text-blue-700",    Icon: PhoneCall },
-  rejected:            { label: "Not Interested",     color: "bg-red-100 text-red-600",      Icon: XCircle },
-  scholarship_offered: { label: "Offer Received",     color: "bg-amber-100 text-amber-700",  Icon: Trophy },
+  interested:          { label: "Interested",      color: "bg-green-100 text-green-700",   Icon: Heart },
+  schedule_call:       { label: "Call Requested",  color: "bg-blue-100 text-blue-700",     Icon: PhoneCall },
+  rejected:            { label: "Not Interested",  color: "bg-red-100 text-red-600",       Icon: XCircle },
+  scholarship_offered: { label: "Offer Received",  color: "bg-amber-100 text-amber-700",   Icon: Trophy },
+  second_follow_up:    { label: "2nd Follow Up",   color: "bg-purple-100 text-purple-700", Icon: RefreshCw },
+  no_interest:         { label: "No Interest",     color: "bg-slate-100 text-slate-600",   Icon: MinusCircle },
 };
 
 function daysSince(dateStr) {
@@ -263,16 +265,16 @@ export default function ResponseTrackerPage() {
                       </button>
                     ) : (
                       <>
-                        {/* AI Next Steps — always shown for all replied colleges */}
+                        {/* Next Steps — uses AI follow-up modal */}
                         <button
                           data-testid={`ai-next-steps-btn-${c.college_id}`}
-                          onClick={() => getNextSteps(c)}
+                          onClick={() => getFollowUp(c)}
                           className="bg-slate-900 text-white font-bold uppercase tracking-wider rounded-lg px-4 py-2 text-xs hover:bg-slate-800 transition-all flex items-center justify-center gap-1.5"
                         >
-                          <Zap className="w-3.5 h-3.5 text-orange-400" /> AI Next Steps
+                          <Wand2 className="w-3.5 h-3.5 text-orange-400" /> Next Steps
                         </button>
                         {/* Outcome-specific shortcut */}
-                        {(c.reply_outcome === "rejected" || c.reply_outcome === "scholarship_offered") && (
+                        {(c.reply_outcome === "rejected" || c.reply_outcome === "scholarship_offered" || c.reply_outcome === "no_interest") && (
                           <button
                             data-testid={`draft-thanks-btn-${c.college_id}`}
                             onClick={() => navigate("/compose", { state: { college: c.college, messageType: "thank_you" } })}
@@ -281,7 +283,7 @@ export default function ResponseTrackerPage() {
                             <Heart className="w-3.5 h-3.5" /> Thank You
                           </button>
                         )}
-                        {(c.reply_outcome === "interested" || c.reply_outcome === "schedule_call") && (
+                        {(c.reply_outcome === "interested" || c.reply_outcome === "schedule_call" || c.reply_outcome === "second_follow_up") && (
                           <button
                             data-testid={`ai-followup-btn-${c.college_id}`}
                             onClick={() => getFollowUp(c)}
@@ -467,10 +469,12 @@ export default function ResponseTrackerPage() {
                 <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1.5">Reply Outcome</label>
                 <div className="grid grid-cols-2 gap-2" data-testid="outcome-selector">
                   {[
-                    { value: "interested",          label: "Interested",          color: "border-green-400 bg-green-50 text-green-800" },
+                    { value: "interested",          label: "Interested",             color: "border-green-400 bg-green-50 text-green-800" },
                     { value: "schedule_call",        label: "Call / Visit Requested", color: "border-blue-400 bg-blue-50 text-blue-800" },
-                    { value: "rejected",             label: "Not Interested",      color: "border-red-400 bg-red-50 text-red-700" },
-                    { value: "scholarship_offered",  label: "Scholarship Offered", color: "border-amber-400 bg-amber-50 text-amber-800" },
+                    { value: "rejected",             label: "Not Interested",         color: "border-red-400 bg-red-50 text-red-700" },
+                    { value: "scholarship_offered",  label: "Scholarship Offered",    color: "border-amber-400 bg-amber-50 text-amber-800" },
+                    { value: "second_follow_up",     label: "2nd Follow Up",          color: "border-purple-400 bg-purple-50 text-purple-800" },
+                    { value: "no_interest",          label: "No Interest",            color: "border-slate-400 bg-slate-100 text-slate-700" },
                   ].map(o => (
                     <button
                       key={o.value}
