@@ -312,6 +312,10 @@ An 18-year-old student basketball player from UK (England Under-18) wants to tra
 - [x] Hover tooltip: date + email count
 - [x] GET /api/dashboard/heatmap endpoint — 365-day dataset with week/day structure
 
+### v1.32 - Stats Preview Card on Compose Page (Feb 2026)
+- [x] Compact preview card above "Generate Draft" button shows all 3 stat contexts (College/School, Academy/Club, Country/National) with colour-coded dots — only renders when at least one context has data
+- [x] Each row shows only the stats the player has filled in — no empty/zero clutter
+
 ### v1.31 - All 3 Stats Contexts in AI Emails (Feb 2026)
 - [x] ComposePage auto-populates stats field from all 3 profile contexts: College/School, Academy/Club, Country/National — each on its own line
 - [x] Falls back to legacy ppg/apg/rpg if new fields are empty; also appends National Team + Club names

@@ -428,6 +428,44 @@ export default function ComposePage() {
               />
             </div>
 
+            {/* Stats preview card */}
+            {(() => {
+              const contexts = [
+                { label: "College/School", color: "bg-orange-500", keys: ["college_ppg","college_apg","college_rpg","college_spg","college_fg_percent","college_three_pt_percent"] },
+                { label: "Academy/Club",   color: "bg-blue-500",   keys: ["academy_ppg","academy_apg","academy_rpg","academy_spg","academy_fg_percent","academy_three_pt_percent"] },
+                { label: "Country/Nat.",   color: "bg-green-600",  keys: ["country_ppg","country_apg","country_rpg","country_spg","country_fg_percent","country_three_pt_percent"] },
+              ];
+              const statLabels = ["PPG","APG","RPG","SPG","FG%","3PT%"];
+              const rows = contexts.map(ctx => ({
+                ...ctx,
+                parts: ctx.keys.map((k, i) => playerProfile[k] ? { lbl: statLabels[i], val: playerProfile[k] } : null).filter(Boolean)
+              })).filter(r => r.parts.length > 0);
+              if (rows.length === 0) return null;
+              return (
+                <div data-testid="stats-preview-card" className="mb-4 border border-slate-200 rounded-lg overflow-hidden">
+                  <div className="bg-slate-50 px-3 py-2 border-b border-slate-200 flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Stats going into this email</span>
+                  </div>
+                  <div className="divide-y divide-slate-100">
+                    {rows.map(row => (
+                      <div key={row.label} className="flex items-center gap-3 px-3 py-2">
+                        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${row.color}`} />
+                        <span className="text-xs font-bold text-slate-600 w-24 flex-shrink-0">{row.label}</span>
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+                          {row.parts.map(({ lbl, val }) => (
+                            <span key={lbl} className="text-xs text-slate-700">
+                              <span className="font-bold">{val}</span>
+                              <span className="text-slate-400 ml-0.5">{lbl}</span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
             {error && <p className="text-red-500 text-sm mb-3">{error}</p>}
 
             <button
