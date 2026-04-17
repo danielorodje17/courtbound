@@ -312,6 +312,14 @@ An 18-year-old student basketball player from UK (England Under-18) wants to tra
 - [x] Hover tooltip: date + email count
 - [x] GET /api/dashboard/heatmap endpoint — 365-day dataset with week/day structure
 
+### v1.34 - Admin User Detail + College Report System (Feb 2026)
+- [x] Admin 3-tab dashboard: Overview, Users (with View button per row), Reports
+- [x] Admin user detail page /admin/users/:userId — profile card, 5 stat pills (emails sent, replies, reply rate, colleges tracked, positive outcomes), Copy Promo Summary button, Activity Timeline tab, All Colleges tab
+- [x] College detail: flag icon on every coach card opens Report Issue modal (issue type, correct info, notes)
+- [x] Backend: POST /reports/college, GET /reports/my, GET /notifications, POST /notifications/read-all
+- [x] Admin: GET /admin/reports, PATCH /admin/reports/{id} — update status + send user notification
+- [x] Notification bell in main nav with red unread dot + dropdown showing admin responses
+
 ### v1.33 - Admin Dashboard with Separate Login (Feb 2026)
 - [x] Separate admin login at /admin/login — email + password form (dark theme, no Google OAuth)
 - [x] Admin credentials validated against ADMIN_EMAIL / ADMIN_PASSWORD in backend/.env
