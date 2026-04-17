@@ -312,6 +312,15 @@ An 18-year-old student basketball player from UK (England Under-18) wants to tra
 - [x] Hover tooltip: date + email count
 - [x] GET /api/dashboard/heatmap endpoint — 365-day dataset with week/day structure
 
+### v1.33 - Admin Dashboard with Separate Login (Feb 2026)
+- [x] Separate admin login at /admin/login — email + password form (dark theme, no Google OAuth)
+- [x] Admin credentials validated against ADMIN_EMAIL / ADMIN_PASSWORD in backend/.env
+- [x] Admin session stored in MongoDB `admin_sessions` collection with 24h expiry
+- [x] Admin dashboard at /admin: 4 stat cards, signup trend chart, subscription breakdown, email activity chart, top 10 colleges, full users table
+- [x] Tier management: change users between Free / Pro / Elite from the users table
+- [x] Logout button clears admin session from DB + localStorage
+- [x] Auth tracking: `created_at` (first login) and `last_active` (every login) on all users
+
 ### v1.32 - Stats Preview Card on Compose Page (Feb 2026)
 - [x] Compact preview card above "Generate Draft" button shows all 3 stat contexts (College/School, Academy/Club, Country/National) with colour-coded dots — only renders when at least one context has data
 - [x] Each row shows only the stats the player has filled in — no empty/zero clutter

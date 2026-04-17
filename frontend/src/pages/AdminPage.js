@@ -372,8 +372,8 @@ export default function AdminPage() {
                 <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-400 text-sm">
                   {search ? "No users match your search" : "No users yet"}
                 </td></tr>
-              ) : filteredUsers.map(u => (
-                <tr key={u.user_id} data-testid={`user-row-${u.user_id}`} className="hover:bg-slate-50 transition-colors">
+              ) : filteredUsers.map((u, idx) => (
+                <tr key={u.user_id || u.email || idx} data-testid={`user-row-${u.user_id}`} className="hover:bg-slate-50 transition-colors">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       {u.picture
