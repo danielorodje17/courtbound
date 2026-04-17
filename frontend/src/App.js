@@ -16,6 +16,8 @@ import LoginPage from "./pages/LoginPage";
 import AuthCallback from "./pages/AuthCallback";
 import LandingPage from "./pages/LandingPage";
 import OnboardingPage from "./pages/OnboardingPage";
+import AdminPage from "./pages/AdminPage";
+import AdminLoginPage from "./pages/AdminLoginPage";
 import HelpWidget from "./components/HelpWidget";
 import { Trophy, Home, BookOpen, Mail, Wand2, Lightbulb, Menu, X, ShieldCheck, UserCircle, MessageSquare, LogOut, ChevronDown, Sparkles } from "lucide-react";
 
@@ -233,6 +235,8 @@ function AppRouter() {
         <Route path="/responses" element={<ProtectedAppRoute needsOnboarding={needsOnboarding}><ResponseTrackerPage /></ProtectedAppRoute>} />
         <Route path="/ai-match" element={<ProtectedAppRoute needsOnboarding={needsOnboarding}><AIMatchPage /></ProtectedAppRoute>} />
         <Route path="/compare" element={<ProtectedAppRoute needsOnboarding={needsOnboarding}><ComparePage /></ProtectedAppRoute>} />
+        <Route path="/admin/login" element={<AdminLoginPage />} />
+        <Route path="/admin" element={<AdminPage />} />
       </Routes>
       <HelpWidget />
     </>

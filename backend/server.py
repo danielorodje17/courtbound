@@ -8,7 +8,7 @@ from fastapi import APIRouter
 
 from database import db, client
 from seed_data import seed_colleges, seed_extended_colleges, _seed_european_colleges_startup
-from routers import auth, colleges, tracked, emails, dashboard, goals, ai, profile
+from routers import auth, colleges, tracked, emails, dashboard, goals, ai, profile, admin
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -32,6 +32,7 @@ api_router.include_router(dashboard.router)
 api_router.include_router(goals.router)
 api_router.include_router(ai.router)
 api_router.include_router(profile.router)
+api_router.include_router(admin.router)
 
 app.include_router(api_router)
 

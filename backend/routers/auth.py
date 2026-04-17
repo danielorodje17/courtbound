@@ -35,15 +35,22 @@ async def exchange_session(body: dict, response: Response):
     picture = user_data.get("picture", "") or user_data.get("avatar", "")
     session_token = user_data.get("session_token", session_id)
 
+    now_iso = datetime.now(timezone.utc).isoformat()
+
     # Look up existing user by email first (stable unique key from Google)
     existing = await db.users.find_one({"email": email}, {"_id": 0, "user_id": 1})
     if existing:
-        # Use the existing user_id to keep sessions consistent
         user_id = existing["user_id"]
 
     await db.users.update_one(
         {"email": email},
-        {"$set": {"user_id": user_id, "email": email, "name": name, "picture": picture, "updated_at": datetime.now(timezone.utc).isoformat()}},
+        {
+            "$set": {
+                "user_id": user_id, "email": email, "name": name, "picture": picture,
+                "updated_at": now_iso, "last_active": now_iso,
+            },
+            "$setOnInsert": {"created_at": now_iso},
+        },
         upsert=True,
     )
     expires_at = datetime.now(timezone.utc) + timedelta(days=7)

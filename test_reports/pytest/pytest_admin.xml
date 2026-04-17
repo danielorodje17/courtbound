@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="13" time="2.162" timestamp="2026-04-17T01:44:43.868152+00:00" hostname="agent-env-9baf01d2-71de-4960-8f05-a0dcddf62b61"><testcase classname="backend.tests.test_admin_system.TestAdminLogin" name="test_login_success" time="0.178" /><testcase classname="backend.tests.test_admin_system.TestAdminLogin" name="test_login_wrong_password" time="0.133" /><testcase classname="backend.tests.test_admin_system.TestAdminLogin" name="test_login_wrong_email" time="0.157" /><testcase classname="backend.tests.test_admin_system.TestAdminLogin" name="test_login_missing_fields" time="0.123" /><testcase classname="backend.tests.test_admin_system.TestAdminStats" name="test_stats_requires_auth" time="0.117" /><testcase classname="backend.tests.test_admin_system.TestAdminStats" name="test_stats_returns_data" time="0.265" /><testcase classname="backend.tests.test_admin_system.TestAdminStats" name="test_stats_user_fields" time="0.155" /><testcase classname="backend.tests.test_admin_system.TestAdminUsers" name="test_users_requires_auth" time="0.124" /><testcase classname="backend.tests.test_admin_system.TestAdminUsers" name="test_users_returns_list" time="0.173"><failure message="assert 500 == 200&#10; +  where 500 = &lt;Response [500]&gt;.status_code">backend/tests/test_admin_system.py:79: in test_users_returns_list
+    assert resp.status_code == 200
+E   assert 500 == 200
+E    +  where 500 = &lt;Response [500]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_admin_system.TestAdminUsers" name="test_users_fields" time="0.142"><failure message="requests.exceptions.JSONDecodeError: Expecting value: line 1 column 1 (char 0)">/root/.venv/lib/python3.11/site-packages/requests/models.py:976: in json
+    return complexjson.loads(self.text, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/json/__init__.py:346: in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/json/decoder.py:337: in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/json/decoder.py:355: in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+E   json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+During handling of the above exception, another exception occurred:
+backend/tests/test_admin_system.py:85: in test_users_fields
+    data = resp.json()
+           ^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/models.py:980: in json
+    raise RequestsJSONDecodeError(e.msg, e.doc, e.pos)
+E   requests.exceptions.JSONDecodeError: Expecting value: line 1 column 1 (char 0)</failure></testcase><testcase classname="backend.tests.test_admin_system.TestAdminSubscription" name="test_invalid_token" time="0.119" /><testcase classname="backend.tests.test_admin_system.TestAdminSubscription" name="test_invalid_tier" time="0.168" /><testcase classname="backend.tests.test_admin_system.TestAdminSubscription" name="test_verify_endpoint" time="0.109" /></testsuite></testsuites>
