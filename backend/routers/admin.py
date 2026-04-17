@@ -165,3 +165,114 @@ async def update_subscription(user_id: str, body: dict, admin=Depends(require_ad
         raise HTTPException(status_code=400, detail="Invalid tier — must be free, pro, or elite")
     await db.users.update_one({"user_id": user_id}, {"$set": {"subscription_tier": tier}})
     return {"message": "Subscription updated", "user_id": user_id, "subscription_tier": tier}
+
+
+# ── User Activity Detail ────────────────────────────────────────────────────
+
+@router.get("/users/{user_id}/activity")
+async def admin_user_activity(user_id: str, admin=Depends(require_admin_token)):
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    profile = await db.profiles.find_one({"user_id": user_id}, {"_id": 0}) or {}
+    emails_all   = await db.emails.find({"user_id": user_id}, {"_id": 0}).sort("created_at", -1).to_list(200)
+    tracked_docs = await db.tracked_colleges.find({"user_id": user_id}, {"_id": 0}).to_list(200)
+    from bson import ObjectId
+    # Enrich tracked with college names
+    enriched_tracked = []
+    for t in tracked_docs:
+        cid = t.get("college_id", "")
+        try:
+            c = await db.colleges.find_one({"_id": ObjectId(cid)}, {"_id": 0, "name": 1, "division": 1, "region": 1})
+        except Exception:
+            c = None
+        enriched_tracked.append({
+            **t,
+            "college_name":     c.get("name", "Unknown") if c else "Unknown",
+            "college_division": c.get("division", "") if c else "",
+            "college_region":   c.get("region", "") if c else "",
+        })
+    sent_emails     = [e for e in emails_all if e.get("direction") == "sent"]
+    received_emails = [e for e in emails_all if e.get("direction") == "received"]
+    # Reply outcomes
+    positive_outcomes = ["interested", "call_requested", "scholarship_offered", "after_call", "after_visit"]
+    positive_replies = [
+        t for t in tracked_docs
+        if t.get("reply_outcome") and t.get("reply_outcome") in positive_outcomes
+    ]
+    return {
+        "user": {
+            "user_id":           user.get("user_id"),
+            "name":              user.get("name", ""),
+            "email":             user.get("email", ""),
+            "picture":           user.get("picture", ""),
+            "subscription_tier": user.get("subscription_tier", "free"),
+            "created_at":        user.get("created_at", ""),
+            "last_active":       user.get("last_active", ""),
+        },
+        "profile": {
+            "full_name":         profile.get("full_name", ""),
+            "primary_position":  profile.get("primary_position") or profile.get("position", ""),
+            "current_team":      profile.get("current_team", ""),
+            "highlight_tape_url": profile.get("highlight_tape_url", ""),
+            "bio":               profile.get("bio", ""),
+        },
+        "stats": {
+            "emails_sent":       len(sent_emails),
+            "emails_received":   len(received_emails),
+            "colleges_tracked":  len(tracked_docs),
+            "positive_replies":  len(positive_replies),
+            "reply_rate":        round(len(received_emails) / len(sent_emails) * 100) if sent_emails else 0,
+        },
+        "recent_emails":    emails_all[:30],
+        "tracked_colleges": enriched_tracked,
+        "positive_colleges": [
+            {
+                "college_name":   t.get("college_name", ""),
+                "division":       t.get("college_division", ""),
+                "reply_outcome":  t.get("reply_outcome", ""),
+            }
+            for t in enriched_tracked
+            if t.get("reply_outcome") in positive_outcomes
+        ],
+    }
+
+
+# ── Reports ─────────────────────────────────────────────────────────────────
+
+@router.get("/reports")
+async def admin_reports(admin=Depends(require_admin_token)):
+    reports = await db.college_reports.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
+    return reports
+
+
+@router.patch("/reports/{report_id}")
+async def update_report(report_id: str, body: dict, admin=Depends(require_admin_token)):
+    import uuid
+    status         = body.get("status", "")
+    admin_response = body.get("admin_response", "")
+    if status not in ["pending", "investigating", "fixed", "invalid"]:
+        raise HTTPException(status_code=400, detail="Invalid status")
+    now = datetime.now(timezone.utc).isoformat()
+    await db.college_reports.update_one(
+        {"id": report_id},
+        {"$set": {"status": status, "admin_response": admin_response, "updated_at": now}},
+    )
+    # Send notification to user if admin wrote a response
+    if admin_response.strip():
+        report = await db.college_reports.find_one({"id": report_id}, {"_id": 0})
+        if report:
+            notif = {
+                "id":         str(uuid.uuid4()),
+                "user_id":    report["user_id"],
+                "report_id":  report_id,
+                "college_name": report.get("college_name", ""),
+                "message":    admin_response,
+                "status":     status,
+                "read":       False,
+                "created_at": now,
+            }
+            await db.user_notifications.insert_one(notif)
+            del notif["_id"]
+    return {"ok": True, "report_id": report_id, "status": status}
+

@@ -2,7 +2,93 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { apiRequest } from "../context/AuthContext";
 import { getCollegeImage } from "../utils/collegeImages";
-import { MapPin, Globe, Mail, Phone, Plus, Check, ArrowLeft, Pen, Clock, Calendar, AlertTriangle, ListChecks, MessageSquare, Trash2, Film, Info } from "lucide-react";
+import { MapPin, Globe, Mail, Phone, Plus, Check, ArrowLeft, Pen, Clock, Calendar, AlertTriangle, ListChecks, MessageSquare, Trash2, Film, Info, Flag, X } from "lucide-react";
+
+const ISSUE_TYPES = [
+  "Wrong email address",
+  "Coach no longer at this school",
+  "Wrong coach name",
+  "Wrong phone number",
+  "Email bounced / undeliverable",
+  "Other",
+];
+
+function ReportModal({ college, coach, onClose }) {
+  const [issueType, setIssueType]   = useState("");
+  const [correctInfo, setCorrectInfo] = useState("");
+  const [notes, setNotes]           = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [done, setDone]             = useState(false);
+
+  const submit = async () => {
+    if (!issueType) return;
+    setSubmitting(true);
+    try {
+      await apiRequest("post", "/reports/college", {
+        college_id:   college.id || college._id || "",
+        college_name: college.name,
+        coach_name:   coach?.name || "",
+        issue_type:   issueType,
+        correct_info: correctInfo,
+        notes,
+      });
+      setDone(true);
+    } catch {}
+    setSubmitting(false);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <Flag className="w-4 h-4 text-red-500" />
+            <h3 className="font-black text-slate-900 text-sm uppercase tracking-wide">Report Contact Issue</h3>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 transition-colors"><X className="w-4 h-4" /></button>
+        </div>
+        <div className="p-6 space-y-4">
+          {done ? (
+            <div className="text-center py-6">
+              <Check className="w-10 h-10 text-green-500 mx-auto mb-3" />
+              <p className="font-bold text-slate-800">Report submitted!</p>
+              <p className="text-sm text-slate-500 mt-1">We'll investigate and notify you when it's fixed.</p>
+              <button onClick={onClose} className="mt-4 text-sm bg-slate-900 text-white px-5 py-2 rounded-xl font-bold">Close</button>
+            </div>
+          ) : (
+            <>
+              <div>
+                <p className="text-xs text-slate-400 mb-3">
+                  Reporting for <span className="font-bold text-slate-700">{college.name}{coach ? ` — ${coach.name}` : ""}</span>
+                </p>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">What's the issue?</label>
+                <select value={issueType} onChange={e => setIssueType(e.target.value)} data-testid="report-issue-type"
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 outline-none bg-white">
+                  <option value="">Select an issue...</option>
+                  {ISSUE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Correct info (if known)</label>
+                <input type="text" value={correctInfo} onChange={e => setCorrectInfo(e.target.value)} data-testid="report-correct-info"
+                  placeholder="e.g. correct email address" className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 outline-none" />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Additional notes</label>
+                <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} data-testid="report-notes"
+                  placeholder="Any extra details..." className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 outline-none resize-none" />
+              </div>
+              <button onClick={submit} disabled={!issueType || submitting} data-testid="report-submit-btn"
+                className="w-full bg-orange-500 hover:bg-orange-600 text-white font-black uppercase tracking-wider rounded-xl py-3 text-sm transition-all disabled:opacity-50">
+                {submitting ? "Submitting..." : "Submit Report"}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const AVATAR_COLORS = [
   "bg-orange-500", "bg-blue-500", "bg-green-600", "bg-purple-500",
@@ -42,6 +128,7 @@ export default function CollegeDetailPage() {
   const [addingNote, setAddingNote] = useState(false);
   const [tapeUrl, setTapeUrl] = useState("");
   const [progressScore, setProgressScore] = useState(null);
+  const [reportTarget, setReportTarget] = useState(null); // {coach} or null for general college report
 
   function daysUntil(dateStr) {
     if (!dateStr) return null;
@@ -263,6 +350,26 @@ export default function CollegeDetailPage() {
                       <p className="font-semibold text-slate-800 text-sm">{coach.name}</p>
                       <p className="text-xs text-slate-500">{coach.title}</p>
                     </div>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {coach.email && (
+                      <a href={`mailto:${coach.email}`} className="p-1.5 text-slate-400 hover:text-orange-500 transition-colors rounded-lg hover:bg-orange-50" title={coach.email}>
+                        <Mail className="w-4 h-4" />
+                      </a>
+                    )}
+                    {coach.phone && (
+                      <a href={`tel:${coach.phone}`} className="p-1.5 text-slate-400 hover:text-orange-500 transition-colors rounded-lg hover:bg-orange-50" title={coach.phone}>
+                        <Phone className="w-4 h-4" />
+                      </a>
+                    )}
+                    <button
+                      data-testid={`report-btn-${coach.name}`}
+                      onClick={() => setReportTarget(coach)}
+                      className="p-1.5 text-slate-300 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50"
+                      title="Report incorrect contact info"
+                    >
+                      <Flag className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                   <div className="flex gap-2">
                     {coach.email && (
@@ -657,6 +764,9 @@ export default function CollegeDetailPage() {
           )}
         </div>
       </div>
+      {reportTarget !== null && college && (
+        <ReportModal college={college} coach={reportTarget} onClose={() => setReportTarget(null)} />
+      )}
     </div>
   );
 }

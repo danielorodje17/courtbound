@@ -8,6 +8,7 @@ import {
 import {
   Users, Mail, BookMarked, TrendingUp, RefreshCw, LogOut,
   Star, CircleDot, ArrowUpRight, ChevronUp, ChevronDown, ShieldCheck,
+  Flag, Clock, CheckCircle2, AlertTriangle, XCircle, ChevronRight,
 } from "lucide-react";
 
 const API = process.env.REACT_APP_BACKEND_URL;
@@ -98,21 +99,27 @@ export default function AdminPage() {
   const navigate  = useNavigate();
   const [stats, setStats]     = useState(null);
   const [users, setUsers]     = useState([]);
+  const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("overview");
   const [sort, setSort]       = useState({ key: "created_at", dir: "desc" });
   const [search, setSearch]   = useState("");
   const [refreshedAt, setRefreshedAt] = useState(null);
+  const [resolvingId, setResolvingId] = useState(null);
+  const [resolveForm, setResolveForm] = useState({ status: "fixed", message: "" });
   const adminEmail = localStorage.getItem("cb_admin_email") || "Admin";
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [sRes, uRes] = await Promise.all([
+      const [sRes, uRes, rRes] = await Promise.all([
         adminReq("get", "/admin/stats"),
         adminReq("get", "/admin/users"),
+        adminReq("get", "/admin/reports"),
       ]);
       setStats(sRes.data);
       setUsers(uRes.data);
+      setReports(rRes.data);
       setRefreshedAt(new Date());
     } catch (e) {
       if (e?.response?.status === 401) {
@@ -205,7 +212,22 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* Top Stats */}
+      {/* Tabs */}
+      <div className="flex gap-1 mb-6 bg-white border border-slate-200 rounded-xl p-1 w-fit">
+        {[
+          { id: "overview", label: "Overview" },
+          { id: "users",    label: `Users (${users.length})` },
+          { id: "reports",  label: `Reports${reports.filter(r => r.status === "pending").length > 0 ? ` (${reports.filter(r => r.status === "pending").length})` : ""}` },
+        ].map(t => (
+          <button key={t.id} onClick={() => setActiveTab(t.id)}
+            className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${activeTab === t.id ? "bg-slate-900 text-white" : "text-slate-500 hover:text-slate-700"}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── OVERVIEW TAB ─────────────────────────────────────── */}
+      {activeTab === "overview" && (<>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard icon={Users}      label="Total Users"      value={stats?.users?.total}       sub={`+${stats?.users?.new_7d ?? 0} this week`} />
         <StatCard icon={TrendingUp} label="Active (7 days)"  value={stats?.users?.active_7d}   sub={`${stats?.users?.active_30d ?? 0} active last 30d`} color="text-blue-500" />
@@ -357,6 +379,7 @@ export default function AdminPage() {
                   { key: "emails_sent", label: "Emails" },
                   { key: "colleges_tracked", label: "Tracked" },
                   { key: null, label: "Change Tier" },
+                  { key: null, label: "" },
                 ].map(col => (
                   <th key={col.label}
                     onClick={() => col.key && toggleSort(col.key)}
@@ -369,7 +392,7 @@ export default function AdminPage() {
             </thead>
             <tbody className="divide-y divide-slate-50">
               {filteredUsers.length === 0 ? (
-                <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-400 text-sm">
+                <tr><td colSpan={8} className="px-4 py-10 text-center text-slate-400 text-sm">
                   {search ? "No users match your search" : "No users yet"}
                 </td></tr>
               ) : filteredUsers.map((u, idx) => (
@@ -394,12 +417,193 @@ export default function AdminPage() {
                   <td className="px-4 py-3"><span className="font-bold text-slate-800">{u.emails_sent}</span><span className="text-xs text-slate-400 ml-1">sent</span></td>
                   <td className="px-4 py-3"><span className="font-bold text-slate-800">{u.colleges_tracked}</span><span className="text-xs text-slate-400 ml-1">colleges</span></td>
                   <td className="px-4 py-3"><TierSelect userId={u.user_id} current={u.subscription_tier} onChange={updateTier} /></td>
+                  <td className="px-4 py-3">
+                    <button
+                      data-testid={`view-user-btn-${u.user_id}`}
+                      onClick={() => navigate(`/admin/users/${u.user_id}`)}
+                      className="flex items-center gap-1 text-xs text-orange-600 hover:text-orange-800 font-bold transition-colors"
+                    >
+                      View <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </div>
+      </>)}
+
+      {/* ── USERS TAB ──────────────────────────────────────────── */}
+      {activeTab === "users" && (
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between flex-wrap gap-3">
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
+            All Users <span className="text-slate-900 font-black ml-1">{filteredUsers.length}</span>
+          </p>
+          <input data-testid="admin-user-search" type="text" value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Search by name or email..." className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm text-slate-700 focus:ring-2 focus:ring-orange-500 outline-none w-60" />
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-100">
+                {[
+                  { key: "name", label: "User" }, { key: "subscription_tier", label: "Tier" },
+                  { key: "created_at", label: "Joined" }, { key: "last_active", label: "Last Active" },
+                  { key: "emails_sent", label: "Emails" }, { key: "colleges_tracked", label: "Tracked" },
+                  { key: null, label: "Change Tier" }, { key: null, label: "" },
+                ].map(col => (
+                  <th key={col.label} onClick={() => col.key && toggleSort(col.key)}
+                    className={`text-left px-4 py-3 text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap select-none ${col.key ? "cursor-pointer hover:text-slate-600" : ""}`}>
+                    <span className="flex items-center gap-1">{col.label}{col.key && <SortIcon k={col.key} />}</span>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {filteredUsers.length === 0
+                ? <tr><td colSpan={8} className="px-4 py-10 text-center text-slate-400 text-sm">{search ? "No users match" : "No users yet"}</td></tr>
+                : filteredUsers.map((u, idx) => (
+                  <tr key={u.user_id || u.email || idx} data-testid={`user-row-${u.user_id}`} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        {u.picture ? <img src={u.picture} alt="" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                          : <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 text-xs font-black flex-shrink-0">{(u.name || u.email || "?")[0].toUpperCase()}</div>}
+                        <div className="min-w-0">
+                          <p className="font-semibold text-slate-800 truncate max-w-[160px]">{u.name || "—"}</p>
+                          <p className="text-xs text-slate-400 truncate max-w-[160px]">{u.email}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3"><TierBadge tier={u.subscription_tier} /></td>
+                    <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">{fmtDate(u.created_at)}</td>
+                    <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">{relTime(u.last_active)}</td>
+                    <td className="px-4 py-3"><span className="font-bold text-slate-800">{u.emails_sent}</span><span className="text-xs text-slate-400 ml-1">sent</span></td>
+                    <td className="px-4 py-3"><span className="font-bold text-slate-800">{u.colleges_tracked}</span><span className="text-xs text-slate-400 ml-1">colleges</span></td>
+                    <td className="px-4 py-3"><TierSelect userId={u.user_id} current={u.subscription_tier} onChange={updateTier} /></td>
+                    <td className="px-4 py-3">
+                      <button data-testid={`view-user-btn-${u.user_id}`} onClick={() => navigate(`/admin/users/${u.user_id}`)}
+                        className="flex items-center gap-1 text-xs text-orange-600 hover:text-orange-800 font-bold transition-colors">
+                        View <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      )}
+
+      {/* ── REPORTS TAB ───────────────────────────────────────── */}
+      {activeTab === "reports" && (() => {
+        const REPORT_STATUS = {
+          pending:      { label: "Pending",      color: "bg-yellow-100 text-yellow-700", icon: Clock },
+          investigating:{ label: "Investigating", color: "bg-blue-100 text-blue-700",    icon: AlertTriangle },
+          fixed:        { label: "Fixed",        color: "bg-green-100 text-green-700",   icon: CheckCircle2 },
+          invalid:      { label: "Not Valid",    color: "bg-slate-100 text-slate-600",   icon: XCircle },
+        };
+        const submitResolve = async (reportId) => {
+          try {
+            await adminReq("patch", `/admin/reports/${reportId}`, {
+              status: resolveForm.status,
+              admin_response: resolveForm.message,
+            });
+            setReports(prev => prev.map(r => r.id === reportId
+              ? { ...r, status: resolveForm.status, admin_response: resolveForm.message }
+              : r
+            ));
+            setResolvingId(null);
+            setResolveForm({ status: "fixed", message: "" });
+          } catch {}
+        };
+
+        return (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                {reports.length} total · {reports.filter(r => r.status === "pending").length} pending
+              </p>
+            </div>
+            {reports.length === 0 ? (
+              <div className="bg-white border border-slate-200 rounded-xl py-14 text-center text-slate-400">
+                <Flag className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                <p className="text-sm">No reports submitted yet</p>
+              </div>
+            ) : reports.map(r => {
+              const sCfg = REPORT_STATUS[r.status] || REPORT_STATUS.pending;
+              const SIcon = sCfg.icon;
+              return (
+                <div key={r.id} data-testid={`report-card-${r.id}`} className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                  <div className="flex items-start justify-between gap-4 p-5">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <span className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full ${sCfg.color}`}>
+                          <SIcon className="w-3 h-3" /> {sCfg.label}
+                        </span>
+                        <span className="text-xs text-slate-400">{fmtDate(r.created_at)}</span>
+                      </div>
+                      <p className="font-bold text-slate-800">{r.college_name} {r.coach_name ? `— ${r.coach_name}` : ""}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        <span className="font-semibold">{r.user_name}</span> ({r.user_email}) · Issue: <span className="font-semibold">{r.issue_type}</span>
+                      </p>
+                      {r.correct_info && <p className="text-xs text-slate-600 mt-1.5 bg-slate-50 rounded px-2 py-1.5"><span className="font-semibold">Suggested info:</span> {r.correct_info}</p>}
+                      {r.notes && <p className="text-xs text-slate-500 mt-1 italic">"{r.notes}"</p>}
+                      {r.admin_response && (
+                        <div className="mt-2 bg-green-50 border border-green-200 rounded px-3 py-2 text-xs text-green-800">
+                          <span className="font-bold">Admin response sent:</span> {r.admin_response}
+                        </div>
+                      )}
+                    </div>
+                    {r.status === "pending" || r.status === "investigating" ? (
+                      <button
+                        data-testid={`resolve-btn-${r.id}`}
+                        onClick={() => { setResolvingId(r.id); setResolveForm({ status: "fixed", message: "" }); }}
+                        className="flex-shrink-0 text-xs bg-slate-900 text-white font-bold px-3 py-2 rounded-lg hover:bg-slate-700 transition-all"
+                      >
+                        Respond
+                      </button>
+                    ) : null}
+                  </div>
+
+                  {/* Inline response form */}
+                  {resolvingId === r.id && (
+                    <div className="border-t border-slate-100 p-5 bg-slate-50 space-y-3">
+                      <div className="flex gap-2 flex-wrap">
+                        {["investigating", "fixed", "invalid"].map(s => (
+                          <button key={s} onClick={() => setResolveForm(f => ({ ...f, status: s }))}
+                            className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-all capitalize ${resolveForm.status === s ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"}`}>
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                      <textarea
+                        data-testid={`report-message-${r.id}`}
+                        value={resolveForm.message}
+                        onChange={e => setResolveForm(f => ({ ...f, message: e.target.value }))}
+                        rows={3}
+                        placeholder="Message to user (optional — will appear as in-app notification if filled in)"
+                        className="w-full border border-slate-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none resize-none bg-white"
+                      />
+                      <div className="flex gap-2">
+                        <button data-testid={`submit-resolve-${r.id}`} onClick={() => submitResolve(r.id)}
+                          className="bg-orange-500 text-white font-bold text-xs px-4 py-2 rounded-lg hover:bg-orange-600 transition-all">
+                          Send & Update
+                        </button>
+                        <button onClick={() => setResolvingId(null)}
+                          className="text-slate-500 font-bold text-xs px-4 py-2 rounded-lg hover:bg-slate-100 transition-all">
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
     </div>
   );
 }

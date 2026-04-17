@@ -18,8 +18,9 @@ import LandingPage from "./pages/LandingPage";
 import OnboardingPage from "./pages/OnboardingPage";
 import AdminPage from "./pages/AdminPage";
 import AdminLoginPage from "./pages/AdminLoginPage";
+import AdminUserDetailPage from "./pages/AdminUserDetailPage";
 import HelpWidget from "./components/HelpWidget";
-import { Trophy, Home, BookOpen, Mail, Wand2, Lightbulb, Menu, X, ShieldCheck, UserCircle, MessageSquare, LogOut, ChevronDown, Sparkles } from "lucide-react";
+import { Trophy, Home, BookOpen, Mail, Wand2, Lightbulb, Menu, X, ShieldCheck, UserCircle, MessageSquare, LogOut, ChevronDown, Sparkles, Bell } from "lucide-react";
 
 const NAV_ITEMS = [
   { path: "/dashboard", label: "Dashboard", icon: Home },
@@ -79,6 +80,61 @@ function UserMenu() {
   );
 }
 
+function NotificationBell() {
+  const [notifs, setNotifs]   = useState([]);
+  const [unread, setUnread]   = useState(0);
+  const [open, setOpen]       = useState(false);
+
+  useEffect(() => {
+    const load = () => apiRequest("get", "/notifications")
+      .then(r => { setNotifs(r.data.notifications || []); setUnread(r.data.unread || 0); })
+      .catch(() => {});
+    load();
+    const iv = setInterval(load, 60000);
+    return () => clearInterval(iv);
+  }, []);
+
+  const markAll = async () => {
+    await apiRequest("post", "/notifications/read-all").catch(() => {});
+    setNotifs(prev => prev.map(n => ({ ...n, read: true })));
+    setUnread(0);
+  };
+
+  return (
+    <div className="relative">
+      <button data-testid="notification-bell" onClick={() => setOpen(!open)}
+        className="relative p-2 text-slate-600 hover:text-slate-900 transition-colors rounded-lg hover:bg-slate-100">
+        <Bell className="w-4 h-4" />
+        {unread > 0 && (
+          <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+        )}
+      </button>
+      {open && (
+        <div className="absolute right-0 top-10 w-80 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+            <p className="text-xs font-black uppercase tracking-wider text-slate-700">Notifications</p>
+            {unread > 0 && (
+              <button onClick={markAll} className="text-xs text-orange-500 font-bold hover:text-orange-700">Mark all read</button>
+            )}
+          </div>
+          <div className="max-h-72 overflow-y-auto">
+            {notifs.length === 0 ? (
+              <div className="py-8 text-center text-slate-400 text-xs">No notifications yet</div>
+            ) : notifs.map(n => (
+              <div key={n.id} data-testid={`notif-${n.id}`}
+                className={`px-4 py-3 border-b border-slate-50 last:border-0 ${!n.read ? "bg-orange-50/60" : ""}`}>
+                <p className="text-xs font-bold text-slate-800">{n.college_name || "Update"}</p>
+                <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">{n.message}</p>
+                <p className="text-xs text-slate-400 mt-1">{n.status ? `Status: ${n.status}` : ""}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AppLayout({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
@@ -117,6 +173,7 @@ function AppLayout({ children }) {
           </nav>
 
           <div className="ml-auto flex items-center gap-2">
+            <NotificationBell />
             <UserMenu />
             <button onClick={() => setMobileOpen(!mobileOpen)} className="lg:hidden p-2 text-slate-600">
               {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -237,6 +294,7 @@ function AppRouter() {
         <Route path="/compare" element={<ProtectedAppRoute needsOnboarding={needsOnboarding}><ComparePage /></ProtectedAppRoute>} />
         <Route path="/admin/login" element={<AdminLoginPage />} />
         <Route path="/admin" element={<AdminPage />} />
+        <Route path="/admin/users/:userId" element={<AdminUserDetailPage />} />
       </Routes>
       <HelpWidget />
     </>
