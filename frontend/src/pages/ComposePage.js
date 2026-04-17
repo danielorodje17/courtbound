@@ -144,7 +144,13 @@ export default function ComposePage() {
     const sendingEmail = playerProfile.email || "";
     const authParam = sendingEmail ? `&authuser=${encodeURIComponent(sendingEmail)}` : "";
     const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1${authParam}${coachEmail ? `&to=${encodeURIComponent(coachEmail)}` : ""}&su=${encodeURIComponent(subject || "Basketball Scholarship Inquiry")}&body=${encodeURIComponent(draft)}`;
-    window.open(gmailUrl, "_blank");
+    const link = document.createElement("a");
+    link.href   = gmailUrl;
+    link.target = "_blank";
+    link.rel    = "noopener noreferrer";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
     setAwaitingConfirmation(true);
     setConfirmed(false);
   };
