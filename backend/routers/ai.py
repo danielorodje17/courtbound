@@ -23,6 +23,7 @@ async def draft_message(data: AIMessageRequest):
         "after_call":        "thank you email written SPECIFICALLY after a phone or video call with the coach — must reference that a call just took place, recap key points discussed on the call, and confirm any agreed next steps",
         "after_visit":       "thank you email written SPECIFICALLY after a campus visit — must reference that the player recently visited the campus, mention genuine impressions of the facilities and the programme, and confirm enthusiasm for the school",
         "thank_you":         "thank you after a call or visit",
+        "no_interest":       "gracious, professional reply to a college coach who has expressed no interest — thank them for their time, keep the door open for future consideration, and leave a positive lasting impression",
     }
     msg_type_label = type_map.get(data.message_type, data.message_type)
     highlight_section = f"\n\nHighlight Tape: {data.highlight_tape_url}" if data.highlight_tape_url else ""

@@ -121,6 +121,7 @@ export default function ComposePage() {
           after_call:        `Following Our Call — ${playerName} | ${selectedCollege.name} Basketball`,
           after_visit:       `Following My Campus Visit — ${playerName} | ${selectedCollege.name}`,
           thank_you:         `Thank You — ${playerName} | ${selectedCollege.name}`,
+          no_interest:       `Thank You for Your Time — ${playerName} | ${selectedCollege.name}`,
         };
         setSubject(subjectMap[messageType] || "Basketball Scholarship Inquiry");
       }
@@ -223,6 +224,7 @@ export default function ComposePage() {
     { value: "reply_to_offer",    label: "Reply to Offer"     },
     { value: "after_call",        label: "After Call"         },
     { value: "after_visit",       label: "After Visit"        },
+    { value: "no_interest",       label: "No Interest"        },
   ];
 
   return (
