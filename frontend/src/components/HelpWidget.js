@@ -103,6 +103,10 @@ const SECTIONS = [
         q: "What is the Email Template Library?",
         a: "On the Compose page, you can save any draft as a reusable template. Next time you compose, select a saved template to pre-fill the subject and body. Great for building a library of successful outreach messages."
       },
+      {
+        q: "How do I report a wrong or bounced coach email?",
+        a: "Open any college's detail page, then find the coach whose contact info is wrong. Next to their name you will see a red 'Report' button with a flag icon. Click it to open the Report Contact Issue form — select the issue type (wrong email, bounced, wrong name, etc.), enter the correct info if you have it, and submit. Your report goes straight to the admin who will update the database. You will receive a notification (bell icon in the top nav) when it has been reviewed."
+      },
     ]
   },
   {

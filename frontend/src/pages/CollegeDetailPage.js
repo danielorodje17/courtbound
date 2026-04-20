@@ -365,10 +365,11 @@ export default function CollegeDetailPage() {
                     <button
                       data-testid={`report-btn-${coach.name}`}
                       onClick={() => setReportTarget(coach)}
-                      className="p-1.5 text-slate-300 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50"
+                      className="flex items-center gap-1 px-2 py-1 text-red-500 bg-red-50 hover:bg-red-100 border border-red-200 transition-colors rounded-lg text-xs font-semibold"
                       title="Report incorrect contact info"
                     >
-                      <Flag className="w-3.5 h-3.5" />
+                      <Flag className="w-3 h-3" />
+                      Report
                     </button>
                   </div>
                   <div className="flex gap-2">
