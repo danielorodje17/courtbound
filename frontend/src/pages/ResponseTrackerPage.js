@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { apiRequest } from "../context/AuthContext";
-import { MessageSquare, Clock, CheckCircle2, TrendingUp, MailOpen, Wand2, Send, X, AlertCircle, Heart, XCircle, Trophy, PhoneCall, RefreshCw, MinusCircle, Zap, AlertTriangle } from "lucide-react";
+import { MessageSquare, Clock, CheckCircle2, TrendingUp, MailOpen, Wand2, Send, X, AlertCircle, Heart, XCircle, Trophy, PhoneCall, RefreshCw, MinusCircle, Zap, AlertTriangle, Archive, ChevronDown } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const DIV_BADGE = {
@@ -18,6 +18,7 @@ const OUTCOME_CONFIG = {
   no_interest:         { label: "No Interest",     color: "bg-slate-100 text-slate-600",   Icon: MinusCircle },
   after_call:          { label: "After Call",      color: "bg-teal-100 text-teal-700",     Icon: PhoneCall },
   after_visit:         { label: "After Visit",     color: "bg-indigo-100 text-indigo-700", Icon: CheckCircle2 },
+  closed:              { label: "Closed",          color: "bg-slate-800 text-white",       Icon: Archive },
 };
 
 function daysSince(dateStr) {
@@ -125,12 +126,15 @@ export default function ResponseTrackerPage() {
   };
 
   const contacted = colleges.filter(c => c.sent?.count > 0 || ["contacted", "replied"].includes(c.status));
-  const awaiting = contacted.filter(c => !c.received?.count);
-  const replied = contacted.filter(c => c.received?.count > 0);
-  const responseRate = contacted.length > 0 ? Math.round((replied.length / contacted.length) * 100) : 0;
+  const active   = contacted.filter(c => c.reply_outcome !== "closed");
+  const closed   = contacted.filter(c => c.reply_outcome === "closed");
+  const awaiting = active.filter(c => !c.received?.count);
+  const replied  = active.filter(c => c.received?.count > 0);
+  const responseRate = active.length > 0 ? Math.round((replied.length / active.length) * 100) : 0;
 
-  const displayed = (filter === "awaiting" ? awaiting : filter === "replied" ? replied : contacted)
+  const displayed = (filter === "awaiting" ? awaiting : filter === "replied" ? replied : active)
     .filter(c => !search || c.college?.name?.toLowerCase().includes(search.toLowerCase()));
+  const [closedOpen, setClosedOpen] = useState(false);
 
   return (
     <div style={{ fontFamily: "Manrope, sans-serif" }}>
@@ -146,7 +150,7 @@ export default function ResponseTrackerPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         {[
-          { label: "Colleges Contacted", value: contacted.length, color: "text-slate-900", Icon: Send },
+          { label: "Colleges Contacted", value: active.length, color: "text-slate-900", Icon: Send },
           { label: "Awaiting Reply", value: awaiting.length, color: "text-orange-600", Icon: Clock },
           { label: "Received Reply", value: replied.length, color: "text-green-600", Icon: CheckCircle2 },
           { label: "Response Rate", value: `${responseRate}%`, color: "text-blue-600", Icon: TrendingUp },
@@ -298,13 +302,26 @@ export default function ResponseTrackerPage() {
                         </button>
                         {/* Outcome-specific shortcut */}
                         {(c.reply_outcome === "rejected" || c.reply_outcome === "no_interest") && (
-                          <button
-                            data-testid={`draft-thanks-btn-${c.college_id}`}
-                            onClick={() => navigate("/compose", { state: { college: c.college, messageType: "after_call" } })}
-                            className="bg-slate-100 text-slate-700 font-bold uppercase tracking-wider rounded-lg px-4 py-2 text-xs hover:bg-slate-200 transition-all flex items-center justify-center gap-1.5"
-                          >
-                            <Heart className="w-3.5 h-3.5" /> Draft Reply
-                          </button>
+                          <div className="flex gap-1.5 flex-wrap">
+                            <button
+                              data-testid={`draft-thanks-btn-${c.college_id}`}
+                              onClick={() => navigate("/compose", { state: { college: c.college, messageType: "no_interest" } })}
+                              className="bg-slate-100 text-slate-700 font-bold uppercase tracking-wider rounded-lg px-4 py-2 text-xs hover:bg-slate-200 transition-all flex items-center justify-center gap-1.5"
+                            >
+                              <Heart className="w-3.5 h-3.5" /> Draft Reply
+                            </button>
+                            <button
+                              data-testid={`close-college-btn-${c.college_id}`}
+                              onClick={() => {
+                                apiRequest("put", `/tracked/${c.college_id}`, { reply_outcome: "closed" })
+                                  .then(() => setColleges(prev => prev.map(x => x.college_id === c.college_id ? { ...x, reply_outcome: "closed" } : x)))
+                                  .catch(() => {});
+                              }}
+                              className="bg-slate-800 text-white font-bold uppercase tracking-wider rounded-lg px-4 py-2 text-xs hover:bg-slate-900 transition-all flex items-center justify-center gap-1.5"
+                            >
+                              <Archive className="w-3.5 h-3.5" /> Move to Closed
+                            </button>
+                          </div>
                         )}
                         {c.reply_outcome === "scholarship_offered" && (
                           <button
@@ -356,6 +373,50 @@ export default function ResponseTrackerPage() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* ── CLOSED SECTION ────────────────────────────────────────────────────── */}
+      {closed.length > 0 && (
+        <div className="mt-6">
+          <button
+            data-testid="closed-section-toggle"
+            onClick={() => setClosedOpen(o => !o)}
+            className="flex items-center gap-2 text-slate-500 hover:text-slate-700 transition-colors w-full text-left"
+          >
+            <Archive className="w-4 h-4" />
+            <span className="text-xs font-bold uppercase tracking-wider">Closed ({closed.length})</span>
+            <ChevronDown className={`w-4 h-4 transition-transform ${closedOpen ? "rotate-180" : ""}`} />
+          </button>
+          {closedOpen && (
+            <div className="mt-3 space-y-2">
+              {closed
+                .filter(c => !search || c.college?.name?.toLowerCase().includes(search.toLowerCase()))
+                .map(c => (
+                  <div key={c.college_id} data-testid={`closed-card-${c.college_id}`}
+                    className="flex items-center justify-between bg-slate-100 border border-slate-200 rounded-xl px-4 py-3 opacity-60">
+                    <div className="min-w-0 flex items-center gap-3">
+                      <Archive className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                      <div>
+                        <p className="font-semibold text-slate-600 text-sm truncate">{c.college?.name}</p>
+                        <p className="text-xs text-slate-400">{c.college?.division}</p>
+                      </div>
+                    </div>
+                    <button
+                      data-testid={`reopen-btn-${c.college_id}`}
+                      onClick={() => {
+                        apiRequest("put", `/tracked/${c.college_id}`, { reply_outcome: "no_interest" })
+                          .then(() => setColleges(prev => prev.map(x => x.college_id === c.college_id ? { ...x, reply_outcome: "no_interest" } : x)))
+                          .catch(() => {});
+                      }}
+                      className="text-xs text-slate-500 hover:text-slate-800 font-bold transition-colors flex-shrink-0 ml-3"
+                    >
+                      Reopen
+                    </button>
+                  </div>
+                ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -526,6 +587,7 @@ export default function ResponseTrackerPage() {
                     { value: "no_interest",          label: "No Interest",            color: "border-slate-400 bg-slate-100 text-slate-700" },
                     { value: "after_call",           label: "After Call",             color: "border-teal-400 bg-teal-50 text-teal-800" },
                     { value: "after_visit",          label: "After Visit",            color: "border-indigo-400 bg-indigo-50 text-indigo-800" },
+                    { value: "closed",               label: "Closed",                 color: "border-slate-700 bg-slate-800 text-white" },
                   ].map(o => (
                     <button
                       key={o.value}
