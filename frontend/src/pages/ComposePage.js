@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { apiRequest } from "../context/AuthContext";
-import { Wand2, Copy, ArrowLeft, ChevronDown, Trash2, X, Plus, BookMarked, Film, Mail, ExternalLink, CheckCircle } from "lucide-react";
+import { Wand2, Copy, ArrowLeft, ChevronDown, Trash2, X, Plus, BookMarked, Film, Mail, ExternalLink, CheckCircle, MessageSquare } from "lucide-react";
 
 export default function ComposePage() {
   const location = useLocation();
   const navigate = useNavigate();
   const preloaded = location.state;
 
+  const [collegeContext, setCollegeContext] = useState(null);
   const [playerProfile, setPlayerProfile] = useState({});
   const [colleges, setColleges] = useState([]);
   const [selectedCollege, setSelectedCollege] = useState(preloaded?.college || null);
@@ -38,7 +39,7 @@ export default function ComposePage() {
 
   // When college changes, check if initial outreach was already sent
   useEffect(() => {
-    if (!selectedCollege?.id) { setAlreadyContacted(false); return; }
+    if (!selectedCollege?.id) { setAlreadyContacted(false); setCollegeContext(null); return; }
     apiRequest("get", `/emails?college_id=${selectedCollege.id}`)
       .then(r => {
         const sentInitial = (r.data || []).some(
@@ -47,6 +48,10 @@ export default function ComposePage() {
         setAlreadyContacted(sentInitial);
         if (sentInitial) setMessageType("follow_up");
       })
+      .catch(() => {});
+    // Fetch reply context for context-aware drafts
+    apiRequest("get", `/emails/college-context/${selectedCollege.id}`)
+      .then(r => setCollegeContext(r.data))
       .catch(() => {});
   }, [selectedCollege?.id]);
 
@@ -107,7 +112,9 @@ export default function ComposePage() {
         user_email: playerProfile.email || "",
         user_phone: playerProfile.phone || "",
         highlight_tape_url: playerProfile.highlight_tape_url || "",
-        message_type: messageType
+        message_type: messageType,
+        college_reply_outcome: ["initial_outreach","follow_up"].includes(messageType) ? "" : (collegeContext?.reply_outcome || ""),
+        college_reply_body:    ["initial_outreach","follow_up"].includes(messageType) ? "" : (collegeContext?.latest_reply?.body || ""),
       });
       setDraft(data.draft);
       if (!subject) {
@@ -435,6 +442,28 @@ export default function ComposePage() {
                 className="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none resize-none font-mono"
               />
             </div>
+
+            {/* College reply context indicator */}
+            {collegeContext && !["initial_outreach","follow_up"].includes(messageType) && (
+              collegeContext.latest_reply || collegeContext.reply_outcome ? (
+                <div data-testid="reply-context-indicator" className="mb-4 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 flex items-start gap-2.5">
+                  <MessageSquare className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs font-bold text-blue-700">Reply context loaded</p>
+                    <p className="text-xs text-blue-600 mt-0.5">
+                      {collegeContext.latest_reply
+                        ? `AI will respond inline with: "${collegeContext.latest_reply.subject || "their reply"}"`
+                        : `Coach outcome: ${collegeContext.reply_outcome?.replace(/_/g, " ")}`}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="mb-4 bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 flex items-start gap-2.5">
+                  <MessageSquare className="w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-slate-500">No reply on record for this college — AI will draft a general {messageType.replace(/_/g," ")} email.</p>
+                </div>
+              )
+            )}
 
             {/* Stats preview card */}
             {(() => {

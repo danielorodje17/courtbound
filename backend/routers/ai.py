@@ -30,6 +30,26 @@ async def draft_message(data: AIMessageRequest):
     position_line = data.user_position
     if data.user_secondary_position:
         position_line = f"{data.user_position} / {data.user_secondary_position} (versatile, can play both)"
+
+    # Build college reply context for context-aware message types
+    context_types = {"second_follow_up", "reply_to_interest", "reply_to_offer", "after_call", "after_visit", "no_interest"}
+    reply_section = ""
+    if data.message_type in context_types:
+        if data.college_reply_body:
+            reply_section = f"\n\nCOLLEGE'S REPLY (most recent message from the coach — the drafted email MUST directly respond to this):\n\"{data.college_reply_body}\""
+        elif data.college_reply_outcome:
+            outcome_labels = {
+                "interested":         "The coach expressed interest in the player",
+                "call_requested":     "The coach requested a phone/video call",
+                "scholarship_offered":"The college has offered a scholarship",
+                "after_call":         "A call has already taken place between the player and coach",
+                "after_visit":        "The player has visited the campus",
+                "no_interest":        "The college has expressed no interest in recruiting the player",
+                "second_follow_up":   "No response yet after an initial follow-up",
+            }
+            outcome_desc = outcome_labels.get(data.college_reply_outcome, data.college_reply_outcome)
+            reply_section = f"\n\nCOLLEGE STATUS: {outcome_desc}. The drafted email must be fully consistent with this context."
+
     prompt = f"""Write a professional {msg_type_label} email from an international basketball player to a college coach.
 
 Player: {data.user_name}
@@ -39,9 +59,9 @@ Statistics across competition levels:
 Contact: {data.user_email or 'N/A'} | {data.user_phone or 'N/A'}{highlight_section}
 
 College: {data.college_name} ({data.division})
-Coach: {data.coach_name}
+Coach: {data.coach_name}{reply_section}
 
-Write a compelling, personalised email. Reference the specific college and division. If multiple stat contexts are provided (College/School, Academy/Club, Country/National), weave the most impressive numbers naturally into the email — do not list them as a table. If the player has a secondary position, mention their positional versatility. Keep it under 300 words.
+Write a compelling, personalised email. Reference the specific college and division.{' The email must directly acknowledge and respond to the college reply shown above — do not ignore it.' if reply_section else ''} If multiple stat contexts are provided (College/School, Academy/Club, Country/National), weave the most impressive numbers naturally into the email — do not list them as a table. If the player has a secondary position, mention their positional versatility. Keep it under 300 words.
 Format: Subject: [subject line]\\n\\n[email body]"""
     chat = LlmChat(
         api_key=api_key, session_id=str(uuid.uuid4()),

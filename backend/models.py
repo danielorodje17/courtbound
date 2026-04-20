@@ -29,6 +29,8 @@ class AIMessageRequest(BaseModel):
     user_phone: Optional[str] = ""
     highlight_tape_url: Optional[str] = ""
     message_type: str = "initial_outreach"
+    college_reply_outcome: Optional[str] = ""
+    college_reply_body: Optional[str] = ""
 
 
 class AIStrategyRequest(BaseModel):

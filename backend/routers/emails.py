@@ -26,6 +26,25 @@ def _map_type_to_direction(t: str) -> str:
     return "sent"
 
 
+@router.get("/emails/college-context/{college_id}")
+async def college_context(college_id: str, current_user: UserModel = Depends(get_current_user)):
+    """Returns the latest college reply and tracked outcome for the compose page."""
+    tracked = await db.tracked_colleges.find_one(
+        {"user_id": current_user.user_id, "college_id": college_id},
+        {"_id": 0, "reply_outcome": 1, "notes": 1}
+    )
+    received = await db.emails.find(
+        {"user_id": current_user.user_id, "college_id": college_id, "direction": "received"},
+        {"_id": 0, "subject": 1, "body": 1, "coach_name": 1, "created_at": 1}
+    ).sort("created_at", -1).limit(1).to_list(1)
+    latest_reply = received[0] if received else None
+    return {
+        "reply_outcome": tracked.get("reply_outcome", "") if tracked else "",
+        "notes": tracked.get("notes", "") if tracked else "",
+        "latest_reply": latest_reply,
+    }
+
+
 @router.get("/emails")
 async def get_emails(current_user: UserModel = Depends(get_current_user), college_id: str = None):
     query = {"user_id": current_user.user_id}
