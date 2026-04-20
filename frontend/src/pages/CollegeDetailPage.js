@@ -327,7 +327,7 @@ export default function CollegeDetailPage() {
             {college.foreign_friendly && (
               <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-3">
                 <p className="text-xs font-bold text-green-700 uppercase tracking-wide mb-1 flex items-center gap-1.5">
-                  <Globe className="w-3.5 h-3.5" /> Euro Friendly
+                  <Globe className="w-3.5 h-3.5" /> UK Friendly
                 </p>
                 <p className="text-xs text-green-700 leading-relaxed">
                   This program actively recruits European players and has experience supporting international student-athletes with visa processes, SEVIS requirements, and NCAA Eligibility Center registration. A great target for your recruitment campaign.

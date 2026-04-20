@@ -203,7 +203,7 @@ export default function LandingPage() {
             <div className="grid grid-cols-2 gap-4">
               {[
                 { n: "274", label: "US Colleges Tracked" },
-                { n: "43",  label: "Euro-Friendly Programs" },
+                { n: "43",  label: "UK-Friendly Programs" },
                 { n: "7",   label: "AI Email Types" },
                 { n: "5min", label: "To Your First Match" },
               ].map(({ n, label }) => (

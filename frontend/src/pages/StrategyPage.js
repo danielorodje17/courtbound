@@ -132,7 +132,7 @@ export default function StrategyPage() {
             <h3 className="font-bold text-orange-900 text-sm mb-2 uppercase tracking-wide">Quick Tips</h3>
             <ul className="space-y-1.5 text-xs text-orange-800">
               <li>• Contact coaches 12-18 months before intake</li>
-              <li>• UK players should highlight Euro U18 credentials</li>
+              <li>• UK players should highlight U18 credentials</li>
               <li>• Follow up every 2-3 weeks if no response</li>
               <li>• Include highlight tape link in every email</li>
               <li>• Research each program's playing style</li>

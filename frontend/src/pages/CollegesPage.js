@@ -312,7 +312,7 @@ export default function CollegesPage() {
                   )}
                   {college.foreign_friendly && (
                     <span className="text-green-600 font-semibold flex items-center gap-0.5">
-                      <Flag className="w-3 h-3" /> Euro
+                      <Flag className="w-3 h-3" /> UK
                     </span>
                   )}
                 </div>
