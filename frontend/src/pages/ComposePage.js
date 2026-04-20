@@ -37,16 +37,22 @@ export default function ComposePage() {
   // Prior outreach detection
   const [alreadyContacted, setAlreadyContacted] = useState(false);
 
-  // When college changes, check if initial outreach was already sent
+  // When college changes, auto-set the correct next message type based on email history
   useEffect(() => {
     if (!selectedCollege?.id) { setAlreadyContacted(false); setCollegeContext(null); return; }
     apiRequest("get", `/emails?college_id=${selectedCollege.id}`)
       .then(r => {
-        const sentInitial = (r.data || []).some(
-          e => e.direction === "sent" && e.message_type === "initial_outreach"
-        );
-        setAlreadyContacted(sentInitial);
-        if (sentInitial) setMessageType("follow_up");
+        const sent = (r.data || []).filter(e => e.direction === "sent").map(e => e.message_type);
+        const has = (type) => sent.includes(type);
+        if (has("second_follow_up") || has("follow_up")) {
+          setAlreadyContacted(true);
+          setMessageType("second_follow_up");
+        } else if (has("initial_outreach")) {
+          setAlreadyContacted(true);
+          setMessageType("follow_up");
+        } else {
+          setAlreadyContacted(false);
+        }
       })
       .catch(() => {});
     // Fetch reply context for context-aware drafts
