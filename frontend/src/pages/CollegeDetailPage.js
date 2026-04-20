@@ -266,7 +266,7 @@ export default function CollegeDetailPage() {
                 </span>
                 {college.foreign_friendly && (
                   <span className="px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide bg-green-500 text-white">
-                    Euro Friendly
+                    UK Friendly
                   </span>
                 )}
               </div>

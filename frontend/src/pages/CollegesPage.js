@@ -151,7 +151,7 @@ export default function CollegesPage() {
               foreignOnly ? "bg-green-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
             }`}
           >
-            <Flag className="w-3 h-3" /> Euro Friendly Only
+            <Flag className="w-3 h-3" /> UK Friendly Only
           </button>
         </div>
 
@@ -191,7 +191,7 @@ export default function CollegesPage() {
             className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold uppercase tracking-wider border-2 transition-all ${foreignOnly ? "bg-green-500 text-white border-green-500 shadow-sm" : "bg-white text-green-700 border-green-300 hover:bg-green-50"}`}
           >
             <Flag className="w-3.5 h-3.5" />
-            Euro Friendly {foreignOnly && `(${colleges.length})`}
+            UK Friendly {foreignOnly && `(${colleges.length})`}
           </button>
           {(search || division || foreignOnly || state) && (
             <button
@@ -263,7 +263,7 @@ export default function CollegesPage() {
                   </span>
                   {college.foreign_friendly && (
                     <span className="px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide bg-green-500 text-white flex items-center gap-1">
-                      <Flag className="w-2.5 h-2.5" /> Euro Pick
+                      <Flag className="w-2.5 h-2.5" /> UK Pick
                     </span>
                   )}
                 </div>

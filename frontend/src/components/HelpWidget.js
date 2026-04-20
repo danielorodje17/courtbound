@@ -13,7 +13,7 @@ const SECTIONS = [
     items: [
       {
         q: "How do I get started?",
-        a: "1. Go to the Profile page and fill in your player details (position, stats, academic grades, highlight tape URL). This powers the AI email drafts.\n2. Browse colleges on the Colleges page — use filters for Division, Region, or Euro Friendly.\n3. Click 'Add to My List' on any college to start tracking it.\n4. Use Compose to draft and send emails to coaches."
+        a: "1. Go to the Profile page and fill in your player details (position, stats, academic grades, highlight tape URL). This powers the AI email drafts.\n2. Browse colleges on the Colleges page — use filters for Division, Region, or UK Friendly.\n3. Click 'Add to My List' on any college to start tracking it.\n4. Use Compose to draft and send emails to coaches."
       },
       {
         q: "How do I set up my player profile?",
@@ -33,11 +33,11 @@ const SECTIONS = [
     items: [
       {
         q: "How do I find colleges?",
-        a: "Go to the Colleges page. You can:\n• Search by college name\n• Filter by Division (D1, D2, NAIA, JUCO)\n• Toggle the USA / Europe tab to switch regions\n• Turn on 'Euro Friendly Only' to show colleges that actively recruit European players"
+        a: "Go to the Colleges page. You can:\n• Search by college name\n• Filter by Division (D1, D2, NAIA, JUCO)\n• Toggle the USA / Europe tab to switch regions\n• Turn on 'UK Friendly Only' to show colleges that actively recruit UK players"
       },
       {
-        q: "What does 'Euro Friendly' mean?",
-        a: "'Euro Friendly' means the college actively recruits European and international players. They are experienced with the visa process (F-1), NCAA Eligibility Center registration, and supporting international student-athletes. These are your best-fit targets."
+        q: "What does 'UK Friendly' mean?",
+        a: "'UK Friendly' means the college actively recruits UK and international players. They are experienced with the visa process (F-1), NCAA Eligibility Center registration, and supporting international student-athletes. These are your best-fit targets."
       },
       {
         q: "What are the European university programmes?",
@@ -45,7 +45,7 @@ const SECTIONS = [
       },
       {
         q: "How do I compare colleges side by side?",
-        a: "On the Colleges page, click the compare icon (⊕) on up to 3 college cards to select them, then click 'Compare Selected'. This opens a side-by-side table showing Division, acceptance rate, scholarship info, Euro Friendly status, and more."
+        a: "On the Colleges page, click the compare icon (⊕) on up to 3 college cards to select them, then click 'Compare Selected'. This opens a side-by-side table showing Division, acceptance rate, scholarship info, UK Friendly status, and more."
       },
     ]
   },
@@ -133,7 +133,7 @@ const SECTIONS = [
     items: [
       {
         q: "What is the AI Match feature?",
-        a: "AI Match (on the Colleges page) analyses your player profile and scores every college in the database as Excellent Fit, Good Fit, or Possible Fit. It prioritises Euro Friendly colleges that match your division target and academic profile. Run it after completing your profile."
+        a: "AI Match (on the Colleges page) analyses your player profile and scores every college in the database as Excellent Fit, Good Fit, or Possible Fit. It prioritises UK Friendly colleges that match your division target and academic profile. Run it after completing your profile."
       },
       {
         q: "How does the AI email draft work?",

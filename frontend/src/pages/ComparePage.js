@@ -63,9 +63,9 @@ export default function ComparePage() {
     )},
     { key: "location",        label: "Location",        render: c => <span className="text-sm text-slate-700">{c.location || "—"}</span> },
     { key: "conference",      label: "Conference",      render: c => <span className="text-sm text-slate-600">{c.conference || "—"}</span> },
-    { key: "foreign_friendly",label: "Euro Friendly",   render: (c, i) => (
+    { key: "foreign_friendly",label: "UK Friendly",   render: (c, i) => (
       <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${c.foreign_friendly ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-400"}`}>
-        {c.foreign_friendly ? <><Flag className="w-3 h-3" /> Euro Pick</> : "Standard"}
+        {c.foreign_friendly ? <><Flag className="w-3 h-3" /> UK Pick</> : "Standard"}
       </div>
     )},
     { key: "acceptance_rate", label: "Acceptance Rate", render: (c, i) => (
