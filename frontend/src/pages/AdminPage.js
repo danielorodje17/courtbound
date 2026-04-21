@@ -112,6 +112,10 @@ export default function AdminPage() {
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null); // {user_id, name, email}
   const [deleting, setDeleting] = useState(false);
+  const [fixingEmail, setFixingEmail] = useState(null); // report id
+  const [emailFixValue, setEmailFixValue] = useState("");
+  const [emailFixSaving, setEmailFixSaving] = useState(false);
+  const [emailFixDone, setEmailFixDone] = useState(null); // report id
   const adminEmail = localStorage.getItem("cb_admin_email") || "Admin";
 
   const load = useCallback(async () => {
@@ -175,6 +179,30 @@ export default function AdminPage() {
       setConfirmDelete(null);
     } catch {}
     setDeleting(false);
+  };
+
+  const applyEmailFix = async (r) => {
+    if (!emailFixValue.trim()) return;
+    setEmailFixSaving(true);
+    try {
+      await adminReq("patch", `/admin/colleges/${r.college_id}/coach-email`, {
+        coach_name: r.coach_name,
+        new_email: emailFixValue.trim(),
+      });
+      // also auto-mark the report as fixed
+      await adminReq("patch", `/admin/reports/${r.id}`, {
+        status: "fixed",
+        admin_response: `Email updated to ${emailFixValue.trim()}`,
+      });
+      setReports(prev => prev.map(rep => rep.id === r.id
+        ? { ...rep, status: "fixed", admin_response: `Email updated to ${emailFixValue.trim()}` }
+        : rep
+      ));
+      setEmailFixDone(r.id);
+      setFixingEmail(null);
+      setEmailFixValue("");
+    } catch {}
+    setEmailFixSaving(false);
   };
 
   const toggleSort = (key) =>
@@ -607,15 +635,60 @@ export default function AdminPage() {
                       )}
                     </div>
                     {r.status === "pending" || r.status === "investigating" ? (
-                      <button
-                        data-testid={`resolve-btn-${r.id}`}
-                        onClick={() => { setResolvingId(r.id); setResolveForm({ status: "fixed", message: "" }); }}
-                        className="flex-shrink-0 text-xs bg-slate-900 text-white font-bold px-3 py-2 rounded-lg hover:bg-slate-700 transition-all"
-                      >
-                        Respond
-                      </button>
+                      <div className="flex gap-2 flex-shrink-0">
+                        {(r.issue_type?.toLowerCase().includes("email") || r.correct_info?.includes("@")) && (
+                          <button
+                            data-testid={`fix-email-btn-${r.id}`}
+                            onClick={() => { setFixingEmail(r.id); setEmailFixValue(r.correct_info || ""); setResolvingId(null); }}
+                            className="flex-shrink-0 text-xs bg-green-600 text-white font-bold px-3 py-2 rounded-lg hover:bg-green-700 transition-all flex items-center gap-1"
+                          >
+                            Fix Email
+                          </button>
+                        )}
+                        <button
+                          data-testid={`resolve-btn-${r.id}`}
+                          onClick={() => { setResolvingId(r.id); setResolveForm({ status: "fixed", message: "" }); setFixingEmail(null); }}
+                          className="flex-shrink-0 text-xs bg-slate-900 text-white font-bold px-3 py-2 rounded-lg hover:bg-slate-700 transition-all"
+                        >
+                          Respond
+                        </button>
+                      </div>
+                    ) : emailFixDone === r.id ? (
+                      <span className="text-xs text-green-600 font-bold">Email Fixed</span>
                     ) : null}
                   </div>
+
+                  {/* Inline fix-email form */}
+                  {fixingEmail === r.id && (
+                    <div className="border-t border-green-100 p-5 bg-green-50 space-y-3">
+                      <p className="text-xs font-bold text-green-800 uppercase tracking-wide">
+                        Update coach email — {r.coach_name || r.college_name}
+                      </p>
+                      <div className="flex gap-2">
+                        <input
+                          data-testid={`fix-email-input-${r.id}`}
+                          type="email"
+                          value={emailFixValue}
+                          onChange={e => setEmailFixValue(e.target.value)}
+                          placeholder="Enter correct email address..."
+                          className="flex-1 border border-green-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none bg-white"
+                        />
+                        <button
+                          data-testid={`confirm-fix-email-${r.id}`}
+                          onClick={() => applyEmailFix(r)}
+                          disabled={emailFixSaving || !emailFixValue.trim()}
+                          className="bg-green-600 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-green-700 transition-all disabled:opacity-60"
+                        >
+                          {emailFixSaving ? "Saving..." : "Apply Fix"}
+                        </button>
+                        <button onClick={() => setFixingEmail(null)}
+                          className="text-slate-500 text-xs font-bold px-3 py-2 rounded-lg hover:bg-slate-100 transition-all">
+                          Cancel
+                        </button>
+                      </div>
+                      <p className="text-xs text-green-700">This updates the email in the database immediately and marks the report as fixed.</p>
+                    </div>
+                  )}
 
                   {/* Inline response form */}
                   {resolvingId === r.id && (

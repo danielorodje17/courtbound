@@ -19,10 +19,12 @@ function ReportModal({ college, coach, onClose }) {
   const [notes, setNotes]           = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone]             = useState(false);
+  const [error, setError]           = useState("");
 
   const submit = async () => {
     if (!issueType) return;
     setSubmitting(true);
+    setError("");
     try {
       await apiRequest("post", "/reports/college", {
         college_id:   college.id || college._id || "",
@@ -33,7 +35,10 @@ function ReportModal({ college, coach, onClose }) {
         notes,
       });
       setDone(true);
-    } catch {}
+    } catch (e) {
+      const msg = e?.response?.data?.detail || "Submission failed — please try again.";
+      setError(msg);
+    }
     setSubmitting(false);
   };
 
@@ -82,6 +87,11 @@ function ReportModal({ college, coach, onClose }) {
                 className="w-full bg-orange-500 hover:bg-orange-600 text-white font-black uppercase tracking-wider rounded-xl py-3 text-sm transition-all disabled:opacity-50">
                 {submitting ? "Submitting..." : "Submit Report"}
               </button>
+              {error && (
+                <p className="text-xs text-red-600 font-semibold text-center bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  {error}
+                </p>
+              )}
             </>
           )}
         </div>

@@ -295,8 +295,30 @@ async def update_report(report_id: str, body: dict, admin=Depends(require_admin_
     return {"ok": True, "report_id": report_id, "status": status}
 
 
-# ── App Settings ─────────────────────────────────────────────────────────────
+# ── College Coach Email Fix ───────────────────────────────────────────────────
 
+@router.patch("/colleges/{college_id}/coach-email")
+async def fix_coach_email(college_id: str, body: dict, admin=Depends(require_admin_token)):
+    """Admin: directly update a coach's email address in the database."""
+    from bson import ObjectId
+    coach_name = (body.get("coach_name") or "").strip()
+    new_email  = (body.get("new_email") or "").strip()
+    if not coach_name or not new_email:
+        raise HTTPException(status_code=400, detail="coach_name and new_email are required")
+    try:
+        oid = ObjectId(college_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid college_id")
+    result = await db.colleges.update_one(
+        {"_id": oid, "coaches.name": coach_name},
+        {"$set": {"coaches.$.email": new_email}},
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="College or coach not found")
+    return {"ok": True, "college_id": college_id, "coach_name": coach_name, "new_email": new_email}
+
+
+# ── App Settings ─────────────────────────────────────────────────────────────
 @router.get("/settings")
 async def get_settings(admin=Depends(require_admin_token)):
     doc = await db.app_settings.find_one({"key": "global"}, {"_id": 0})
