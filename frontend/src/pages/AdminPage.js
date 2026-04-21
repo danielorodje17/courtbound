@@ -123,6 +123,7 @@ export default function AdminPage() {
   const [contactFilter, setContactFilter] = useState("all");
   const [inlineEdit, setInlineEdit] = useState(null);
   const [inlineValue, setInlineValue] = useState("");
+  const [inlineNameValue, setInlineNameValue] = useState("");
   const [inlineSaving, setInlineSaving] = useState(false);
   const [inlineDone, setInlineDone] = useState({}); // {`${college_id}-${coach_name}`: true}
   const adminEmail = localStorage.getItem("cb_admin_email") || "Admin";
@@ -200,22 +201,27 @@ export default function AdminPage() {
   };
 
   const saveInlineEmail = async () => {
-    if (!inlineEdit || !inlineValue.trim()) return;
+    if (!inlineEdit) return;
+    if (!inlineValue.trim() && !inlineNameValue.trim()) return;
     setInlineSaving(true);
     try {
       await adminReq("patch", `/admin/colleges/${inlineEdit.college_id}/coach-email`, {
-        coach_name: inlineEdit.coach_name,
-        new_email: inlineValue.trim(),
+        coach_name:     inlineEdit.coach_name,
+        new_coach_name: inlineNameValue.trim() || undefined,
+        new_email:      inlineValue.trim() || undefined,
       });
       const key = `${inlineEdit.college_id}-${inlineEdit.coach_name}`;
+      const finalName  = inlineNameValue.trim() || inlineEdit.coach_name;
+      const finalEmail = inlineValue.trim() || inlineEdit.current_email;
       setContacts(prev => prev.map(c =>
         c.college_id === inlineEdit.college_id && c.coach_name === inlineEdit.coach_name
-          ? { ...c, email: inlineValue.trim(), suspicious: false }
+          ? { ...c, coach_name: finalName, email: finalEmail, suspicious: false }
           : c
       ));
       setInlineDone(prev => ({ ...prev, [key]: true }));
       setInlineEdit(null);
       setInlineValue("");
+      setInlineNameValue("");
     } catch {}
     setInlineSaving(false);
   };
@@ -842,21 +848,33 @@ export default function AdminPage() {
                           <td className="px-4 py-3 text-xs text-slate-700">{c.coach_name}<br/><span className="text-slate-400">{c.coach_title}</span></td>
                           <td className="px-4 py-3">
                             {isEditing ? (
-                              <div className="flex items-center gap-2">
+                              <div className="flex flex-col gap-2">
                                 <input
-                                  data-testid={`inline-email-input-${i}`}
-                                  type="email"
-                                  value={inlineValue}
-                                  onChange={e => setInlineValue(e.target.value)}
-                                  className="border border-orange-300 rounded-lg px-2 py-1 text-xs w-52 focus:ring-2 focus:ring-orange-400 outline-none"
-                                  autoFocus
-                                  onKeyDown={e => e.key === "Enter" && saveInlineEmail()}
+                                  data-testid={`inline-name-input-${i}`}
+                                  type="text"
+                                  value={inlineNameValue}
+                                  onChange={e => setInlineNameValue(e.target.value)}
+                                  placeholder="Coach name..."
+                                  className="border border-slate-300 rounded-lg px-2 py-1 text-xs w-52 focus:ring-2 focus:ring-orange-400 outline-none"
                                 />
-                                <button onClick={saveInlineEmail} disabled={inlineSaving}
-                                  className="bg-green-600 text-white text-xs font-bold px-2 py-1 rounded hover:bg-green-700 disabled:opacity-60">
-                                  {inlineSaving ? "..." : "Save"}
-                                </button>
-                                <button onClick={() => setInlineEdit(null)} className="text-slate-400 text-xs hover:text-slate-600">✕</button>
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    data-testid={`inline-email-input-${i}`}
+                                    type="email"
+                                    value={inlineValue}
+                                    onChange={e => setInlineValue(e.target.value)}
+                                    placeholder="Email address..."
+                                    className="border border-orange-300 rounded-lg px-2 py-1 text-xs w-52 focus:ring-2 focus:ring-orange-400 outline-none"
+                                    autoFocus
+                                    onKeyDown={e => e.key === "Enter" && saveInlineEmail()}
+                                  />
+                                  <button onClick={saveInlineEmail} disabled={inlineSaving}
+                                    className="bg-green-600 text-white text-xs font-bold px-2 py-1 rounded hover:bg-green-700 disabled:opacity-60">
+                                    {inlineSaving ? "..." : "Save"}
+                                  </button>
+                                  <button onClick={() => { setInlineEdit(null); setInlineNameValue(""); setInlineValue(""); }}
+                                    className="text-slate-400 text-xs hover:text-slate-600">✕</button>
+                                </div>
                               </div>
                             ) : (
                               <div className="flex items-center gap-2">
@@ -876,7 +894,11 @@ export default function AdminPage() {
                             {!isEditing && (
                               <button
                                 data-testid={`edit-contact-${i}`}
-                                onClick={() => { setInlineEdit({ college_id: c.college_id, coach_name: c.coach_name }); setInlineValue(c.email); }}
+                                onClick={() => {
+                                  setInlineEdit({ college_id: c.college_id, coach_name: c.coach_name, current_email: c.email });
+                                  setInlineNameValue(c.coach_name);
+                                  setInlineValue(c.email);
+                                }}
                                 className="text-xs text-orange-600 hover:text-orange-800 font-bold transition-colors"
                               >
                                 Edit

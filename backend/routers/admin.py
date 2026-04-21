@@ -299,18 +299,21 @@ async def update_report(report_id: str, body: dict, admin=Depends(require_admin_
 
 @router.patch("/colleges/{college_id}/coach-email")
 async def fix_coach_email(college_id: str, body: dict, admin=Depends(require_admin_token)):
-    """Admin: update a coach's email and delete all sent emails to the old address."""
+    """Admin: update a coach's name and/or email, and delete all sent emails to the old address."""
     from bson import ObjectId
-    coach_name = (body.get("coach_name") or "").strip()
-    new_email  = (body.get("new_email") or "").strip()
-    if not coach_name or not new_email:
-        raise HTTPException(status_code=400, detail="coach_name and new_email are required")
+    coach_name     = (body.get("coach_name") or "").strip()
+    new_coach_name = (body.get("new_coach_name") or "").strip()
+    new_email      = (body.get("new_email") or "").strip()
+    if not coach_name:
+        raise HTTPException(status_code=400, detail="coach_name is required")
+    if not new_coach_name and not new_email:
+        raise HTTPException(status_code=400, detail="Provide new_coach_name or new_email")
     try:
         oid = ObjectId(college_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid college_id")
 
-    # Find the current (bounced) email before overwriting
+    # Find current coach data before overwriting
     college = await db.colleges.find_one(
         {"_id": oid, "coaches.name": coach_name},
         {"coaches.$": 1}
@@ -320,27 +323,37 @@ async def fix_coach_email(college_id: str, body: dict, admin=Depends(require_adm
 
     old_email = college["coaches"][0].get("email", "") if college.get("coaches") else ""
 
-    # Update the coach's email
+    # Build the update fields
+    set_fields = {}
+    if new_email:
+        set_fields["coaches.$.email"] = new_email
+    if new_coach_name:
+        set_fields["coaches.$.name"] = new_coach_name
+
     result = await db.colleges.update_one(
         {"_id": oid, "coaches.name": coach_name},
-        {"$set": {"coaches.$.email": new_email}},
+        {"$set": set_fields},
     )
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="College or coach not found")
 
-    # Delete all sent emails that used the old (bounced) email address
-    deleted = await db.emails.delete_many({
-        "college_id": college_id,
-        "coach_email": old_email,
-    })
+    # Delete sent emails that used the old (bounced) email address
+    deleted = 0
+    if new_email and old_email and old_email != new_email:
+        res = await db.emails.delete_many({
+            "college_id": college_id,
+            "coach_email": old_email,
+        })
+        deleted = res.deleted_count
 
     return {
         "ok": True,
         "college_id": college_id,
-        "coach_name": coach_name,
+        "old_coach_name": coach_name,
+        "new_coach_name": new_coach_name or coach_name,
         "old_email": old_email,
-        "new_email": new_email,
-        "emails_deleted": deleted.deleted_count,
+        "new_email": new_email or old_email,
+        "emails_deleted": deleted,
     }
 
 
