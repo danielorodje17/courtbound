@@ -9,6 +9,7 @@ import {
   Users, Mail, BookMarked, TrendingUp, RefreshCw, LogOut,
   Star, CircleDot, ArrowUpRight, ChevronUp, ChevronDown, ShieldCheck,
   Flag, Clock, CheckCircle2, AlertTriangle, XCircle, ChevronRight, Settings, Globe, Trash2,
+  Download, Upload,
 } from "lucide-react";
 
 const API = process.env.REACT_APP_BACKEND_URL;
@@ -125,7 +126,9 @@ export default function AdminPage() {
   const [inlineValue, setInlineValue] = useState("");
   const [inlineNameValue, setInlineNameValue] = useState("");
   const [inlineSaving, setInlineSaving] = useState(false);
-  const [inlineDone, setInlineDone] = useState({}); // {`${college_id}-${coach_name}`: true}
+  const [inlineDone, setInlineDone] = useState({});
+  const [importResult, setImportResult] = useState(null);
+  const [importing, setImporting] = useState(false); // {`${college_id}-${coach_name}`: true}
   const adminEmail = localStorage.getItem("cb_admin_email") || "Admin";
 
   const load = useCallback(async () => {
@@ -191,8 +194,51 @@ export default function AdminPage() {
     setDeleting(false);
   };
 
-  const loadContacts = async () => {
-    if (contactsLoaded) return;
+  const exportContacts = async (filterType) => {
+    const token = localStorage.getItem("cb_admin_token");
+    const API = process.env.REACT_APP_BACKEND_URL;
+    const res = await fetch(`${API}/api/admin/colleges-contacts/export?filter=${filterType}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `courtbound_contacts_${filterType}_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    setImportResult(null);
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const token = localStorage.getItem("cb_admin_token");
+      const API = process.env.REACT_APP_BACKEND_URL;
+      const res = await fetch(`${API}/api/admin/colleges-contacts/import`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      const data = await res.json();
+      setImportResult(data);
+      if (data.updated > 0) {
+        // Refresh the contacts list
+        setContactsLoaded(false);
+        await loadContacts();
+      }
+    } catch {
+      setImportResult({ ok: false, error: "Upload failed. Check file format." });
+    }
+    setImporting(false);
+    e.target.value = "";
+  };
+
+  const loadContacts = async () => {    if (contactsLoaded) return;
     try {
       const res = await adminReq("get", "/admin/colleges-contacts");
       setContacts(res.data);
@@ -803,6 +849,50 @@ export default function AdminPage() {
                 <span className="text-green-600 ml-1">verified-looking</span>
               </div>
             </div>
+
+            {/* Export / Import toolbar */}
+            <div className="flex items-center gap-2 mb-4 flex-wrap">
+              <button
+                data-testid="export-suspicious-btn"
+                onClick={() => exportContacts("suspicious")}
+                className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold uppercase tracking-wide rounded-lg transition-all"
+              >
+                <Download className="w-3.5 h-3.5" /> Export Suspicious ({suspiciousCount})
+              </button>
+              <button
+                data-testid="export-all-btn"
+                onClick={() => exportContacts("all")}
+                className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-900 text-white text-xs font-bold uppercase tracking-wide rounded-lg transition-all"
+              >
+                <Download className="w-3.5 h-3.5" /> Export All
+              </button>
+              <label className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-xs font-bold uppercase tracking-wide rounded-lg transition-all cursor-pointer">
+                <Upload className="w-3.5 h-3.5" />
+                {importing ? "Importing..." : "Import CSV"}
+                <input type="file" accept=".csv" className="hidden" onChange={handleImport} disabled={importing} />
+              </label>
+              <span className="text-xs text-slate-400">Edit the exported CSV, then import to bulk-update</span>
+            </div>
+
+            {/* Import result banner */}
+            {importResult && (
+              <div data-testid="import-result" className={`mb-4 px-4 py-3 rounded-xl text-sm font-semibold border flex flex-wrap items-center gap-4 ${importResult.ok ? "bg-green-50 border-green-200 text-green-800" : "bg-red-50 border-red-200 text-red-800"}`}>
+                {importResult.ok ? (
+                  <>
+                    <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />
+                    <span>Import complete — <strong>{importResult.updated}</strong> updated, <strong>{importResult.skipped}</strong> skipped, <strong>{importResult.emails_deleted}</strong> bounced email{importResult.emails_deleted !== 1 ? "s" : ""} deleted</span>
+                    {importResult.errors?.length > 0 && (
+                      <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                        {importResult.errors.length} row error(s): {importResult.errors[0]}
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <span>{importResult.error || "Import failed"}</span>
+                )}
+                <button onClick={() => setImportResult(null)} className="ml-auto text-slate-400 hover:text-slate-600 text-xs">Dismiss</button>
+              </div>
+            )}
 
             {/* Filters */}
             <div className="flex gap-2 mb-4 flex-wrap items-center">

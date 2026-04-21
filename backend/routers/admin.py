@@ -1,6 +1,9 @@
 import os
+import io
+import csv
 import secrets
-from fastapi import APIRouter, Header, HTTPException, Depends
+from fastapi import APIRouter, Header, HTTPException, Depends, UploadFile, File
+from fastapi.responses import StreamingResponse
 from typing import Optional
 from database import db
 from datetime import datetime, timezone, timedelta
@@ -387,7 +390,127 @@ async def admin_colleges_contacts(admin=Depends(require_admin_token)):
     return result
 
 
-# ── App Settings ─────────────────────────────────────────────────────────────@router.get("/settings")
+@router.get("/colleges-contacts/export")
+async def export_contacts(filter: Optional[str] = "suspicious", admin=Depends(require_admin_token)):
+    """Export college coach contacts as CSV. filter=suspicious|all"""
+    colleges = await db.colleges.find(
+        {}, {"_id": 1, "name": 1, "division": 1, "coaches": 1}
+    ).sort("name", 1).to_list(length=None)
+
+    suspicious_patterns = ["athletics@", "info@", "admin@", "basketball@",
+                           "sports@", "recruiting@", "coaches@", "contact@"]
+
+    def is_suspicious(email):
+        return not email or any(email.lower().startswith(p) for p in suspicious_patterns)
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "college_id", "college_name", "division",
+        "coach_name", "coach_title", "email", "phone", "suspicious"
+    ])
+    for c in colleges:
+        for coach in (c.get("coaches") or []):
+            email = coach.get("email", "")
+            susp  = is_suspicious(email)
+            if filter == "suspicious" and not susp:
+                continue
+            writer.writerow([
+                str(c["_id"]),
+                c.get("name", ""),
+                c.get("division", ""),
+                coach.get("name", ""),
+                coach.get("title", ""),
+                email,
+                coach.get("phone", ""),
+                "yes" if susp else "no",
+            ])
+
+    output.seek(0)
+    filename = f"courtbound_contacts_{filter}_{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@router.post("/colleges-contacts/import")
+async def import_contacts(file: UploadFile = File(...), admin=Depends(require_admin_token)):
+    """Import updated coach contacts from CSV. Matches by college_id + coach_name."""
+    from bson import ObjectId
+
+    content = await file.read()
+    try:
+        text = content.decode("utf-8-sig")
+    except Exception:
+        raise HTTPException(status_code=400, detail="Could not decode file — use UTF-8 CSV")
+
+    reader = csv.DictReader(io.StringIO(text))
+    if not {"college_id", "coach_name", "email"}.issubset(set(reader.fieldnames or [])):
+        raise HTTPException(status_code=400, detail="CSV must have columns: college_id, coach_name, email")
+
+    updated = 0
+    skipped = 0
+    emails_deleted = 0
+    errors = []
+
+    for row in reader:
+        college_id = (row.get("college_id") or "").strip()
+        coach_name = (row.get("coach_name") or "").strip()
+        new_email  = (row.get("email") or "").strip()
+        new_title  = (row.get("coach_title") or "").strip()
+
+        if not college_id or not coach_name:
+            skipped += 1
+            continue
+        try:
+            oid = ObjectId(college_id)
+        except Exception:
+            errors.append(f"Invalid college_id: {college_id}")
+            skipped += 1
+            continue
+
+        college = await db.colleges.find_one(
+            {"_id": oid, "coaches.name": coach_name}, {"coaches.$": 1}
+        )
+        if not college or not college.get("coaches"):
+            errors.append(f"Not found: {coach_name} @ {college_id}")
+            skipped += 1
+            continue
+
+        old_email = college["coaches"][0].get("email", "")
+        set_fields = {}
+        if new_email:
+            set_fields["coaches.$.email"] = new_email
+        if new_title:
+            set_fields["coaches.$.title"] = new_title
+        if not set_fields:
+            skipped += 1
+            continue
+
+        await db.colleges.update_one(
+            {"_id": oid, "coaches.name": coach_name},
+            {"$set": set_fields},
+        )
+        updated += 1
+
+        if new_email and old_email and old_email != new_email:
+            res = await db.emails.delete_many({"college_id": college_id, "coach_email": old_email})
+            emails_deleted += res.deleted_count
+
+    return {
+        "ok": True,
+        "updated": updated,
+        "skipped": skipped,
+        "emails_deleted": emails_deleted,
+        "errors": errors[:20],
+    }
+
+
+# ── App Settings ─────────────────────────────────────────────────────────────
+
+@router.get("/settings")
 async def get_settings(admin=Depends(require_admin_token)):
     doc = await db.app_settings.find_one({"key": "global"}, {"_id": 0})
     if not doc:
