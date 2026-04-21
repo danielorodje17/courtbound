@@ -116,6 +116,15 @@ export default function AdminPage() {
   const [emailFixValue, setEmailFixValue] = useState("");
   const [emailFixSaving, setEmailFixSaving] = useState(false);
   const [emailFixDone, setEmailFixDone] = useState(null); // report id
+  // Colleges contacts tab
+  const [contacts, setContacts] = useState([]);
+  const [contactsLoaded, setContactsLoaded] = useState(false);
+  const [contactSearch, setContactSearch] = useState("");
+  const [contactFilter, setContactFilter] = useState("all");
+  const [inlineEdit, setInlineEdit] = useState(null);
+  const [inlineValue, setInlineValue] = useState("");
+  const [inlineSaving, setInlineSaving] = useState(false);
+  const [inlineDone, setInlineDone] = useState({}); // {`${college_id}-${coach_name}`: true}
   const adminEmail = localStorage.getItem("cb_admin_email") || "Admin";
 
   const load = useCallback(async () => {
@@ -181,8 +190,37 @@ export default function AdminPage() {
     setDeleting(false);
   };
 
-  const applyEmailFix = async (r) => {
-    if (!emailFixValue.trim()) return;
+  const loadContacts = async () => {
+    if (contactsLoaded) return;
+    try {
+      const res = await adminReq("get", "/admin/colleges-contacts");
+      setContacts(res.data);
+      setContactsLoaded(true);
+    } catch {}
+  };
+
+  const saveInlineEmail = async () => {
+    if (!inlineEdit || !inlineValue.trim()) return;
+    setInlineSaving(true);
+    try {
+      await adminReq("patch", `/admin/colleges/${inlineEdit.college_id}/coach-email`, {
+        coach_name: inlineEdit.coach_name,
+        new_email: inlineValue.trim(),
+      });
+      const key = `${inlineEdit.college_id}-${inlineEdit.coach_name}`;
+      setContacts(prev => prev.map(c =>
+        c.college_id === inlineEdit.college_id && c.coach_name === inlineEdit.coach_name
+          ? { ...c, email: inlineValue.trim(), suspicious: false }
+          : c
+      ));
+      setInlineDone(prev => ({ ...prev, [key]: true }));
+      setInlineEdit(null);
+      setInlineValue("");
+    } catch {}
+    setInlineSaving(false);
+  };
+
+  const applyEmailFix = async (r) => {    if (!emailFixValue.trim()) return;
     setEmailFixSaving(true);
     try {
       await adminReq("patch", `/admin/colleges/${r.college_id}/coach-email`, {
@@ -275,9 +313,10 @@ export default function AdminPage() {
           { id: "overview",  label: "Overview" },
           { id: "users",     label: `Users (${users.length})` },
           { id: "reports",   label: `Reports${reports.filter(r => r.status === "pending").length > 0 ? ` (${reports.filter(r => r.status === "pending").length})` : ""}` },
+          { id: "colleges",  label: "Colleges" },
           { id: "settings",  label: "Settings" },
         ].map(t => (
-          <button key={t.id} onClick={() => setActiveTab(t.id)}
+          <button key={t.id} onClick={() => { setActiveTab(t.id); if (t.id === "colleges") loadContacts(); }}
             className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${activeTab === t.id ? "bg-slate-900 text-white" : "text-slate-500 hover:text-slate-700"}`}>
             {t.label}
           </button>
@@ -724,6 +763,133 @@ export default function AdminPage() {
                 </div>
               );
             })}
+          </div>
+        );
+      })()}
+
+      {/* ── COLLEGES TAB ─────────────────────────────────────── */}
+      {activeTab === "colleges" && (() => {
+        const suspiciousPatterns = ["athletics@","info@","admin@","basketball@","sports@","recruiting@","coaches@","contact@"];
+        const isSuspicious = (email) => !email || suspiciousPatterns.some(p => email.toLowerCase().startsWith(p));
+
+        const filtered = contacts.filter(c => {
+          const matchSearch = !contactSearch || c.college_name.toLowerCase().includes(contactSearch.toLowerCase()) || c.coach_name.toLowerCase().includes(contactSearch.toLowerCase()) || c.email.toLowerCase().includes(contactSearch.toLowerCase());
+          const matchFilter = contactFilter === "all" || (contactFilter === "suspicious" && isSuspicious(c.email)) || (contactFilter === "ok" && !isSuspicious(c.email));
+          return matchSearch && matchFilter;
+        });
+
+        const suspiciousCount = contacts.filter(c => isSuspicious(c.email)).length;
+
+        return (
+          <div>
+            {/* Stats bar */}
+            <div className="flex items-center gap-4 mb-4 flex-wrap">
+              <div className="bg-white border border-slate-200 rounded-lg px-4 py-2 text-sm">
+                <span className="font-black text-slate-900">{contacts.length}</span>
+                <span className="text-slate-500 ml-1">total coaches</span>
+              </div>
+              <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 text-sm">
+                <span className="font-black text-amber-700">{suspiciousCount}</span>
+                <span className="text-amber-600 ml-1">suspicious emails</span>
+              </div>
+              <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2 text-sm">
+                <span className="font-black text-green-700">{contacts.length - suspiciousCount}</span>
+                <span className="text-green-600 ml-1">verified-looking</span>
+              </div>
+            </div>
+
+            {/* Filters */}
+            <div className="flex gap-2 mb-4 flex-wrap items-center">
+              <input
+                data-testid="contact-search"
+                value={contactSearch}
+                onChange={e => setContactSearch(e.target.value)}
+                placeholder="Search college, coach or email..."
+                className="border border-slate-200 rounded-lg px-3 py-2 text-sm w-64 focus:ring-2 focus:ring-orange-400 outline-none bg-white"
+              />
+              {["all","suspicious","ok"].map(f => (
+                <button key={f} onClick={() => setContactFilter(f)}
+                  className={`px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${contactFilter === f ? "bg-slate-900 text-white" : "bg-white border border-slate-200 text-slate-500 hover:text-slate-800"}`}>
+                  {f === "suspicious" ? `Suspicious (${suspiciousCount})` : f === "ok" ? "OK" : "All"}
+                </button>
+              ))}
+              <span className="text-xs text-slate-400 ml-2">Showing {filtered.length} records</span>
+            </div>
+
+            {/* Table */}
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200">
+                      <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">College</th>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Division</th>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Coach</th>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Email</th>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filtered.map((c, i) => {
+                      const key = `${c.college_id}-${c.coach_name}`;
+                      const suspicious = isSuspicious(c.email);
+                      const done = inlineDone[key];
+                      const isEditing = inlineEdit?.college_id === c.college_id && inlineEdit?.coach_name === c.coach_name;
+                      return (
+                        <tr key={i} className={suspicious && !done ? "bg-amber-50" : ""}>
+                          <td className="px-4 py-3 font-semibold text-slate-800 text-xs max-w-[180px] truncate">{c.college_name}</td>
+                          <td className="px-4 py-3 text-xs text-slate-500">{c.division}</td>
+                          <td className="px-4 py-3 text-xs text-slate-700">{c.coach_name}<br/><span className="text-slate-400">{c.coach_title}</span></td>
+                          <td className="px-4 py-3">
+                            {isEditing ? (
+                              <div className="flex items-center gap-2">
+                                <input
+                                  data-testid={`inline-email-input-${i}`}
+                                  type="email"
+                                  value={inlineValue}
+                                  onChange={e => setInlineValue(e.target.value)}
+                                  className="border border-orange-300 rounded-lg px-2 py-1 text-xs w-52 focus:ring-2 focus:ring-orange-400 outline-none"
+                                  autoFocus
+                                  onKeyDown={e => e.key === "Enter" && saveInlineEmail()}
+                                />
+                                <button onClick={saveInlineEmail} disabled={inlineSaving}
+                                  className="bg-green-600 text-white text-xs font-bold px-2 py-1 rounded hover:bg-green-700 disabled:opacity-60">
+                                  {inlineSaving ? "..." : "Save"}
+                                </button>
+                                <button onClick={() => setInlineEdit(null)} className="text-slate-400 text-xs hover:text-slate-600">✕</button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                {suspicious && !done ? (
+                                  <span className="inline-flex items-center gap-1 text-xs text-amber-700 font-semibold">
+                                    <AlertTriangle className="w-3 h-3" /> {c.email || "No email"}
+                                  </span>
+                                ) : (
+                                  <span className={`text-xs font-mono ${done ? "text-green-600 font-semibold" : "text-slate-600"}`}>
+                                    {done ? "✓ " : ""}{c.email || "—"}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            {!isEditing && (
+                              <button
+                                data-testid={`edit-contact-${i}`}
+                                onClick={() => { setInlineEdit({ college_id: c.college_id, coach_name: c.coach_name }); setInlineValue(c.email); }}
+                                className="text-xs text-orange-600 hover:text-orange-800 font-bold transition-colors"
+                              >
+                                Edit
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         );
       })()}

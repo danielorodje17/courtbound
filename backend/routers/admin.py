@@ -344,8 +344,37 @@ async def fix_coach_email(college_id: str, body: dict, admin=Depends(require_adm
     }
 
 
-# ── App Settings ─────────────────────────────────────────────────────────────
-@router.get("/settings")
+@router.get("/colleges-contacts")
+async def admin_colleges_contacts(admin=Depends(require_admin_token)):
+    """Return all colleges with their coach contact info for admin review."""
+    colleges = await db.colleges.find(
+        {},
+        {"_id": 1, "name": 1, "division": 1, "conference": 1, "region": 1, "coaches": 1}
+    ).sort("name", 1).to_list(length=None)
+
+    result = []
+    for c in colleges:
+        cid = str(c["_id"])
+        for coach in (c.get("coaches") or []):
+            email = coach.get("email", "")
+            # Flag suspicious emails
+            suspicious_patterns = ["athletics@", "info@", "admin@", "basketball@",
+                                   "sports@", "recruiting@", "coaches@", "contact@"]
+            is_suspicious = any(email.lower().startswith(p) for p in suspicious_patterns) or not email
+            result.append({
+                "college_id": cid,
+                "college_name": c.get("name", ""),
+                "division": c.get("division", ""),
+                "coach_name": coach.get("name", ""),
+                "coach_title": coach.get("title", ""),
+                "email": email,
+                "phone": coach.get("phone", ""),
+                "suspicious": is_suspicious,
+            })
+    return result
+
+
+# ── App Settings ─────────────────────────────────────────────────────────────@router.get("/settings")
 async def get_settings(admin=Depends(require_admin_token)):
     doc = await db.app_settings.find_one({"key": "global"}, {"_id": 0})
     if not doc:
