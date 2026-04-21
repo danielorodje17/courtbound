@@ -276,3 +276,27 @@ async def update_report(report_id: str, body: dict, admin=Depends(require_admin_
             del notif["_id"]
     return {"ok": True, "report_id": report_id, "status": status}
 
+
+# ── App Settings ─────────────────────────────────────────────────────────────
+
+@router.get("/settings")
+async def get_settings(admin=Depends(require_admin_token)):
+    doc = await db.app_settings.find_one({"key": "global"}, {"_id": 0})
+    if not doc:
+        return {"show_european": True}
+    return {"show_european": doc.get("show_european", True)}
+
+
+@router.patch("/settings")
+async def update_settings(body: dict, admin=Depends(require_admin_token)):
+    updates = {}
+    if "show_european" in body:
+        updates["show_european"] = bool(body["show_european"])
+    if not updates:
+        raise HTTPException(status_code=400, detail="No valid settings provided")
+    await db.app_settings.update_one(
+        {"key": "global"},
+        {"$set": updates},
+        upsert=True,
+    )
+    return {"ok": True, **updates}

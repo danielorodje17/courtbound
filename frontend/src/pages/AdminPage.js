@@ -8,7 +8,7 @@ import {
 import {
   Users, Mail, BookMarked, TrendingUp, RefreshCw, LogOut,
   Star, CircleDot, ArrowUpRight, ChevronUp, ChevronDown, ShieldCheck,
-  Flag, Clock, CheckCircle2, AlertTriangle, XCircle, ChevronRight,
+  Flag, Clock, CheckCircle2, AlertTriangle, XCircle, ChevronRight, Settings, Globe,
 } from "lucide-react";
 
 const API = process.env.REACT_APP_BACKEND_URL;
@@ -107,19 +107,24 @@ export default function AdminPage() {
   const [refreshedAt, setRefreshedAt] = useState(null);
   const [resolvingId, setResolvingId] = useState(null);
   const [resolveForm, setResolveForm] = useState({ status: "fixed", message: "" });
+  const [appSettings, setAppSettings] = useState({ show_european: true });
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [settingsSaved, setSettingsSaved] = useState(false);
   const adminEmail = localStorage.getItem("cb_admin_email") || "Admin";
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [sRes, uRes, rRes] = await Promise.all([
+      const [sRes, uRes, rRes, setRes] = await Promise.all([
         adminReq("get", "/admin/stats"),
         adminReq("get", "/admin/users"),
         adminReq("get", "/admin/reports"),
+        adminReq("get", "/admin/settings"),
       ]);
       setStats(sRes.data);
       setUsers(uRes.data);
       setReports(rRes.data);
+      setAppSettings(setRes.data);
       setRefreshedAt(new Date());
     } catch (e) {
       if (e?.response?.status === 401) {
@@ -147,6 +152,17 @@ export default function AdminPage() {
 
   const updateTier = (userId, tier) =>
     setUsers(prev => prev.map(u => u.user_id === userId ? { ...u, subscription_tier: tier } : u));
+
+  const saveSettings = async (newVal) => {
+    setSavingSettings(true);
+    try {
+      await adminReq("patch", "/admin/settings", { show_european: newVal });
+      setAppSettings(prev => ({ ...prev, show_european: newVal }));
+      setSettingsSaved(true);
+      setTimeout(() => setSettingsSaved(false), 3000);
+    } catch {}
+    setSavingSettings(false);
+  };
 
   const toggleSort = (key) =>
     setSort(s => s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "desc" });
@@ -215,9 +231,10 @@ export default function AdminPage() {
       {/* Tabs */}
       <div className="flex gap-1 mb-6 bg-white border border-slate-200 rounded-xl p-1 w-fit">
         {[
-          { id: "overview", label: "Overview" },
-          { id: "users",    label: `Users (${users.length})` },
-          { id: "reports",  label: `Reports${reports.filter(r => r.status === "pending").length > 0 ? ` (${reports.filter(r => r.status === "pending").length})` : ""}` },
+          { id: "overview",  label: "Overview" },
+          { id: "users",     label: `Users (${users.length})` },
+          { id: "reports",   label: `Reports${reports.filter(r => r.status === "pending").length > 0 ? ` (${reports.filter(r => r.status === "pending").length})` : ""}` },
+          { id: "settings",  label: "Settings" },
         ].map(t => (
           <button key={t.id} onClick={() => setActiveTab(t.id)}
             className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${activeTab === t.id ? "bg-slate-900 text-white" : "text-slate-500 hover:text-slate-700"}`}>
@@ -604,6 +621,61 @@ export default function AdminPage() {
           </div>
         );
       })()}
+
+      {/* ── SETTINGS TAB ─────────────────────────────────────── */}
+      {activeTab === "settings" && (
+        <div className="max-w-xl">
+          <div className="bg-white border border-slate-200 rounded-xl p-6">
+            <div className="flex items-center gap-2 mb-1">
+              <Settings className="w-4 h-4 text-orange-500" />
+              <span className="text-xs font-bold uppercase tracking-wider text-orange-600">App Settings</span>
+            </div>
+            <h2 className="text-xl font-black text-slate-900 mb-5" style={{ fontFamily: "Barlow Condensed, sans-serif", textTransform: "uppercase" }}>
+              Feature Flags
+            </h2>
+
+            {/* European Colleges Toggle */}
+            <div className="flex items-start justify-between gap-4 p-4 rounded-xl border border-slate-200 bg-slate-50">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                  <Globe className="w-4 h-4 text-blue-600" />
+                </div>
+                <div>
+                  <p className="font-bold text-slate-800 text-sm">European Colleges</p>
+                  <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
+                    Show or hide the 43 European basketball programme listings for all users.
+                    Toggle off to keep the trial focused on US colleges only. All data is preserved — toggle back on to reinstate them instantly.
+                  </p>
+                  {!appSettings.show_european && (
+                    <p className="text-xs font-semibold text-amber-600 mt-2">
+                      Currently hidden from all users
+                    </p>
+                  )}
+                </div>
+              </div>
+              <button
+                data-testid="toggle-european-btn"
+                onClick={() => saveSettings(!appSettings.show_european)}
+                disabled={savingSettings}
+                className={`relative flex-shrink-0 w-12 h-6 rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-60 ${
+                  appSettings.show_european ? "bg-green-500" : "bg-slate-300"
+                }`}
+              >
+                <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${
+                  appSettings.show_european ? "translate-x-6" : "translate-x-0"
+                }`} />
+              </button>
+            </div>
+
+            {settingsSaved && (
+              <div data-testid="settings-saved-banner" className="mt-4 flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 text-sm font-semibold px-4 py-3 rounded-lg">
+                <CheckCircle2 className="w-4 h-4" />
+                Settings saved — changes are live for all users immediately.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

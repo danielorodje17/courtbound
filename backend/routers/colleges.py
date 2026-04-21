@@ -26,6 +26,12 @@ async def get_colleges(
     if state:
         query["state"] = {"$regex": state, "$options": "i"}
 
+    # Check global setting — hide European colleges if disabled
+    settings = await db.app_settings.find_one({"key": "global"}, {"_id": 0})
+    show_european = settings.get("show_european", True) if settings else True
+    if not show_european:
+        query["region"] = {"$ne": "Europe"}
+
     colleges = await db.colleges.find(query, {
         "_id": 1, "name": 1, "location": 1, "state": 1, "division": 1,
         "conference": 1, "foreign_friendly": 1, "ranking": 1, "acceptance_rate": 1,
