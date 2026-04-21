@@ -362,3 +362,11 @@ An 18-year-old student basketball player from UK (England Under-18) wants to tra
 ### P2
 - [ ] Stats Counter on Landing Page (social proof: "412 coaches contacted this month")
 - [ ] Important Deadlines / Calendar alerts on Dashboard
+
+### Post-Trial: Women's Basketball (Option B — Separate College List)
+- [ ] Separate seeded college list for women's programmes (own coaches, emails, contacts)
+- [ ] Player profile "Programme" field: Men's / Women's
+- [ ] College directory filters by programme type
+- [ ] Admin Colleges tab shows programme column with Men/Women tag
+- [ ] AI email prompts adapt language/tone for women's outreach
+- [ ] Same tracking, compose, heatmap, admin tools work for both — no structural change needed
