@@ -192,10 +192,10 @@ export default function AdminPage() {
       // also auto-mark the report as fixed
       await adminReq("patch", `/admin/reports/${r.id}`, {
         status: "fixed",
-        admin_response: `Email updated to ${emailFixValue.trim()}`,
+        admin_response: `Email updated to ${emailFixValue.trim()}. Bounced emails removed from user history.`,
       });
       setReports(prev => prev.map(rep => rep.id === r.id
-        ? { ...rep, status: "fixed", admin_response: `Email updated to ${emailFixValue.trim()}` }
+        ? { ...rep, status: "fixed", admin_response: `Email updated to ${emailFixValue.trim()}. Bounced emails removed from user history.` }
         : rep
       ));
       setEmailFixDone(r.id);

@@ -299,7 +299,7 @@ async def update_report(report_id: str, body: dict, admin=Depends(require_admin_
 
 @router.patch("/colleges/{college_id}/coach-email")
 async def fix_coach_email(college_id: str, body: dict, admin=Depends(require_admin_token)):
-    """Admin: directly update a coach's email address in the database."""
+    """Admin: update a coach's email and delete all sent emails to the old address."""
     from bson import ObjectId
     coach_name = (body.get("coach_name") or "").strip()
     new_email  = (body.get("new_email") or "").strip()
@@ -309,13 +309,39 @@ async def fix_coach_email(college_id: str, body: dict, admin=Depends(require_adm
         oid = ObjectId(college_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid college_id")
+
+    # Find the current (bounced) email before overwriting
+    college = await db.colleges.find_one(
+        {"_id": oid, "coaches.name": coach_name},
+        {"coaches.$": 1}
+    )
+    if not college:
+        raise HTTPException(status_code=404, detail="College or coach not found")
+
+    old_email = college["coaches"][0].get("email", "") if college.get("coaches") else ""
+
+    # Update the coach's email
     result = await db.colleges.update_one(
         {"_id": oid, "coaches.name": coach_name},
         {"$set": {"coaches.$.email": new_email}},
     )
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="College or coach not found")
-    return {"ok": True, "college_id": college_id, "coach_name": coach_name, "new_email": new_email}
+
+    # Delete all sent emails that used the old (bounced) email address
+    deleted = await db.emails.delete_many({
+        "college_id": college_id,
+        "coach_email": old_email,
+    })
+
+    return {
+        "ok": True,
+        "college_id": college_id,
+        "coach_name": coach_name,
+        "old_email": old_email,
+        "new_email": new_email,
+        "emails_deleted": deleted.deleted_count,
+    }
 
 
 # ── App Settings ─────────────────────────────────────────────────────────────
