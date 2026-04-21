@@ -158,6 +158,24 @@ async def admin_users(admin=Depends(require_admin_token)):
     return result
 
 
+@router.delete("/users/{user_id}")
+async def delete_user(user_id: str, admin=Depends(require_admin_token)):
+    """Permanently delete a user and all their associated data."""
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "email": 1})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    # Delete all user data across every collection
+    await db.users.delete_one({"user_id": user_id})
+    await db.emails.delete_many({"user_id": user_id})
+    await db.tracked_colleges.delete_many({"user_id": user_id})
+    await db.profiles.delete_many({"user_id": user_id})
+    await db.goals.delete_many({"user_id": user_id})
+    await db.email_templates.delete_many({"user_id": user_id})
+    await db.college_reports.delete_many({"user_id": user_id})
+    await db.user_notifications.delete_many({"user_id": user_id})
+    return {"ok": True, "deleted_user": user.get("email", user_id)}
+
+
 @router.patch("/users/{user_id}/subscription")
 async def update_subscription(user_id: str, body: dict, admin=Depends(require_admin_token)):
     tier = body.get("subscription_tier", "free")

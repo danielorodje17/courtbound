@@ -8,7 +8,7 @@ import {
 import {
   Users, Mail, BookMarked, TrendingUp, RefreshCw, LogOut,
   Star, CircleDot, ArrowUpRight, ChevronUp, ChevronDown, ShieldCheck,
-  Flag, Clock, CheckCircle2, AlertTriangle, XCircle, ChevronRight, Settings, Globe,
+  Flag, Clock, CheckCircle2, AlertTriangle, XCircle, ChevronRight, Settings, Globe, Trash2,
 } from "lucide-react";
 
 const API = process.env.REACT_APP_BACKEND_URL;
@@ -110,6 +110,8 @@ export default function AdminPage() {
   const [appSettings, setAppSettings] = useState({ show_european: true });
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsSaved, setSettingsSaved] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(null); // {user_id, name, email}
+  const [deleting, setDeleting] = useState(false);
   const adminEmail = localStorage.getItem("cb_admin_email") || "Admin";
 
   const load = useCallback(async () => {
@@ -162,6 +164,17 @@ export default function AdminPage() {
       setTimeout(() => setSettingsSaved(false), 3000);
     } catch {}
     setSavingSettings(false);
+  };
+
+  const deleteUser = async () => {
+    if (!confirmDelete) return;
+    setDeleting(true);
+    try {
+      await adminReq("delete", `/admin/users/${confirmDelete.user_id}`);
+      setUsers(prev => prev.filter(u => u.user_id !== confirmDelete.user_id));
+      setConfirmDelete(null);
+    } catch {}
+    setDeleting(false);
   };
 
   const toggleSort = (key) =>
@@ -435,13 +448,23 @@ export default function AdminPage() {
                   <td className="px-4 py-3"><span className="font-bold text-slate-800">{u.colleges_tracked}</span><span className="text-xs text-slate-400 ml-1">colleges</span></td>
                   <td className="px-4 py-3"><TierSelect userId={u.user_id} current={u.subscription_tier} onChange={updateTier} /></td>
                   <td className="px-4 py-3">
-                    <button
-                      data-testid={`view-user-btn-${u.user_id}`}
-                      onClick={() => navigate(`/admin/users/${u.user_id}`)}
-                      className="flex items-center gap-1 text-xs text-orange-600 hover:text-orange-800 font-bold transition-colors"
-                    >
-                      View <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        data-testid={`view-user-btn-${u.user_id}`}
+                        onClick={() => navigate(`/admin/users/${u.user_id}`)}
+                        className="flex items-center gap-1 text-xs text-orange-600 hover:text-orange-800 font-bold transition-colors"
+                      >
+                        View <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        data-testid={`delete-user-btn-${u.user_id}`}
+                        onClick={() => setConfirmDelete({ user_id: u.user_id, name: u.name, email: u.email })}
+                        className="p-1 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                        title="Delete user"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -500,10 +523,20 @@ export default function AdminPage() {
                     <td className="px-4 py-3"><span className="font-bold text-slate-800">{u.colleges_tracked}</span><span className="text-xs text-slate-400 ml-1">colleges</span></td>
                     <td className="px-4 py-3"><TierSelect userId={u.user_id} current={u.subscription_tier} onChange={updateTier} /></td>
                     <td className="px-4 py-3">
-                      <button data-testid={`view-user-btn-${u.user_id}`} onClick={() => navigate(`/admin/users/${u.user_id}`)}
-                        className="flex items-center gap-1 text-xs text-orange-600 hover:text-orange-800 font-bold transition-colors">
-                        View <ChevronRight className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button data-testid={`view-user-btn-${u.user_id}`} onClick={() => navigate(`/admin/users/${u.user_id}`)}
+                          className="flex items-center gap-1 text-xs text-orange-600 hover:text-orange-800 font-bold transition-colors">
+                          View <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          data-testid={`delete-user-btn-${u.user_id}`}
+                          onClick={() => setConfirmDelete({ user_id: u.user_id, name: u.name, email: u.email })}
+                          className="p-1 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                          title="Delete user"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -673,6 +706,49 @@ export default function AdminPage() {
                 Settings saved — changes are live for all users immediately.
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── DELETE CONFIRM MODAL ──────────────────────────────── */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                <Trash2 className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="font-black text-slate-900 text-lg" style={{ fontFamily: "Barlow Condensed, sans-serif", textTransform: "uppercase" }}>
+                  Delete User Account
+                </h3>
+                <p className="text-xs text-slate-500">This action cannot be undone</p>
+              </div>
+            </div>
+            <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-5">
+              <p className="text-sm font-bold text-red-800">{confirmDelete.name || "Unknown"}</p>
+              <p className="text-xs text-red-600">{confirmDelete.email}</p>
+              <p className="text-xs text-red-600 mt-2">
+                All their data will be permanently deleted — tracked colleges, sent emails, profile, goals, and templates.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                data-testid="confirm-delete-user-btn"
+                onClick={deleteUser}
+                disabled={deleting}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold text-sm uppercase tracking-wider rounded-xl py-3 transition-colors disabled:opacity-60"
+              >
+                {deleting ? "Deleting..." : "Yes, Delete Account"}
+              </button>
+              <button
+                data-testid="cancel-delete-user-btn"
+                onClick={() => setConfirmDelete(null)}
+                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm uppercase tracking-wider rounded-xl py-3 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}
