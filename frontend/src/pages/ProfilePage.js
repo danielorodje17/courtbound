@@ -353,9 +353,9 @@ export default function ProfilePage() {
               <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Statistics by Competition Level</p>
               <div className="space-y-4">
                 {[
-                  { label: "College / School Team", prefix: "college", color: "bg-orange-50 border-orange-200 text-orange-700" },
-                  { label: "Academy / Club Team",   prefix: "academy", color: "bg-blue-50 border-blue-200 text-blue-700" },
-                  { label: "Country / National Team", prefix: "country", color: "bg-green-50 border-green-200 text-green-700" },
+                  { label: "School Team",   prefix: "college", color: "bg-orange-50 border-orange-200 text-orange-700" },
+                  { label: "Club Team",     prefix: "academy", color: "bg-blue-50 border-blue-200 text-blue-700" },
+                  { label: "National Team", prefix: "country", color: "bg-green-50 border-green-200 text-green-700" },
                 ].map(({ label, prefix, color }) => (
                   <div key={prefix} className={`border rounded-lg overflow-hidden`}>
                     <div className={`px-4 py-2 ${color} flex items-center`}>

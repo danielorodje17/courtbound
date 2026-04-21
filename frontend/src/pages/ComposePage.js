@@ -72,9 +72,9 @@ export default function ComposePage() {
 
       // Build rich multi-context stats string
       const statContexts = [
-        { label: "College/School", keys: ["college_ppg","college_apg","college_rpg","college_spg","college_fg_percent","college_three_pt_percent"] },
-        { label: "Academy/Club",   keys: ["academy_ppg","academy_apg","academy_rpg","academy_spg","academy_fg_percent","academy_three_pt_percent"] },
-        { label: "Country/National",keys: ["country_ppg","country_apg","country_rpg","country_spg","country_fg_percent","country_three_pt_percent"] },
+        { label: "School",   keys: ["college_ppg","college_apg","college_rpg","college_spg","college_fg_percent","college_three_pt_percent"] },
+        { label: "Club",     keys: ["academy_ppg","academy_apg","academy_rpg","academy_spg","academy_fg_percent","academy_three_pt_percent"] },
+        { label: "National", keys: ["country_ppg","country_apg","country_rpg","country_spg","country_fg_percent","country_three_pt_percent"] },
       ];
       const statLabels = ["PPG","APG","RPG","SPG","FG%","3PT%"];
       const lines = [];
@@ -444,7 +444,7 @@ export default function ComposePage() {
                 value={stats}
                 onChange={e => setStats(e.target.value)}
                 rows={4}
-                placeholder={"College/School: 18.5 PPG, 6.2 APG\nAcademy/Club: 22.0 PPG, 8.0 APG\nCountry/National: 15.0 PPG, 4.5 APG"}
+                placeholder={"School: 18.5 PPG, 6.2 APG\nClub: 22.0 PPG, 8.0 APG\nNational: 15.0 PPG, 4.5 APG"}
                 className="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none resize-none font-mono"
               />
             </div>
@@ -474,9 +474,9 @@ export default function ComposePage() {
             {/* Stats preview card */}
             {(() => {
               const contexts = [
-                { label: "College/School", color: "bg-orange-500", keys: ["college_ppg","college_apg","college_rpg","college_spg","college_fg_percent","college_three_pt_percent"] },
-                { label: "Academy/Club",   color: "bg-blue-500",   keys: ["academy_ppg","academy_apg","academy_rpg","academy_spg","academy_fg_percent","academy_three_pt_percent"] },
-                { label: "Country/Nat.",   color: "bg-green-600",  keys: ["country_ppg","country_apg","country_rpg","country_spg","country_fg_percent","country_three_pt_percent"] },
+                { label: "School",   color: "bg-orange-500", keys: ["college_ppg","college_apg","college_rpg","college_spg","college_fg_percent","college_three_pt_percent"] },
+                { label: "Club",     color: "bg-blue-500",   keys: ["academy_ppg","academy_apg","academy_rpg","academy_spg","academy_fg_percent","academy_three_pt_percent"] },
+                { label: "National", color: "bg-green-600",  keys: ["country_ppg","country_apg","country_rpg","country_spg","country_fg_percent","country_three_pt_percent"] },
               ];
               const statLabels = ["PPG","APG","RPG","SPG","FG%","3PT%"];
               const rows = contexts.map(ctx => ({
