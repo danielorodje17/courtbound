@@ -1300,9 +1300,44 @@ export default function AdminPage() {
               {editForm.image_url && (
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Image Preview</label>
-                  <img src={editForm.image_url} alt="preview" className="h-24 rounded-lg object-cover border border-slate-200" onError={e => e.target.style.display="none"} />
+                  <img src={editForm.image_url.startsWith("/static/") ? `${process.env.REACT_APP_BACKEND_URL}${editForm.image_url}` : editForm.image_url} alt="preview" className="h-24 rounded-lg object-cover border border-slate-200" onError={e => e.target.style.display="none"} />
                 </div>
               )}
+
+              {/* Logo upload */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Upload Logo / Image</label>
+                <p className="text-xs text-slate-400 mb-2">Upload PNG or JPG from the college website. This replaces the placeholder image.</p>
+                <label className="flex items-center gap-2 w-fit px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold uppercase tracking-wide rounded-lg cursor-pointer transition-all">
+                  <Upload className="w-3.5 h-3.5" />
+                  Choose Image File
+                  <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file || !editCollege) return;
+                      const formData = new FormData();
+                      formData.append("file", file);
+                      try {
+                        const token = localStorage.getItem("cb_admin_token");
+                        const API = process.env.REACT_APP_BACKEND_URL;
+                        const res = await fetch(`${API}/api/admin/colleges/${editCollege.id}/upload-image`, {
+                          method: "POST",
+                          headers: { Authorization: `Bearer ${token}` },
+                          body: formData,
+                        });
+                        const data = await res.json();
+                        if (data.ok) {
+                          setEditForm(p => ({ ...p, image_url: data.image_url }));
+                        }
+                      } catch {}
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+                {editForm.image_url?.startsWith("/static/") && (
+                  <p className="text-xs text-green-600 font-semibold mt-1">Custom logo uploaded</p>
+                )}
+              </div>
 
               {/* Coaches */}
               <div>

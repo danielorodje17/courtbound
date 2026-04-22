@@ -415,6 +415,45 @@ async def admin_colleges_contacts(admin=Depends(require_admin_token)):
     return result
 
 
+@router.post("/colleges/{college_id}/upload-image")
+async def upload_college_image(college_id: str, file: UploadFile = File(...), admin=Depends(require_admin_token)):
+    """Upload a PNG/JPG logo for a college. Stores in static/college_images/ and updates image_url."""
+    import os
+    from bson import ObjectId
+
+    allowed_types = {"image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif"}
+    if file.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="Only PNG, JPG, WEBP images are allowed")
+
+    try:
+        oid = ObjectId(college_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid college_id")
+
+    college = await db.colleges.find_one({"_id": oid}, {"name": 1})
+    if not college:
+        raise HTTPException(status_code=404, detail="College not found")
+
+    # Save file
+    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else "png"
+    filename = f"{college_id}.{ext}"
+    static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "backend", "static", "college_images")
+    # Resolve relative to this file
+    static_dir = os.path.join(os.path.dirname(__file__), "static", "college_images")
+    os.makedirs(static_dir, exist_ok=True)
+
+    file_path = os.path.join(static_dir, filename)
+    content = await file.read()
+    with open(file_path, "wb") as f:
+        f.write(content)
+
+    # Update image_url in DB to the static path (frontend constructs full URL)
+    image_url = f"/static/college_images/{filename}"
+    await db.colleges.update_one({"_id": oid}, {"$set": {"image_url": image_url}})
+
+    return {"ok": True, "image_url": image_url, "college_name": college.get("name", "")}
+
+
 @router.patch("/colleges/{college_id}/details")
 async def update_college_details(college_id: str, body: dict, admin=Depends(require_admin_token)):
     """Admin: update any top-level college fields and/or full coaches array."""

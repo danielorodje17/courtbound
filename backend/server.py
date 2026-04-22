@@ -5,6 +5,8 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import APIRouter
+from fastapi.staticfiles import StaticFiles
+import os
 
 from database import db, client
 from seed_data import seed_colleges, seed_extended_colleges, _seed_european_colleges_startup
@@ -36,6 +38,11 @@ api_router.include_router(admin.router)
 api_router.include_router(reports.router)
 
 app.include_router(api_router)
+
+# Serve uploaded college images as static files
+STATIC_DIR = os.path.join(os.path.dirname(__file__), "static", "college_images")
+os.makedirs(STATIC_DIR, exist_ok=True)
+app.mount("/static/college_images", StaticFiles(directory=STATIC_DIR), name="college_images")
 
 
 @app.on_event("startup")
