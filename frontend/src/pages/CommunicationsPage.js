@@ -274,7 +274,7 @@ export default function CommunicationsPage() {
                 Import from CSV
               </h2>
               <p className="text-slate-500 text-sm mt-0.5">
-                Upload your communications CSV. Colleges not in the app will be added automatically. Exact dates are preserved.
+                Upload your communications CSV to log emails for colleges already in the app. Exact dates are preserved.
               </p>
             </div>
             <button onClick={() => { setShowCSV(false); setCsvResult(null); setCsvFile(null); }} className="text-slate-400 hover:text-slate-600 p-1">
@@ -324,14 +324,10 @@ export default function CommunicationsPage() {
                   <div className="flex items-center gap-2 text-green-700 font-bold text-sm">
                     <CheckCircle className="w-4 h-4" /> {csvResult.message}
                   </div>
-                  <div className="grid grid-cols-3 gap-3 mt-3">
+                  <div className="grid grid-cols-2 gap-3 mt-3">
                     <div className="bg-white rounded-lg p-3 text-center border border-green-100">
                       <p className="text-2xl font-bold text-green-600">{csvResult.emails_added}</p>
                       <p className="text-xs text-slate-500 mt-0.5">Emails Logged</p>
-                    </div>
-                    <div className="bg-white rounded-lg p-3 text-center border border-green-100">
-                      <p className="text-2xl font-bold text-blue-600">{csvResult.colleges_added}</p>
-                      <p className="text-xs text-slate-500 mt-0.5">New Colleges Added</p>
                     </div>
                     <div className="bg-white rounded-lg p-3 text-center border border-green-100">
                       <p className="text-2xl font-bold text-slate-400">{csvResult.duplicates_skipped}</p>

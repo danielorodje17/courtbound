@@ -28,13 +28,12 @@ export default function CollegesPage() {
 
   useEffect(() => {
     applyFilters();
-  }, [search, division, region, foreignOnly, verifiedOnly, state, allColleges, trackedOnly, trackedData]);
+  }, [search, division, region, foreignOnly, verifiedOnly, state, allColleges, trackedOnly, trackedData, tracked]);
 
   const fetchAllColleges = async () => {
     try {
       const { data } = await apiRequest("get", "/colleges");
       setAllColleges(data);
-      setColleges(data);
     } catch (err) {
       console.error(err);
     } finally {
@@ -44,7 +43,8 @@ export default function CollegesPage() {
 
   const applyFilters = () => {
     let filtered = allColleges;
-    if (trackedOnly) filtered = filtered.filter(c => tracked.has(c.id));
+    // trackedOnly is a pipeline view — only apply it when not using discovery filters
+    if (trackedOnly && !verifiedOnly && !foreignOnly) filtered = filtered.filter(c => tracked.has(c.id));
     if (region) filtered = filtered.filter(c => (c.region || "USA") === region);
     if (search) filtered = filtered.filter(c => c.name.toLowerCase().includes(search.toLowerCase()) || c.location.toLowerCase().includes(search.toLowerCase()) || c.country?.toLowerCase().includes(search.toLowerCase()));
     if (division) filtered = filtered.filter(c => c.division === division);

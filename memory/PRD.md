@@ -233,6 +233,13 @@ An 18-year-old student basketball player from UK (England Under-18) wants to tra
 - [x] "Open in Gmail" button on ComposePage — opens Gmail compose in new tab with coach email, subject, body pre-filled
 - [x] On click: logs email (POST /api/emails), auto-tracks college if not tracked, sets status=contacted + follow_up_date=today+7
 - [x] Success banner confirms: "[College] marked as Contacted with follow-up reminder set for 7 days"
+### v1.35 - Email Verified Filter Fix + College Import Removal (Feb 2026)
+- [x] Fixed "Email Verified" filter: verifiedOnly and foreignOnly now override trackedOnly — clicking "Email Verified" from the tracked pipeline view correctly shows all 273 verified colleges
+- [x] Fixed race-condition flash: removed direct setColleges(data) call in fetchAllColleges so filters always apply consistently via applyFilters
+- [x] Added `tracked` to applyFilters useEffect dependency array (was missing, could cause stale filter on tracked view)
+- [x] Removed user ability to import/create colleges via CSV: import-csv endpoint now skips unknown colleges (admin-only function)
+- [x] Updated CSV import UI to reflect new behaviour (no more "colleges added automatically" copy)
+
 ### v1.18 - Help & Support Widget (Apr 2026)
 - [x] Floating `?` button fixed bottom-right, visible on every page
 - [x] Opens a 600px panel with searchable FAQ (27 questions across 7 sections)

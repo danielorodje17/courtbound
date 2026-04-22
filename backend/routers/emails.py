@@ -116,14 +116,8 @@ async def import_csv(current_user: UserModel = Depends(get_current_user), file: 
     if not rows:
         raise HTTPException(status_code=400, detail="CSV is empty or unreadable")
 
-    colleges_added = emails_added = duplicates_skipped = 0
+    emails_added = duplicates_skipped = 0
     ts = datetime.now(timezone.utc).isoformat()
-    img_cycle = [
-        "https://images.unsplash.com/photo-1562774053-701939374585?w=400",
-        "https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=400",
-        "https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=400",
-        "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400",
-    ]
 
     for i, row in enumerate(rows):
         college_name = _clean(row.get("College Name", ""))
@@ -133,8 +127,6 @@ async def import_csv(current_user: UserModel = Depends(get_current_user), file: 
         comm_type = _clean(row.get("Type", "Email Sent"))
         coach_name = _clean(row.get("Coach Name", ""))
         coach_email = _clean(row.get("Coach Email", ""))
-        asst_coach_name = _clean(row.get("Assistant Coach Name", ""))
-        asst_coach_email = _clean(row.get("Assistant Coach Email", ""))
         subject = _clean(row.get("Subject", ""))
         notes = _clean(row.get("Notes", ""))
         follow_up_needed = _clean(row.get("Follow Up Needed (yes/no)", "no")).lower() == "yes"
@@ -146,32 +138,10 @@ async def import_csv(current_user: UserModel = Depends(get_current_user), file: 
         direction = _map_type_to_direction(comm_type)
         name_base = college_name.split("(")[0].split("–")[0].split("-")[0].strip()
         existing_college = await db.colleges.find_one({"name": {"$regex": f"^{name_base}", "$options": "i"}})
-        if existing_college:
-            college_id = str(existing_college["_id"])
-            current_names = [c.get("name", "").lower() for c in existing_college.get("coaches", [])]
-            new_coaches = []
-            if coach_name and "not listed" not in coach_name.lower() and coach_name.lower() not in current_names:
-                new_coaches.append({"name": coach_name, "title": "Head Coach", "email": coach_email, "phone": ""})
-            if asst_coach_name and asst_coach_name.lower() not in current_names:
-                new_coaches.append({"name": asst_coach_name, "title": "Assistant Coach", "email": asst_coach_email, "phone": ""})
-            if new_coaches:
-                await db.colleges.update_one({"_id": existing_college["_id"]}, {"$push": {"coaches": {"$each": new_coaches}}})
-        else:
-            coaches = []
-            if coach_name and "not listed" not in coach_name.lower():
-                coaches.append({"name": coach_name, "title": "Head Coach", "email": coach_email, "phone": ""})
-            if asst_coach_name:
-                coaches.append({"name": asst_coach_name, "title": "Assistant Coach", "email": asst_coach_email, "phone": ""})
-            result = await db.colleges.insert_one({
-                "name": college_name, "location": "", "state": "", "division": "Unknown",
-                "conference": "", "foreign_friendly": True,
-                "scholarship_info": "Contacted — details to be confirmed.",
-                "acceptance_rate": "N/A", "notable_alumni": "", "ranking": 900 + i,
-                "website": "", "image_url": img_cycle[i % 4], "coaches": coaches,
-                "created_at": ts, "from_csv": True,
-            })
-            college_id = str(result.inserted_id)
-            colleges_added += 1
+        if not existing_college:
+            # Skip rows for colleges not in the app — college import is admin-only
+            continue
+        college_id = str(existing_college["_id"])
 
         tracked = await db.tracked_colleges.find_one({"user_id": current_user.user_id, "college_id": college_id})
         follow_note = f" | Follow up by: {follow_up_date}" if follow_up_needed and follow_up_date else ""
@@ -203,9 +173,9 @@ async def import_csv(current_user: UserModel = Depends(get_current_user), file: 
             duplicates_skipped += 1
 
     return {
-        "colleges_added": colleges_added, "emails_added": emails_added,
+        "emails_added": emails_added,
         "duplicates_skipped": duplicates_skipped, "total_rows": len(rows),
-        "message": f"Import complete: {emails_added} emails logged, {colleges_added} new colleges added.",
+        "message": f"Import complete: {emails_added} emails logged.",
     }
 
 
