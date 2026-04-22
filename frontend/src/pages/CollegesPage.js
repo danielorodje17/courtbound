@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { apiRequest } from "../context/AuthContext";
 import { getCollegeImage } from "../utils/collegeImages";
-import { Search, MapPin, Users, Globe, Plus, Check, Flag, BarChart2, ArrowLeft } from "lucide-react";
+import { Search, MapPin, Users, Globe, Plus, Check, Flag, BarChart2, ArrowLeft, ShieldCheck } from "lucide-react";
 
 export default function CollegesPage() {
   const navigate = useNavigate();
@@ -18,6 +18,7 @@ export default function CollegesPage() {
   const [division, setDivision] = useState("");
   const [region, setRegion] = useState("");
   const [foreignOnly, setForeignOnly] = useState(false);
+  const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [state, setState] = useState("");
 
   useEffect(() => {
@@ -27,7 +28,7 @@ export default function CollegesPage() {
 
   useEffect(() => {
     applyFilters();
-  }, [search, division, region, foreignOnly, state, allColleges, trackedOnly, trackedData]);
+  }, [search, division, region, foreignOnly, verifiedOnly, state, allColleges, trackedOnly, trackedData]);
 
   const fetchAllColleges = async () => {
     try {
@@ -48,6 +49,7 @@ export default function CollegesPage() {
     if (search) filtered = filtered.filter(c => c.name.toLowerCase().includes(search.toLowerCase()) || c.location.toLowerCase().includes(search.toLowerCase()) || c.country?.toLowerCase().includes(search.toLowerCase()));
     if (division) filtered = filtered.filter(c => c.division === division);
     if (foreignOnly) filtered = filtered.filter(c => c.foreign_friendly);
+    if (verifiedOnly) filtered = filtered.filter(c => (c.coaches || []).some(coach => coach.last_verified));
     if (state) filtered = filtered.filter(c => c.state?.toLowerCase().includes(state.toLowerCase()) || c.location?.toLowerCase().includes(state.toLowerCase()) || c.country?.toLowerCase().includes(state.toLowerCase()));
     setColleges(filtered);
   };
@@ -153,6 +155,15 @@ export default function CollegesPage() {
           >
             <Flag className="w-3 h-3" /> UK Friendly Only
           </button>
+          <button
+            data-testid="verified-email-filter-btn"
+            onClick={() => setVerifiedOnly(!verifiedOnly)}
+            className={`px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1 ${
+              verifiedOnly ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            <ShieldCheck className="w-3 h-3" /> Email Verified
+          </button>
         </div>
 
         {/* Search + Division filter row */}
@@ -193,9 +204,17 @@ export default function CollegesPage() {
             <Flag className="w-3.5 h-3.5" />
             UK Friendly {foreignOnly && `(${colleges.length})`}
           </button>
-          {(search || division || foreignOnly || state) && (
+          <button
+            data-testid="college-verified-filter"
+            onClick={() => setVerifiedOnly(!verifiedOnly)}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold uppercase tracking-wider border-2 transition-all ${verifiedOnly ? "bg-blue-600 text-white border-blue-600 shadow-sm" : "bg-white text-blue-700 border-blue-300 hover:bg-blue-50"}`}
+          >
+            <ShieldCheck className="w-3.5 h-3.5" />
+            Email Verified {verifiedOnly && `(${colleges.length})`}
+          </button>
+          {(search || division || foreignOnly || verifiedOnly || state) && (
             <button
-              onClick={() => { setSearch(""); setDivision(""); setForeignOnly(false); setState(""); }}
+              onClick={() => { setSearch(""); setDivision(""); setForeignOnly(false); setVerifiedOnly(false); setState(""); }}
               className="px-3 py-2.5 text-xs text-slate-500 hover:text-slate-700 font-medium border border-slate-200 rounded-lg hover:bg-slate-50 transition-all"
             >
               Clear filters
