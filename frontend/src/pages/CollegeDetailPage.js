@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { apiRequest } from "../context/AuthContext";
 import { getCollegeImage } from "../utils/collegeImages";
-import { MapPin, Globe, Mail, Phone, Plus, Check, ArrowLeft, Pen, Clock, Calendar, AlertTriangle, ListChecks, MessageSquare, Trash2, Film, Info, Flag, X } from "lucide-react";
+import { MapPin, Globe, Mail, Phone, Plus, Check, ArrowLeft, Pen, Clock, Calendar, AlertTriangle, ListChecks, MessageSquare, Trash2, Film, Info, Flag, X, ShieldCheck } from "lucide-react";
 
 const ISSUE_TYPES = [
   "Wrong email address",
@@ -351,37 +351,53 @@ export default function CollegeDetailPage() {
             <h2 className="font-bold text-slate-900 mb-4" style={{ fontFamily: "Barlow Condensed, sans-serif", textTransform: "uppercase", letterSpacing: "0.05em" }}>Coaching Staff</h2>
             <div className="space-y-3">
               {college.coaches?.map((coach, i) => (
-                <div key={i} data-testid={`coach-card-${coach.name}`} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-black flex-shrink-0 ${coachAvatarColor(coach.name)}`}>
-                      {coachInitials(coach.name)}
+                <div key={i} data-testid={`coach-card-${coach.name}`} className="p-3 bg-slate-50 rounded-lg space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-black flex-shrink-0 ${coachAvatarColor(coach.name)}`}>
+                        {coachInitials(coach.name)}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-800 text-sm">{coach.name}</p>
+                        <p className="text-xs text-slate-500">{coach.title}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-semibold text-slate-800 text-sm">{coach.name}</p>
-                      <p className="text-xs text-slate-500">{coach.title}</p>
+                    <div className="flex items-center gap-1.5">
+                      {coach.email && (
+                        <a href={`mailto:${coach.email}`} className="p-1.5 text-slate-400 hover:text-orange-500 transition-colors rounded-lg hover:bg-orange-50" title={coach.email}>
+                          <Mail className="w-4 h-4" />
+                        </a>
+                      )}
+                      {coach.phone && (
+                        <a href={`tel:${coach.phone}`} className="p-1.5 text-slate-400 hover:text-orange-500 transition-colors rounded-lg hover:bg-orange-50" title={coach.phone}>
+                          <Phone className="w-4 h-4" />
+                        </a>
+                      )}
+                      <button
+                        data-testid={`report-btn-${coach.name}`}
+                        onClick={() => setReportTarget(coach)}
+                        className="flex items-center gap-1 px-2 py-1 text-red-500 bg-red-50 hover:bg-red-100 border border-red-200 transition-colors rounded-lg text-xs font-semibold"
+                        title="Report incorrect contact info"
+                      >
+                        <Flag className="w-3 h-3" />
+                        Report
+                      </button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    {coach.email && (
-                      <a href={`mailto:${coach.email}`} className="p-1.5 text-slate-400 hover:text-orange-500 transition-colors rounded-lg hover:bg-orange-50" title={coach.email}>
-                        <Mail className="w-4 h-4" />
-                      </a>
-                    )}
-                    {coach.phone && (
-                      <a href={`tel:${coach.phone}`} className="p-1.5 text-slate-400 hover:text-orange-500 transition-colors rounded-lg hover:bg-orange-50" title={coach.phone}>
-                        <Phone className="w-4 h-4" />
-                      </a>
-                    )}
-                    <button
-                      data-testid={`report-btn-${coach.name}`}
-                      onClick={() => setReportTarget(coach)}
-                      className="flex items-center gap-1 px-2 py-1 text-red-500 bg-red-50 hover:bg-red-100 border border-red-200 transition-colors rounded-lg text-xs font-semibold"
-                      title="Report incorrect contact info"
-                    >
-                      <Flag className="w-3 h-3" />
-                      Report
-                    </button>
-                  </div>
+
+                  {/* Last Verified badge */}
+                  {coach.last_verified ? (
+                    <div className="flex items-center gap-1.5 text-xs text-green-700 bg-green-50 border border-green-100 rounded-lg px-2 py-1 w-fit">
+                      <ShieldCheck className="w-3 h-3 flex-shrink-0" />
+                      <span>Verified by CourtBound · {coach.last_verified}</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-2 py-1 w-fit">
+                      <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                      <span>Contact not yet verified — use Report if email bounces</span>
+                    </div>
+                  )}
+
                   <div className="flex gap-2">
                     {coach.email && (
                       <button
