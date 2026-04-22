@@ -233,6 +233,14 @@ An 18-year-old student basketball player from UK (England Under-18) wants to tra
 - [x] "Open in Gmail" button on ComposePage — opens Gmail compose in new tab with coach email, subject, body pre-filled
 - [x] On click: logs email (POST /api/emails), auto-tracks college if not tracked, sets status=contacted + follow_up_date=today+7
 - [x] Success banner confirms: "[College] marked as Contacted with follow-up reminder set for 7 days"
+### v1.36 - Closed Tab in Response Tracker (Feb 2026)
+- [x] Added "CLOSED" filter tab next to "RECEIVED REPLY" in Responses page — matches user screenshot request
+- [x] Closed tab shows all colleges with reply_outcome="closed" in the main list view (with opacity styling and Reopen button)
+- [x] Clicking Reopen moves college back to "Received Reply" view (resets reply_outcome to no_interest)
+- [x] Compose button hidden for closed colleges
+- [x] Removed old collapsible closed section at page bottom — replaced by proper tab
+- [x] "All Contacted" tab count now uses active.length (excludes closed, consistent with displayed list)
+
 ### v1.35 - Email Verified Filter Fix + College Import Removal (Feb 2026)
 - [x] Fixed "Email Verified" filter: verifiedOnly and foreignOnly now override trackedOnly — clicking "Email Verified" from the tracked pipeline view correctly shows all 273 verified colleges
 - [x] Fixed race-condition flash: removed direct setColleges(data) call in fetchAllColleges so filters always apply consistently via applyFilters
