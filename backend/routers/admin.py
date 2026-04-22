@@ -300,6 +300,27 @@ async def update_report(report_id: str, body: dict, admin=Depends(require_admin_
 
 # ── College Coach Email Fix ───────────────────────────────────────────────────
 
+@router.delete("/colleges/{college_id}/coaches")
+async def delete_coach(college_id: str, body: dict, admin=Depends(require_admin_token)):
+    """Remove a coach from a college by name."""
+    from bson import ObjectId
+    coach_name = (body.get("coach_name") or "").strip()
+    if not coach_name:
+        raise HTTPException(status_code=400, detail="coach_name is required")
+    try:
+        oid = ObjectId(college_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid college_id")
+
+    result = await db.colleges.update_one(
+        {"_id": oid},
+        {"$pull": {"coaches": {"name": coach_name}}},
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="College not found")
+    return {"ok": True, "removed_coach": coach_name}
+
+
 @router.patch("/colleges/{college_id}/coach-email")
 async def fix_coach_email(college_id: str, body: dict, admin=Depends(require_admin_token)):
     """Admin: update a coach's name and/or email, and delete all sent emails to the old address."""
@@ -332,6 +353,9 @@ async def fix_coach_email(college_id: str, body: dict, admin=Depends(require_adm
         set_fields["coaches.$.email"] = new_email
     if new_coach_name:
         set_fields["coaches.$.name"] = new_coach_name
+    # last_verified: use provided value or auto-stamp today
+    lv = (body.get("last_verified") or "").strip() or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    set_fields["coaches.$.last_verified"] = lv
 
     result = await db.colleges.update_one(
         {"_id": oid, "coaches.name": coach_name},
@@ -365,17 +389,17 @@ async def admin_colleges_contacts(admin=Depends(require_admin_token)):
     """Return all colleges with their coach contact info for admin review."""
     colleges = await db.colleges.find(
         {},
-        {"_id": 1, "name": 1, "division": 1, "conference": 1, "region": 1, "coaches": 1}
+        {"_id": 1, "name": 1, "division": 1, "coaches": 1}
     ).sort("name", 1).to_list(length=None)
+
+    suspicious_patterns = ["athletics@", "info@", "admin@", "basketball@",
+                           "sports@", "recruiting@", "coaches@", "contact@"]
 
     result = []
     for c in colleges:
         cid = str(c["_id"])
         for coach in (c.get("coaches") or []):
             email = coach.get("email", "")
-            # Flag suspicious emails
-            suspicious_patterns = ["athletics@", "info@", "admin@", "basketball@",
-                                   "sports@", "recruiting@", "coaches@", "contact@"]
             is_suspicious = any(email.lower().startswith(p) for p in suspicious_patterns) or not email
             result.append({
                 "college_id": cid,
@@ -385,6 +409,7 @@ async def admin_colleges_contacts(admin=Depends(require_admin_token)):
                 "coach_title": coach.get("title", ""),
                 "email": email,
                 "phone": coach.get("phone", ""),
+                "last_verified": coach.get("last_verified", ""),
                 "suspicious": is_suspicious,
             })
     return result
@@ -426,8 +451,8 @@ async def bulk_export_colleges(admin=Depends(require_admin_token)):
         "college_id", "name", "location", "state", "division", "conference",
         "region", "foreign_friendly", "scholarship_info", "acceptance_rate",
         "notable_alumni", "ranking", "website", "image_url",
-        "coach1_name", "coach1_title", "coach1_email", "coach1_phone",
-        "coach2_name", "coach2_title", "coach2_email", "coach2_phone",
+        "coach1_name", "coach1_title", "coach1_email", "coach1_phone", "coach1_last_verified",
+        "coach2_name", "coach2_title", "coach2_email", "coach2_phone", "coach2_last_verified",
     ])
     for c in colleges:
         coaches = c.get("coaches") or []
@@ -448,8 +473,8 @@ async def bulk_export_colleges(admin=Depends(require_admin_token)):
             c.get("ranking", ""),
             c.get("website", ""),
             c.get("image_url", ""),
-            c1.get("name", ""), c1.get("title", ""), c1.get("email", ""), c1.get("phone", ""),
-            c2.get("name", ""), c2.get("title", ""), c2.get("email", ""), c2.get("phone", ""),
+            c1.get("name",""), c1.get("title",""), c1.get("email",""), c1.get("phone",""), c1.get("last_verified",""),
+            c2.get("name",""), c2.get("title",""), c2.get("email",""), c2.get("phone",""), c2.get("last_verified",""),
         ])
 
     output.seek(0)
@@ -498,6 +523,7 @@ async def bulk_import_colleges(file: UploadFile = File(...), admin=Depends(requi
                     "title": (row.get(f"{prefix}_title") or "Head Coach").strip(),
                     "email": (row.get(f"{prefix}_email") or "").strip(),
                     "phone": (row.get(f"{prefix}_phone") or "").strip(),
+                    "last_verified": (row.get(f"{prefix}_last_verified") or "").strip(),
                 })
 
         def boolify(v):
@@ -562,7 +588,7 @@ async def export_contacts(filter: Optional[str] = "suspicious", admin=Depends(re
     writer = csv.writer(output)
     writer.writerow([
         "college_id", "college_name", "division",
-        "coach_name", "coach_title", "email", "phone", "suspicious"
+        "coach_name", "coach_title", "email", "phone", "last_verified", "suspicious"
     ])
     for c in colleges:
         for coach in (c.get("coaches") or []):
@@ -578,6 +604,7 @@ async def export_contacts(filter: Optional[str] = "suspicious", admin=Depends(re
                 coach.get("title", ""),
                 email,
                 coach.get("phone", ""),
+                coach.get("last_verified", ""),
                 "yes" if susp else "no",
             ])
 
@@ -615,6 +642,7 @@ async def import_contacts(file: UploadFile = File(...), admin=Depends(require_ad
         coach_name = (row.get("coach_name") or "").strip()
         new_email  = (row.get("email") or "").strip()
         new_title  = (row.get("coach_title") or "").strip()
+        new_lv     = (row.get("last_verified") or "").strip()
 
         if not college_id or not coach_name:
             skipped += 1
@@ -640,6 +668,8 @@ async def import_contacts(file: UploadFile = File(...), admin=Depends(require_ad
             set_fields["coaches.$.email"] = new_email
         if new_title:
             set_fields["coaches.$.title"] = new_title
+        if new_lv:
+            set_fields["coaches.$.last_verified"] = new_lv
         if not set_fields:
             skipped += 1
             continue

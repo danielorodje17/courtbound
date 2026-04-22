@@ -125,6 +125,7 @@ export default function AdminPage() {
   const [inlineEdit, setInlineEdit] = useState(null);
   const [inlineValue, setInlineValue] = useState("");
   const [inlineNameValue, setInlineNameValue] = useState("");
+  const [inlineLvValue, setInlineLvValue] = useState("");
   const [inlineSaving, setInlineSaving] = useState(false);
   const [inlineDone, setInlineDone] = useState({});
   const [importResult, setImportResult] = useState(null);
@@ -246,6 +247,24 @@ export default function AdminPage() {
     e.target.value = "";
   };
 
+  const [confirmDeleteCoach, setConfirmDeleteCoach] = useState(null);
+  const [deletingCoach, setDeletingCoach] = useState(false);
+
+  const deleteCoach = async () => {
+    if (!confirmDeleteCoach) return;
+    setDeletingCoach(true);
+    try {
+      await adminReq("delete", `/admin/colleges/${confirmDeleteCoach.college_id}/coaches`, {
+        coach_name: confirmDeleteCoach.coach_name,
+      });
+      setContacts(prev => prev.filter(c =>
+        !(c.college_id === confirmDeleteCoach.college_id && c.coach_name === confirmDeleteCoach.coach_name)
+      ));
+      setConfirmDeleteCoach(null);
+    } catch {}
+    setDeletingCoach(false);
+  };
+
   const openEditCollege = async (college_id) => {
     try {
       // fetch full college from public API
@@ -345,26 +364,29 @@ export default function AdminPage() {
 
   const saveInlineEmail = async () => {
     if (!inlineEdit) return;
-    if (!inlineValue.trim() && !inlineNameValue.trim()) return;
+    if (!inlineValue.trim() && !inlineNameValue.trim() && !inlineLvValue.trim()) return;
     setInlineSaving(true);
     try {
       await adminReq("patch", `/admin/colleges/${inlineEdit.college_id}/coach-email`, {
         coach_name:     inlineEdit.coach_name,
         new_coach_name: inlineNameValue.trim() || undefined,
         new_email:      inlineValue.trim() || undefined,
+        last_verified:  inlineLvValue.trim() || undefined,
       });
       const key = `${inlineEdit.college_id}-${inlineEdit.coach_name}`;
       const finalName  = inlineNameValue.trim() || inlineEdit.coach_name;
       const finalEmail = inlineValue.trim() || inlineEdit.current_email;
+      const finalLv    = inlineLvValue.trim() || inlineEdit.last_verified || "";
       setContacts(prev => prev.map(c =>
         c.college_id === inlineEdit.college_id && c.coach_name === inlineEdit.coach_name
-          ? { ...c, coach_name: finalName, email: finalEmail, suspicious: false }
+          ? { ...c, coach_name: finalName, email: finalEmail, last_verified: finalLv, suspicious: false }
           : c
       ));
       setInlineDone(prev => ({ ...prev, [key]: true }));
       setInlineEdit(null);
       setInlineValue("");
       setInlineNameValue("");
+      setInlineLvValue("");
     } catch {}
     setInlineSaving(false);
   };
@@ -1047,6 +1069,7 @@ export default function AdminPage() {
                       <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Division</th>
                       <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Coach</th>
                       <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Email</th>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Last Verified</th>
                       <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Action</th>
                     </tr>
                   </thead>
@@ -1087,8 +1110,20 @@ export default function AdminPage() {
                                     className="bg-green-600 text-white text-xs font-bold px-2 py-1 rounded hover:bg-green-700 disabled:opacity-60">
                                     {inlineSaving ? "..." : "Save"}
                                   </button>
-                                  <button onClick={() => { setInlineEdit(null); setInlineNameValue(""); setInlineValue(""); }}
+                                  <button onClick={() => { setInlineEdit(null); setInlineNameValue(""); setInlineValue(""); setInlineLvValue(""); }}
                                     className="text-slate-400 text-xs hover:text-slate-600">✕</button>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <label className="text-xs text-slate-500 font-semibold w-24 flex-shrink-0">Last Verified:</label>
+                                  <input
+                                    data-testid={`inline-lv-input-${i}`}
+                                    type="date"
+                                    value={inlineLvValue}
+                                    onChange={e => setInlineLvValue(e.target.value)}
+                                    className="border border-slate-300 rounded-lg px-2 py-1 text-xs focus:ring-2 focus:ring-orange-400 outline-none"
+                                  />
+                                  <button onClick={() => setInlineLvValue(new Date().toISOString().slice(0,10))}
+                                    className="text-xs text-green-600 font-semibold hover:text-green-800">Today</button>
                                 </div>
                               </div>
                             ) : (
@@ -1106,11 +1141,20 @@ export default function AdminPage() {
                             )}
                           </td>
                           <td className="px-4 py-3">
+                            {(() => {
+                              const lv = c.last_verified;
+                              if (!lv) return <span className="text-xs text-red-500 font-semibold">Never</span>;
+                              const days = Math.floor((Date.now() - new Date(lv)) / 86400000);
+                              const color = days > 180 ? "text-amber-600" : "text-green-600";
+                              return <span className={`text-xs font-semibold ${color}`}>{lv}<br/><span className="text-slate-400 font-normal">{days}d ago</span></span>;
+                            })()}
+                          </td>
+                          <td className="px-4 py-3">
                             {!isEditing && (
                               <div className="flex items-center gap-2">
                                 <button
                                   data-testid={`edit-contact-${i}`}
-                                  onClick={() => { setInlineEdit({ college_id: c.college_id, coach_name: c.coach_name, current_email: c.email }); setInlineNameValue(c.coach_name); setInlineValue(c.email); }}
+                                  onClick={() => { setInlineEdit({ college_id: c.college_id, coach_name: c.coach_name, current_email: c.email, last_verified: c.last_verified }); setInlineNameValue(c.coach_name); setInlineValue(c.email); setInlineLvValue(c.last_verified || ""); }}
                                   className="text-xs text-orange-600 hover:text-orange-800 font-bold transition-colors"
                                 >
                                   Edit Coach
@@ -1122,6 +1166,15 @@ export default function AdminPage() {
                                   className="text-xs text-blue-600 hover:text-blue-800 font-bold transition-colors"
                                 >
                                   Edit College
+                                </button>
+                                <span className="text-slate-200">|</span>
+                                <button
+                                  data-testid={`delete-coach-${i}`}
+                                  onClick={() => setConfirmDeleteCoach({ college_id: c.college_id, coach_name: c.coach_name, college_name: c.college_name })}
+                                  className="text-xs text-red-400 hover:text-red-600 font-bold transition-colors"
+                                  title="Delete coach"
+                                >
+                                  Delete
                                 </button>
                               </div>
                             )}
@@ -1264,6 +1317,13 @@ export default function AdminPage() {
                       className="border border-slate-200 rounded px-2 py-1.5 text-xs focus:ring-1 focus:ring-orange-400 outline-none" />
                     <input placeholder="Phone" value={coach.phone || ""} onChange={e => { const c=[...editForm.coaches]; c[ci]={...c[ci],phone:e.target.value}; setEditForm(p=>({...p,coaches:c})); }}
                       className="border border-slate-200 rounded px-2 py-1.5 text-xs focus:ring-1 focus:ring-orange-400 outline-none" />
+                    <div className="col-span-2 flex items-center gap-2">
+                      <label className="text-xs text-slate-500 font-semibold w-28 flex-shrink-0">Last Verified:</label>
+                      <input type="date" value={coach.last_verified || ""} onChange={e => { const c=[...editForm.coaches]; c[ci]={...c[ci],last_verified:e.target.value}; setEditForm(p=>({...p,coaches:c})); }}
+                        className="border border-slate-200 rounded px-2 py-1.5 text-xs focus:ring-1 focus:ring-orange-400 outline-none flex-1" />
+                      <button type="button" onClick={() => { const c=[...editForm.coaches]; c[ci]={...c[ci],last_verified:new Date().toISOString().slice(0,10)}; setEditForm(p=>({...p,coaches:c})); }}
+                        className="text-xs text-green-600 font-semibold hover:text-green-800 whitespace-nowrap">Mark Today</button>
+                    </div>
                     <button onClick={() => setEditForm(p => ({ ...p, coaches: p.coaches.filter((_,ii) => ii!==ci) }))}
                       className="col-span-2 text-xs text-red-500 hover:text-red-700 text-left font-semibold">Remove coach</button>
                   </div>
@@ -1282,6 +1342,37 @@ export default function AdminPage() {
                   Cancel
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── DELETE COACH CONFIRM MODAL ───────────────────────── */}
+      {confirmDeleteCoach && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                <Trash2 className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="font-black text-slate-900 text-lg uppercase" style={{ fontFamily: "Barlow Condensed, sans-serif" }}>Delete Coach</h3>
+                <p className="text-xs text-slate-500">This removes the coach from the college</p>
+              </div>
+            </div>
+            <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-5">
+              <p className="text-sm font-bold text-red-800">{confirmDeleteCoach.coach_name}</p>
+              <p className="text-xs text-red-600">{confirmDeleteCoach.college_name}</p>
+            </div>
+            <div className="flex gap-3">
+              <button data-testid="confirm-delete-coach-btn" onClick={deleteCoach} disabled={deletingCoach}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold text-sm uppercase tracking-wider rounded-xl py-3 transition-colors disabled:opacity-60">
+                {deletingCoach ? "Deleting..." : "Delete Coach"}
+              </button>
+              <button onClick={() => setConfirmDeleteCoach(null)}
+                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm uppercase tracking-wider rounded-xl py-3">
+                Cancel
+              </button>
             </div>
           </div>
         </div>
