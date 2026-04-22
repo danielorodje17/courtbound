@@ -1,8 +1,7 @@
-// Unique college image — each college name maps to its own consistent photo
-// Uses picsum.photos with the college name as a stable seed
-// Every college gets a different image, always the same one for the same name
-
-export function getCollegeImage(name = "") {
+// Returns a unique, consistent image for each college.
+// Uses stored image_url if provided, otherwise generates a stable picsum photo.
+export function getCollegeImage(name = "", imageUrl = "") {
+  if (imageUrl && imageUrl.startsWith("http")) return imageUrl;
   const seed = encodeURIComponent(name.trim() || "default");
   return `https://picsum.photos/seed/${seed}/600/400`;
 }

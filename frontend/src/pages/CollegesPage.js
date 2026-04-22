@@ -245,7 +245,7 @@ export default function CollegesPage() {
             >
               <div className="h-32 relative overflow-hidden">
                 <img
-                  src={getCollegeImage(college.name)}
+                  src={getCollegeImage(college.name, college.image_url)}
                   alt={college.name}
                   className="w-full h-full object-cover"
                   onError={e => { e.target.src = getCollegeImage("default"); }}

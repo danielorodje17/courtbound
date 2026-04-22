@@ -265,7 +265,7 @@ export default function CollegeDetailPage() {
 
       {/* Hero */}
       <div className="relative rounded-xl overflow-hidden h-52 mb-6">
-        <img src={getCollegeImage(college.name)} alt={college.name} className="w-full h-full object-cover" onError={e => { e.target.src = getCollegeImage("default"); }} />
+        <img src={getCollegeImage(college.name, college.image_url)} alt={college.name} className="w-full h-full object-cover" onError={e => { e.target.src = getCollegeImage("default"); }} />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 to-slate-900/20" />
         <div className="absolute bottom-0 left-0 p-6 right-0">
           <div className="flex items-end justify-between">

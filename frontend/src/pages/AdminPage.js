@@ -128,7 +128,15 @@ export default function AdminPage() {
   const [inlineSaving, setInlineSaving] = useState(false);
   const [inlineDone, setInlineDone] = useState({});
   const [importResult, setImportResult] = useState(null);
-  const [importing, setImporting] = useState(false); // {`${college_id}-${coach_name}`: true}
+  const [importing, setImporting] = useState(false);
+  // College edit modal
+  const [editCollege, setEditCollege] = useState(null); // full college object
+  const [editForm, setEditForm] = useState({});
+  const [editSaving, setEditSaving] = useState(false);
+  const [editSaved, setEditSaved] = useState(false);
+  // Bulk college import
+  const [bulkImportResult, setBulkImportResult] = useState(null);
+  const [bulkImporting, setBulkImporting] = useState(false); // {`${college_id}-${coach_name}`: true}
   const adminEmail = localStorage.getItem("cb_admin_email") || "Admin";
 
   const load = useCallback(async () => {
@@ -238,7 +246,96 @@ export default function AdminPage() {
     e.target.value = "";
   };
 
-  const loadContacts = async () => {    if (contactsLoaded) return;
+  const openEditCollege = async (college_id) => {
+    try {
+      // fetch full college from public API
+      const API = process.env.REACT_APP_BACKEND_URL;
+      const res = await fetch(`${API}/api/colleges/${college_id}`);
+      const data = await res.json();
+      setEditCollege(data);
+      setEditForm({
+        name: data.name || "",
+        location: data.location || "",
+        state: data.state || "",
+        division: data.division || "",
+        conference: data.conference || "",
+        region: data.region || "USA",
+        foreign_friendly: data.foreign_friendly ? "yes" : "no",
+        scholarship_info: data.scholarship_info || "",
+        acceptance_rate: data.acceptance_rate || "",
+        notable_alumni: data.notable_alumni || "",
+        ranking: data.ranking ?? "",
+        website: data.website || "",
+        image_url: data.image_url || "",
+        coaches: JSON.parse(JSON.stringify(data.coaches || [])),
+      });
+    } catch {}
+  };
+
+  const saveEditCollege = async () => {
+    if (!editCollege) return;
+    setEditSaving(true);
+    try {
+      const payload = {
+        ...editForm,
+        foreign_friendly: editForm.foreign_friendly === "yes",
+        ranking: editForm.ranking !== "" ? Number(editForm.ranking) : null,
+      };
+      await adminReq("patch", `/admin/colleges/${editCollege.id}/details`, payload);
+      // Refresh contacts list
+      setContactsLoaded(false);
+      await loadContacts();
+      setEditSaved(true);
+      setTimeout(() => { setEditSaved(false); setEditCollege(null); }, 1500);
+    } catch {}
+    setEditSaving(false);
+  };
+
+  const handleBulkCollegeImport = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBulkImporting(true);
+    setBulkImportResult(null);
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const token = localStorage.getItem("cb_admin_token");
+      const API = process.env.REACT_APP_BACKEND_URL;
+      const res = await fetch(`${API}/api/admin/colleges/bulk-import`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      const data = await res.json();
+      setBulkImportResult(data);
+      if (data.created > 0 || data.updated > 0) {
+        setContactsLoaded(false);
+        await loadContacts();
+      }
+    } catch {
+      setBulkImportResult({ ok: false, error: "Upload failed. Check file format." });
+    }
+    setBulkImporting(false);
+    e.target.value = "";
+  };
+
+  const exportBulkColleges = async () => {
+    const token = localStorage.getItem("cb_admin_token");
+    const API = process.env.REACT_APP_BACKEND_URL;
+    const res = await fetch(`${API}/api/admin/colleges/bulk-export`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `courtbound_colleges_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const loadContacts = async () => {
+    if (contactsLoaded) return;
     try {
       const res = await adminReq("get", "/admin/colleges-contacts");
       setContacts(res.data);
@@ -834,6 +931,34 @@ export default function AdminPage() {
 
         return (
           <div>
+            {/* Bulk College Import/Export */}
+            <div className="flex items-center gap-2 mb-5 flex-wrap p-4 bg-slate-50 border border-slate-200 rounded-xl">
+              <span className="text-xs font-bold text-slate-600 uppercase tracking-wide mr-2">Colleges:</span>
+              <button data-testid="export-colleges-btn" onClick={exportBulkColleges}
+                className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-900 text-white text-xs font-bold uppercase tracking-wide rounded-lg transition-all">
+                <Download className="w-3.5 h-3.5" /> Export All Colleges
+              </button>
+              <label className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold uppercase tracking-wide rounded-lg transition-all cursor-pointer">
+                <Upload className="w-3.5 h-3.5" />
+                {bulkImporting ? "Importing..." : "Import / Add Colleges"}
+                <input type="file" accept=".csv" className="hidden" onChange={handleBulkCollegeImport} disabled={bulkImporting} />
+              </label>
+              <span className="text-xs text-slate-400">Empty college_id = add new college. Existing id = update.</span>
+            </div>
+
+            {bulkImportResult && (
+              <div data-testid="bulk-import-result" className={`mb-4 px-4 py-3 rounded-xl text-sm font-semibold border flex flex-wrap items-center gap-4 ${bulkImportResult.ok ? "bg-green-50 border-green-200 text-green-800" : "bg-red-50 border-red-200 text-red-800"}`}>
+                {bulkImportResult.ok ? (
+                  <>
+                    <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+                    <span><strong>{bulkImportResult.created}</strong> added, <strong>{bulkImportResult.updated}</strong> updated, <strong>{bulkImportResult.skipped}</strong> skipped</span>
+                    {bulkImportResult.errors?.length > 0 && <span className="text-xs text-amber-700">{bulkImportResult.errors[0]}</span>}
+                  </>
+                ) : <span>{bulkImportResult.error}</span>}
+                <button onClick={() => setBulkImportResult(null)} className="ml-auto text-slate-400 hover:text-slate-600 text-xs">Dismiss</button>
+              </div>
+            )}
+
             {/* Stats bar */}
             <div className="flex items-center gap-4 mb-4 flex-wrap">
               <div className="bg-white border border-slate-200 rounded-lg px-4 py-2 text-sm">
@@ -982,17 +1107,23 @@ export default function AdminPage() {
                           </td>
                           <td className="px-4 py-3">
                             {!isEditing && (
-                              <button
-                                data-testid={`edit-contact-${i}`}
-                                onClick={() => {
-                                  setInlineEdit({ college_id: c.college_id, coach_name: c.coach_name, current_email: c.email });
-                                  setInlineNameValue(c.coach_name);
-                                  setInlineValue(c.email);
-                                }}
-                                className="text-xs text-orange-600 hover:text-orange-800 font-bold transition-colors"
-                              >
-                                Edit
-                              </button>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  data-testid={`edit-contact-${i}`}
+                                  onClick={() => { setInlineEdit({ college_id: c.college_id, coach_name: c.coach_name, current_email: c.email }); setInlineNameValue(c.coach_name); setInlineValue(c.email); }}
+                                  className="text-xs text-orange-600 hover:text-orange-800 font-bold transition-colors"
+                                >
+                                  Edit Coach
+                                </button>
+                                <span className="text-slate-200">|</span>
+                                <button
+                                  data-testid={`edit-college-${i}`}
+                                  onClick={() => openEditCollege(c.college_id)}
+                                  className="text-xs text-blue-600 hover:text-blue-800 font-bold transition-colors"
+                                >
+                                  Edit College
+                                </button>
+                              </div>
                             )}
                           </td>
                         </tr>
@@ -1057,6 +1188,101 @@ export default function AdminPage() {
                 Settings saved — changes are live for all users immediately.
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── EDIT COLLEGE MODAL ───────────────────────────────── */}
+      {editCollege && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between rounded-t-2xl">
+              <h3 className="font-black text-slate-900 text-lg uppercase" style={{ fontFamily: "Barlow Condensed, sans-serif" }}>
+                Edit College
+              </h3>
+              <button onClick={() => setEditCollege(null)} className="text-slate-400 hover:text-slate-700"><XCircle className="w-5 h-5" /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              {/* Basic fields */}
+              <div className="grid grid-cols-2 gap-4">
+                {[
+                  { key: "name", label: "College Name", full: true },
+                  { key: "location", label: "Location (City, State)" },
+                  { key: "state", label: "State" },
+                  { key: "division", label: "Division" },
+                  { key: "conference", label: "Conference" },
+                  { key: "region", label: "Region (USA / Europe)" },
+                  { key: "acceptance_rate", label: "Acceptance Rate" },
+                  { key: "ranking", label: "Ranking #" },
+                  { key: "website", label: "Website URL" },
+                  { key: "image_url", label: "Image URL" },
+                ].map(f => (
+                  <div key={f.key} className={f.full ? "col-span-2" : ""}>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">{f.label}</label>
+                    <input type="text" value={editForm[f.key] ?? ""} onChange={e => setEditForm(p => ({ ...p, [f.key]: e.target.value }))}
+                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 outline-none" />
+                  </div>
+                ))}
+                <div className="col-span-2">
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Notable Alumni</label>
+                  <input type="text" value={editForm.notable_alumni ?? ""} onChange={e => setEditForm(p => ({ ...p, notable_alumni: e.target.value }))}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 outline-none" />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Scholarship Info</label>
+                  <textarea rows={2} value={editForm.scholarship_info ?? ""} onChange={e => setEditForm(p => ({ ...p, scholarship_info: e.target.value }))}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 outline-none resize-none" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">UK Friendly</label>
+                  <select value={editForm.foreign_friendly} onChange={e => setEditForm(p => ({ ...p, foreign_friendly: e.target.value }))}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 outline-none bg-white">
+                    <option value="yes">Yes</option>
+                    <option value="no">No</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Image preview */}
+              {editForm.image_url && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Image Preview</label>
+                  <img src={editForm.image_url} alt="preview" className="h-24 rounded-lg object-cover border border-slate-200" onError={e => e.target.style.display="none"} />
+                </div>
+              )}
+
+              {/* Coaches */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Coaches</label>
+                {(editForm.coaches || []).map((coach, ci) => (
+                  <div key={ci} className="grid grid-cols-2 gap-2 p-3 border border-slate-100 rounded-lg mb-2 bg-slate-50">
+                    <input placeholder="Name" value={coach.name || ""} onChange={e => { const c=[...editForm.coaches]; c[ci]={...c[ci],name:e.target.value}; setEditForm(p=>({...p,coaches:c})); }}
+                      className="border border-slate-200 rounded px-2 py-1.5 text-xs focus:ring-1 focus:ring-orange-400 outline-none" />
+                    <input placeholder="Title" value={coach.title || ""} onChange={e => { const c=[...editForm.coaches]; c[ci]={...c[ci],title:e.target.value}; setEditForm(p=>({...p,coaches:c})); }}
+                      className="border border-slate-200 rounded px-2 py-1.5 text-xs focus:ring-1 focus:ring-orange-400 outline-none" />
+                    <input placeholder="Email" value={coach.email || ""} onChange={e => { const c=[...editForm.coaches]; c[ci]={...c[ci],email:e.target.value}; setEditForm(p=>({...p,coaches:c})); }}
+                      className="border border-slate-200 rounded px-2 py-1.5 text-xs focus:ring-1 focus:ring-orange-400 outline-none" />
+                    <input placeholder="Phone" value={coach.phone || ""} onChange={e => { const c=[...editForm.coaches]; c[ci]={...c[ci],phone:e.target.value}; setEditForm(p=>({...p,coaches:c})); }}
+                      className="border border-slate-200 rounded px-2 py-1.5 text-xs focus:ring-1 focus:ring-orange-400 outline-none" />
+                    <button onClick={() => setEditForm(p => ({ ...p, coaches: p.coaches.filter((_,ii) => ii!==ci) }))}
+                      className="col-span-2 text-xs text-red-500 hover:text-red-700 text-left font-semibold">Remove coach</button>
+                  </div>
+                ))}
+                <button onClick={() => setEditForm(p => ({ ...p, coaches: [...(p.coaches||[]), {name:"",title:"Head Coach",email:"",phone:""}] }))}
+                  className="text-xs text-orange-600 hover:text-orange-800 font-bold">+ Add Coach</button>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button data-testid="save-college-btn" onClick={saveEditCollege} disabled={editSaving}
+                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-black text-sm uppercase tracking-wider rounded-xl py-3 transition-all disabled:opacity-60">
+                  {editSaving ? "Saving..." : editSaved ? "Saved!" : "Save Changes"}
+                </button>
+                <button onClick={() => setEditCollege(null)}
+                  className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm uppercase tracking-wider rounded-xl py-3 transition-all">
+                  Cancel
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -390,6 +390,161 @@ async def admin_colleges_contacts(admin=Depends(require_admin_token)):
     return result
 
 
+@router.patch("/colleges/{college_id}/details")
+async def update_college_details(college_id: str, body: dict, admin=Depends(require_admin_token)):
+    """Admin: update any top-level college fields and/or full coaches array."""
+    from bson import ObjectId
+    try:
+        oid = ObjectId(college_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid college_id")
+
+    allowed = {
+        "name", "location", "state", "division", "conference", "region",
+        "foreign_friendly", "scholarship_info", "acceptance_rate",
+        "notable_alumni", "ranking", "website", "image_url", "coaches",
+    }
+    updates = {k: v for k, v in body.items() if k in allowed}
+    if not updates:
+        raise HTTPException(status_code=400, detail="No valid fields provided")
+
+    updates["updated_at"] = datetime.now(timezone.utc).isoformat()
+    result = await db.colleges.update_one({"_id": oid}, {"$set": updates})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="College not found")
+    return {"ok": True, "college_id": college_id, "fields_updated": list(updates.keys())}
+
+
+@router.get("/colleges/bulk-export")
+async def bulk_export_colleges(admin=Depends(require_admin_token)):
+    """Export all colleges as CSV (one row per college, first coach flattened)."""
+    colleges = await db.colleges.find({}).sort("name", 1).to_list(length=None)
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "college_id", "name", "location", "state", "division", "conference",
+        "region", "foreign_friendly", "scholarship_info", "acceptance_rate",
+        "notable_alumni", "ranking", "website", "image_url",
+        "coach1_name", "coach1_title", "coach1_email", "coach1_phone",
+        "coach2_name", "coach2_title", "coach2_email", "coach2_phone",
+    ])
+    for c in colleges:
+        coaches = c.get("coaches") or []
+        c1 = coaches[0] if len(coaches) > 0 else {}
+        c2 = coaches[1] if len(coaches) > 1 else {}
+        writer.writerow([
+            str(c["_id"]),
+            c.get("name", ""),
+            c.get("location", ""),
+            c.get("state", ""),
+            c.get("division", ""),
+            c.get("conference", ""),
+            c.get("region", "USA"),
+            "yes" if c.get("foreign_friendly") else "no",
+            c.get("scholarship_info", ""),
+            c.get("acceptance_rate", ""),
+            c.get("notable_alumni", ""),
+            c.get("ranking", ""),
+            c.get("website", ""),
+            c.get("image_url", ""),
+            c1.get("name", ""), c1.get("title", ""), c1.get("email", ""), c1.get("phone", ""),
+            c2.get("name", ""), c2.get("title", ""), c2.get("email", ""), c2.get("phone", ""),
+        ])
+
+    output.seek(0)
+    filename = f"courtbound_colleges_{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@router.post("/colleges/bulk-import")
+async def bulk_import_colleges(file: UploadFile = File(...), admin=Depends(require_admin_token)):
+    """Bulk import colleges from CSV. Empty college_id = create new. Existing id = update."""
+    from bson import ObjectId
+
+    content = await file.read()
+    try:
+        text = content.decode("utf-8-sig")
+    except Exception:
+        raise HTTPException(status_code=400, detail="Could not decode file — use UTF-8 CSV")
+
+    reader = csv.DictReader(io.StringIO(text))
+    required = {"name", "division"}
+    if not required.issubset(set(reader.fieldnames or [])):
+        raise HTTPException(status_code=400, detail="CSV must have at minimum: name, division")
+
+    created = 0
+    updated = 0
+    skipped = 0
+    errors = []
+
+    for row in reader:
+        name = (row.get("name") or "").strip()
+        if not name:
+            skipped += 1
+            continue
+
+        # Build coaches array
+        coaches = []
+        for prefix in ("coach1", "coach2"):
+            cname = (row.get(f"{prefix}_name") or "").strip()
+            if cname:
+                coaches.append({
+                    "name": cname,
+                    "title": (row.get(f"{prefix}_title") or "Head Coach").strip(),
+                    "email": (row.get(f"{prefix}_email") or "").strip(),
+                    "phone": (row.get(f"{prefix}_phone") or "").strip(),
+                })
+
+        def boolify(v):
+            return str(v).strip().lower() in ("yes", "true", "1")
+
+        college_doc = {
+            "name":            name,
+            "location":        (row.get("location") or "").strip(),
+            "state":           (row.get("state") or "").strip(),
+            "division":        (row.get("division") or "").strip(),
+            "conference":      (row.get("conference") or "").strip(),
+            "region":          (row.get("region") or "USA").strip(),
+            "foreign_friendly": boolify(row.get("foreign_friendly", "no")),
+            "scholarship_info": (row.get("scholarship_info") or "").strip(),
+            "acceptance_rate":  (row.get("acceptance_rate") or "").strip(),
+            "notable_alumni":   (row.get("notable_alumni") or "").strip(),
+            "ranking":          int(row["ranking"]) if str(row.get("ranking", "")).strip().isdigit() else None,
+            "website":          (row.get("website") or "").strip(),
+            "image_url":        (row.get("image_url") or "").strip(),
+            "coaches":          coaches,
+        }
+
+        college_id = (row.get("college_id") or "").strip()
+        if college_id:
+            # Update existing
+            try:
+                oid = ObjectId(college_id)
+            except Exception:
+                errors.append(f"Invalid id for {name}")
+                skipped += 1
+                continue
+            college_doc["updated_at"] = datetime.now(timezone.utc).isoformat()
+            res = await db.colleges.update_one({"_id": oid}, {"$set": college_doc})
+            if res.matched_count:
+                updated += 1
+            else:
+                errors.append(f"Not found: {college_id}")
+                skipped += 1
+        else:
+            # Create new
+            college_doc["created_at"] = datetime.now(timezone.utc).isoformat()
+            await db.colleges.insert_one(college_doc)
+            created += 1
+
+    return {"ok": True, "created": created, "updated": updated, "skipped": skipped, "errors": errors[:20]}
+
+
 @router.get("/colleges-contacts/export")
 async def export_contacts(filter: Optional[str] = "suspicious", admin=Depends(require_admin_token)):
     """Export college coach contacts as CSV. filter=suspicious|all"""
