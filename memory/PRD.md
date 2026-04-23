@@ -116,7 +116,12 @@ Build "CourtBound," a web app to help UK/European college basketball players tra
 - This hoists ajv@8 for webpack while allowing fork-ts-checker to keep nested ajv@6
 - `yarn build` passes locally
 
-### ⚠️ REQUIRED: Run Supabase Migration SQL
+### ✅ Auto-clear Verified Badge on Email Report (DONE — 2026-04-23)
+- `POST /reports/college` endpoint fixed (frontend was calling `/reports/college`, backend had `/reports`)
+- `CollegeReportCreate` model replaced with inline `body: dict` to match actual frontend payload
+- When `issue_type` is `"Wrong email address"` or `"Email bounced / undeliverable"`, `coaches.last_verified` is immediately set to `NULL`
+- Non-email issue types ("Coach no longer at school", "Other", etc.) do NOT clear the badge
+- Tested and verified: badge clears on email reports, preserved on non-email reports
 **File**: `/app/memory/supabase_migration_v2.sql`
 **Where**: Supabase Dashboard → Database → SQL Editor
 
