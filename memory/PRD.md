@@ -233,6 +233,15 @@ An 18-year-old student basketball player from UK (England Under-18) wants to tra
 - [x] "Open in Gmail" button on ComposePage — opens Gmail compose in new tab with coach email, subject, body pre-filled
 - [x] On click: logs email (POST /api/emails), auto-tracks college if not tracked, sets status=contacted + follow_up_date=today+7
 - [x] Success banner confirms: "[College] marked as Contacted with follow-up reminder set for 7 days"
+### v1.38 - Phase 2: Data Migration MongoDB → Supabase (Feb 2026)
+- [x] Installed supabase-py client in backend
+- [x] Generated and executed `migrate_to_supabase.py` — migrated 977 records across 15 tables with zero errors
+- [x] All MongoDB IDs converted to deterministic UUIDs (uuid5) — script is fully idempotent, safe to re-run
+- [x] FK order respected: colleges → coaches → users → all dependent tables
+- [x] Integrity verified: Duke coaches, player profile (Daniel Orodje), app_settings all confirmed in Supabase
+- [x] 3 orphan records noted (1 tracked_college, 2 emails) — test data with dangling user/college refs, safely skipped
+- Migration script saved at: /app/backend/migrate_to_supabase.py
+
 ### v1.37 - Email Verified Migration Fix (Feb 2026)
 - [x] Added `_stamp_verified_coaches()` startup migration in server.py: runs on every boot, idempotent, stamps `last_verified: "2026-04-22"` on any coach missing the field — fixes deployed databases that were seeded without verification dates
 - [x] Root cause: previous agent stamped preview DB via one-off Python script but deployed DB was seeded fresh from seed_data.py (no last_verified). Migration now handles both on startup.
