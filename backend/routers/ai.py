@@ -3,7 +3,8 @@ import uuid
 import json
 import re
 from fastapi import APIRouter, Depends, HTTPException
-from database import db
+from fastapi.concurrency import run_in_threadpool
+from supabase_db import supa
 from auth_utils import UserModel, get_current_user
 from models import AIMessageRequest, AIStrategyRequest, NCAACHeckRequest, FollowUpRequest, ReplyNextStepsRequest
 
@@ -31,7 +32,6 @@ async def draft_message(data: AIMessageRequest):
     if data.user_secondary_position:
         position_line = f"{data.user_position} / {data.user_secondary_position} (versatile, can play both)"
 
-    # Build college reply context for context-aware message types
     context_types = {"second_follow_up", "reply_to_interest", "reply_to_offer", "after_call", "after_visit", "no_interest"}
     reply_section = ""
     if data.message_type in context_types:
@@ -39,13 +39,13 @@ async def draft_message(data: AIMessageRequest):
             reply_section = f"\n\nCOLLEGE'S REPLY (most recent message from the coach — the drafted email MUST directly respond to this):\n\"{data.college_reply_body}\""
         elif data.college_reply_outcome:
             outcome_labels = {
-                "interested":         "The coach expressed interest in the player",
-                "call_requested":     "The coach requested a phone/video call",
-                "scholarship_offered":"The college has offered a scholarship",
-                "after_call":         "A call has already taken place between the player and coach",
-                "after_visit":        "The player has visited the campus",
-                "no_interest":        "The college has expressed no interest in recruiting the player",
-                "second_follow_up":   "No response yet after an initial follow-up",
+                "interested": "The coach expressed interest in the player",
+                "call_requested": "The coach requested a phone/video call",
+                "scholarship_offered": "The college has offered a scholarship",
+                "after_call": "A call has already taken place between the player and coach",
+                "after_visit": "The player has visited the campus",
+                "no_interest": "The college has expressed no interest in recruiting the player",
+                "second_follow_up": "No response yet after an initial follow-up",
             }
             outcome_desc = outcome_labels.get(data.college_reply_outcome, data.college_reply_outcome)
             reply_section = f"\n\nCOLLEGE STATUS: {outcome_desc}. The drafted email must be fully consistent with this context."
@@ -175,7 +175,7 @@ async def reply_next_steps(data: ReplyNextStepsRequest, current_user: UserModel 
         "schedule_call":       "The coach has requested a call or campus visit — this is a strong signal",
         "scholarship_offered": "The coach has made a formal scholarship offer — critical decision point",
         "rejected":            "The coach has politely declined — not interested at this time",
-    }.get(data.outcome, "The outcome of this reply is unclear and needs your assessment")
+    }.get(data.outcome or "", "The outcome of this reply is unclear and needs your assessment")
     prompt = f"""You are a college basketball recruitment advisor for an international player.
 
 CONTEXT:
@@ -213,34 +213,33 @@ Provide structured, specific next steps. Return ONLY valid JSON:
 @router.get("/ai/profile-review")
 async def ai_profile_review(current_user: UserModel = Depends(get_current_user)):
     from emergentintegrations.llm.chat import LlmChat, UserMessage
-    from bson import ObjectId
     api_key = os.environ.get("EMERGENT_LLM_KEY")
-    profile = await db.profiles.find_one({"user_id": current_user.user_id}, {"_id": 0})
-    if not profile:
-        raise HTTPException(status_code=400, detail="Please complete your player profile first")
 
-    emails = await db.emails.find(
-        {"user_id": current_user.user_id}, {"_id": 0, "direction": 1, "college_id": 1}
-    ).to_list(1000)
+    profile_r = await run_in_threadpool(
+        lambda: supa.table("profiles").select("*").eq("user_id", current_user.user_id).execute()
+    )
+    if not profile_r.data:
+        raise HTTPException(status_code=400, detail="Please complete your player profile first")
+    profile = profile_r.data[0]
+
+    emails_r = await run_in_threadpool(
+        lambda: supa.table("emails").select("direction,college_id").eq("user_id", current_user.user_id).execute()
+    )
+    emails = emails_r.data or []
     sent_ids = list({e["college_id"] for e in emails if e.get("direction") == "sent"})
     replied_ids = list({e["college_id"] for e in emails if e.get("direction") == "received"})
 
     response_context = ""
     if replied_ids:
-        try:
-            resp_colleges = await db.colleges.find(
-                {"_id": {"$in": [ObjectId(i) for i in replied_ids[:10]]}},
-                {"_id": 0, "name": 1, "division": 1}
-            ).to_list(10)
-            names = [f"{c['name']} ({c.get('division','')})" for c in resp_colleges]
-            response_context = f"\nColleges that replied: {', '.join(names)}"
-        except Exception:
-            pass
+        resp_r = await run_in_threadpool(
+            lambda: supa.table("colleges").select("name,division").in_("id", replied_ids[:10]).execute()
+        )
+        names = [f"{c['name']} ({c.get('division','')})" for c in (resp_r.data or [])]
+        response_context = f"\nColleges that replied: {', '.join(names)}"
 
     primary_pos = profile.get("primary_position") or profile.get("position", "Not set")
     secondary_pos = profile.get("secondary_position", "")
     position = f"{primary_pos} / {secondary_pos}" if secondary_pos and secondary_pos != "None" else primary_pos
-
     p = profile
 
     def stat_line(prefix):
@@ -248,11 +247,8 @@ async def ai_profile_review(current_user: UserModel = Depends(get_current_user))
             (f"{prefix}_ppg", "PPG"), (f"{prefix}_apg", "APG"), (f"{prefix}_rpg", "RPG"),
             (f"{prefix}_spg", "SPG"), (f"{prefix}_fg_percent", "FG%"), (f"{prefix}_three_pt_percent", "3PT%"),
         ]
-        vals = [(label, p.get(key, "")) for key, label in fields]
-        set_vals = [(lbl, v) for lbl, v in vals if v]
-        if not set_vals:
-            return "Not set"
-        return " | ".join(f"{lbl} {v}" for lbl, v in set_vals)
+        set_vals = [(lbl, p.get(key, "")) for key, lbl in fields if p.get(key)]
+        return " | ".join(f"{lbl} {v}" for lbl, v in set_vals) if set_vals else "Not set"
 
     profile_text = f"""
 Name: {p.get('full_name', 'Not set')}
@@ -323,34 +319,44 @@ Return ONLY valid JSON:
 
 @router.get("/ai/match/saved")
 async def get_saved_match(current_user: UserModel = Depends(get_current_user)):
-    """Return the last saved AI match result for this user without re-running."""
-    saved = await db.ai_match_results.find_one(
-        {"user_id": current_user.user_id}, {"_id": 0}
+    saved_r = await run_in_threadpool(
+        lambda: supa.table("ai_match_results").select("results,run_at")
+        .eq("user_id", current_user.user_id).execute()
     )
-    if not saved:
+    if not saved_r.data:
         return {"results": None, "run_at": None}
-    return {"results": saved["results"], "run_at": saved.get("run_at")}
+    return {"results": saved_r.data[0]["results"], "run_at": saved_r.data[0].get("run_at")}
 
 
 @router.get("/ai/match")
 async def ai_match(current_user: UserModel = Depends(get_current_user)):
     from emergentintegrations.llm.chat import LlmChat, UserMessage
+    from datetime import datetime, timezone
     api_key = os.environ.get("EMERGENT_LLM_KEY")
-    profile = await db.profiles.find_one({"user_id": current_user.user_id}, {"_id": 0})
-    if not profile:
+
+    profile_r = await run_in_threadpool(
+        lambda: supa.table("profiles").select("*").eq("user_id", current_user.user_id).execute()
+    )
+    if not profile_r.data:
         raise HTTPException(status_code=400, detail="Please complete your player profile first")
-    colleges = await db.colleges.find(
-        {}, {"_id": 1, "name": 1, "division": 1, "foreign_friendly": 1, "acceptance_rate": 1, "scholarship_info": 1}
-    ).to_list(200)
+    profile = profile_r.data[0]
+
+    colleges_r = await run_in_threadpool(
+        lambda: supa.table("colleges")
+        .select("id,name,division,foreign_friendly,acceptance_rate,scholarship_info")
+        .execute()
+    )
+    colleges = colleges_r.data or []
+
     college_lines = []
     for c in colleges:
         ff = "UK-Friendly" if c.get("foreign_friendly") else "Standard"
-        college_lines.append(f"{str(c['_id'])}|{c.get('name','?')}|{c.get('division','?')}|{ff}|{c.get('acceptance_rate','?')}")
-    name = profile.get("full_name", current_user.name or "Player")
+        college_lines.append(f"{c['id']}|{c.get('name','?')}|{c.get('division','?')}|{ff}|{c.get('acceptance_rate','?')}")
+
+    name = profile.get("full_name") or current_user.name or "Player"
     primary_pos = profile.get("primary_position") or profile.get("position", "Not specified")
     secondary_pos = profile.get("secondary_position", "")
     position = f"{primary_pos} / {secondary_pos} (versatile)" if secondary_pos else primary_pos
-    # Use best available stats: prefer college stats, fallback to legacy ppg/apg/rpg
     ppg = profile.get("college_ppg") or profile.get("academy_ppg") or profile.get("ppg", "N/A")
     rpg = profile.get("college_rpg") or profile.get("academy_rpg") or profile.get("rpg", "N/A")
     apg = profile.get("college_apg") or profile.get("academy_apg") or profile.get("apg", "N/A")
@@ -358,12 +364,13 @@ async def ai_match(current_user: UserModel = Depends(get_current_user)):
     height_cm = profile.get("height_cm", "")
     height = f"{height_ft} / {height_cm}cm" if height_ft or height_cm else "Not specified"
     target_div = profile.get("target_division", "Any Division")
-    gcse = profile.get("gcse_results", "N/A")
+    gcse = profile.get("gcse_grades", "N/A")
     predicted = profile.get("predicted_grades", profile.get("a_level_grades", "N/A"))
     bio = profile.get("bio", "")
     current_team = profile.get("current_team", "")
     club_team = profile.get("club_team", "")
     team_line = " / ".join(t for t in [current_team, club_team] if t) or "Not specified"
+
     prompt = f"""You are a college basketball recruitment AI. Analyse this player profile and categorize ALL the colleges listed.
 
 PLAYER PROFILE:
@@ -383,18 +390,19 @@ Categorise each college as excellent_fit, good_fit, or possible_fit.
 SCORING RULES — BE CONSERVATIVE AND REALISTIC:
 - A European player always faces real barriers: visa/immigration hurdles, stiff scholarship competition from US players, cultural adjustment, athletic level differences, and distance. No college is ever a perfect match.
 - NEVER assign a score above 86%. Scores of 84-86% should be rare and reserved for genuinely exceptional alignment.
-- Vary scores meaningfully within each band — do not cluster scores together. If two colleges are both "excellent", one might be 83% and another 77%.
+- Vary scores meaningfully within each band — do not cluster scores together.
 
 BANDS:
 - excellent_fit (72-86%): UK-Friendly + division matches target + realistic for player level. Hard ceiling 86%.
 - good_fit (50-71%): UK-Friendly OR division is close match + reasonable path forward
-- possible_fit (30-49%): Achievable but significant work required — different division, not UK-friendly, or academic uncertainty
+- possible_fit (30-49%): Achievable but significant work required
 
 Include at most 10 per category. Prioritise UK-Friendly colleges.
 The "why" field must be honest — mention at least one realistic challenge the player will face at that college.
 
 Return ONLY valid JSON — no markdown, no explanation:
 {{"excellent_fit":[{{"id":"...","name":"...","division":"...","pct":79,"why":"One sentence max 25 words, noting one challenge"}}],"good_fit":[...],"possible_fit":[...]}}"""
+
     chat = LlmChat(
         api_key=api_key, session_id=str(uuid.uuid4()),
         system_message="You are a college basketball recruitment AI. Return only valid JSON."
@@ -406,11 +414,11 @@ Return ONLY valid JSON — no markdown, no explanation:
     except Exception:
         raise HTTPException(status_code=500, detail="AI response could not be parsed. Please try again.")
 
-    # Persist results so the user sees them on next visit
-    from datetime import datetime, timezone
-    await db.ai_match_results.update_one(
-        {"user_id": current_user.user_id},
-        {"$set": {"user_id": current_user.user_id, "results": result, "run_at": datetime.now(timezone.utc).isoformat()}},
-        upsert=True,
+    run_at = datetime.now(timezone.utc).isoformat()
+    await run_in_threadpool(
+        lambda: supa.table("ai_match_results").upsert(
+            {"user_id": current_user.user_id, "results": result, "run_at": run_at},
+            on_conflict="user_id",
+        ).execute()
     )
-    return {"results": result, "run_at": datetime.now(timezone.utc).isoformat()}
+    return {"results": result, "run_at": run_at}

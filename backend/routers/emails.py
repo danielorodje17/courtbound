@@ -2,9 +2,9 @@ import io
 import csv
 import re as _re
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
-from bson import ObjectId
+from fastapi.concurrency import run_in_threadpool
 from datetime import datetime, timezone
-from database import db
+from supabase_db import supa
 from auth_utils import UserModel, get_current_user
 from models import EmailLogCreate, BulkEmailImport, ReplyLogRequest, EmailTemplateCreate
 
@@ -26,18 +26,33 @@ def _map_type_to_direction(t: str) -> str:
     return "sent"
 
 
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
 @router.get("/emails/college-context/{college_id}")
 async def college_context(college_id: str, current_user: UserModel = Depends(get_current_user)):
-    """Returns the latest college reply and tracked outcome for the compose page."""
-    tracked = await db.tracked_colleges.find_one(
-        {"user_id": current_user.user_id, "college_id": college_id},
-        {"_id": 0, "reply_outcome": 1, "notes": 1}
+    tracked_result = await run_in_threadpool(
+        lambda: supa.table("tracked_colleges")
+        .select("reply_outcome,notes")
+        .eq("user_id", current_user.user_id)
+        .eq("college_id", college_id)
+        .execute()
     )
-    received = await db.emails.find(
-        {"user_id": current_user.user_id, "college_id": college_id, "direction": "received"},
-        {"_id": 0, "subject": 1, "body": 1, "coach_name": 1, "created_at": 1}
-    ).sort("created_at", -1).limit(1).to_list(1)
-    latest_reply = received[0] if received else None
+    tracked = tracked_result.data[0] if tracked_result.data else None
+
+    received_result = await run_in_threadpool(
+        lambda: supa.table("emails")
+        .select("subject,body,coach_name,created_at")
+        .eq("user_id", current_user.user_id)
+        .eq("college_id", college_id)
+        .eq("direction", "received")
+        .order("created_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    latest_reply = received_result.data[0] if received_result.data else None
+
     return {
         "reply_outcome": tracked.get("reply_outcome", "") if tracked else "",
         "notes": tracked.get("notes", "") if tracked else "",
@@ -47,33 +62,39 @@ async def college_context(college_id: str, current_user: UserModel = Depends(get
 
 @router.get("/emails")
 async def get_emails(current_user: UserModel = Depends(get_current_user), college_id: str = None):
-    query = {"user_id": current_user.user_id}
+    query = supa.table("emails").select("*").eq("user_id", current_user.user_id)
     if college_id:
-        query["college_id"] = college_id
-    emails = await db.emails.find(query).sort("created_at", -1).to_list(500)
-    for e in emails:
-        e["id"] = str(e.pop("_id"))
-    return emails
+        query = query.eq("college_id", college_id)
+    result = await run_in_threadpool(lambda: query.order("created_at", desc=True).limit(500).execute())
+    return result.data
 
 
 @router.post("/emails")
 async def log_email(data: EmailLogCreate, current_user: UserModel = Depends(get_current_user)):
     doc = {
-        "user_id": current_user.user_id, "college_id": data.college_id,
-        "direction": data.direction, "subject": data.subject, "body": data.body,
-        "coach_name": data.coach_name, "coach_email": data.coach_email,
-        "message_type": data.message_type,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "user_id": current_user.user_id,
+        "college_id": data.college_id,
+        "direction": data.direction,
+        "subject": data.subject,
+        "body": data.body,
+        "coach_name": data.coach_name or "",
+        "coach_email": data.coach_email or "",
+        "message_type": data.message_type or "initial_outreach",
+        "created_at": _now(),
     }
-    result = await db.emails.insert_one(doc)
-    doc["id"] = str(result.inserted_id)
-    doc.pop("_id", None)
-    return doc
+    result = await run_in_threadpool(lambda: supa.table("emails").insert(doc).execute())
+    return result.data[0] if result.data else doc
 
 
 @router.delete("/emails/{email_id}")
 async def delete_email(email_id: str, current_user: UserModel = Depends(get_current_user)):
-    await db.emails.delete_one({"_id": ObjectId(email_id), "user_id": current_user.user_id})
+    await run_in_threadpool(
+        lambda: supa.table("emails")
+        .delete()
+        .eq("id", email_id)
+        .eq("user_id", current_user.user_id)
+        .execute()
+    )
     return {"message": "Deleted"}
 
 
@@ -81,26 +102,39 @@ async def delete_email(email_id: str, current_user: UserModel = Depends(get_curr
 async def bulk_import_emails(data: BulkEmailImport, current_user: UserModel = Depends(get_current_user)):
     if not data.college_ids:
         raise HTTPException(status_code=400, detail="No colleges selected")
+
+    sent_date = data.sent_date or _now()
     docs = []
-    sent_date = data.sent_date or datetime.now(timezone.utc).isoformat()
     for college_id in data.college_ids:
-        try:
-            college = await db.colleges.find_one({"_id": ObjectId(college_id)})
-        except Exception:
+        college_result = await run_in_threadpool(
+            lambda cid=college_id: supa.table("colleges")
+            .select("id,coaches(*)")
+            .eq("id", cid)
+            .execute()
+        )
+        if not college_result.data:
             continue
-        if not college:
-            continue
-        coach = (college.get("coaches") or [{}])[0]
+        college = college_result.data[0]
+        coaches = college.get("coaches") or [{}]
+        coach = coaches[0] if coaches else {}
         docs.append({
-            "user_id": current_user.user_id, "college_id": college_id,
-            "direction": data.direction, "subject": data.subject, "body": data.body,
+            "user_id": current_user.user_id,
+            "college_id": college_id,
+            "direction": data.direction,
+            "subject": data.subject,
+            "body": data.body,
             "coach_name": data.coach_name or coach.get("name", ""),
-            "coach_email": coach.get("email", ""), "created_at": sent_date,
+            "coach_email": coach.get("email", ""),
+            "message_type": "initial_outreach",
+            "created_at": sent_date,
         })
+
     if not docs:
         raise HTTPException(status_code=400, detail="No valid colleges found")
-    result = await db.emails.insert_many(docs)
-    return {"inserted": len(result.inserted_ids), "message": f"Logged email for {len(result.inserted_ids)} colleges"}
+
+    result = await run_in_threadpool(lambda: supa.table("emails").insert(docs).execute())
+    count = len(result.data) if result.data else len(docs)
+    return {"inserted": count, "message": f"Logged email for {count} colleges"}
 
 
 @router.post("/emails/import-csv")
@@ -117,9 +151,9 @@ async def import_csv(current_user: UserModel = Depends(get_current_user), file: 
         raise HTTPException(status_code=400, detail="CSV is empty or unreadable")
 
     emails_added = duplicates_skipped = 0
-    ts = datetime.now(timezone.utc).isoformat()
+    ts = _now()
 
-    for i, row in enumerate(rows):
+    for row in rows:
         college_name = _clean(row.get("College Name", ""))
         if not college_name:
             continue
@@ -136,162 +170,210 @@ async def import_csv(current_user: UserModel = Depends(get_current_user), file: 
         except ValueError:
             dt = ts
         direction = _map_type_to_direction(comm_type)
-        name_base = college_name.split("(")[0].split("–")[0].split("-")[0].strip()
-        existing_college = await db.colleges.find_one({"name": {"$regex": f"^{name_base}", "$options": "i"}})
-        if not existing_college:
-            # Skip rows for colleges not in the app — college import is admin-only
-            continue
-        college_id = str(existing_college["_id"])
 
-        tracked = await db.tracked_colleges.find_one({"user_id": current_user.user_id, "college_id": college_id})
+        name_base = college_name.split("(")[0].split("–")[0].split("-")[0].strip()
+        college_result = await run_in_threadpool(
+            lambda nb=name_base: supa.table("colleges").select("id").ilike("name", f"{nb}%").execute()
+        )
+        if not college_result.data:
+            continue
+        college_id = college_result.data[0]["id"]
+
+        tracked_result = await run_in_threadpool(
+            lambda: supa.table("tracked_colleges")
+            .select("status")
+            .eq("user_id", current_user.user_id)
+            .eq("college_id", college_id)
+            .execute()
+        )
         follow_note = f" | Follow up by: {follow_up_date}" if follow_up_needed and follow_up_date else ""
-        if not tracked:
-            await db.tracked_colleges.insert_one({
-                "user_id": current_user.user_id, "college_id": college_id,
-                "notes": (notes or "") + follow_note, "status": "contacted",
-                "follow_up_needed": follow_up_needed, "follow_up_date": follow_up_date,
-                "created_at": ts,
-            })
+        if not tracked_result.data:
+            await run_in_threadpool(
+                lambda: supa.table("tracked_colleges").insert({
+                    "user_id": current_user.user_id, "college_id": college_id,
+                    "notes": (notes or "") + follow_note, "status": "contacted",
+                    "follow_up_needed": follow_up_needed,
+                    "follow_up_date": follow_up_date or None,
+                    "created_at": ts, "updated_at": ts,
+                }).execute()
+            )
         else:
-            if tracked.get("status") == "interested":
-                await db.tracked_colleges.update_one(
-                    {"user_id": current_user.user_id, "college_id": college_id},
-                    {"$set": {"status": "contacted", "follow_up_needed": follow_up_needed, "follow_up_date": follow_up_date}},
+            if tracked_result.data[0].get("status") == "interested":
+                await run_in_threadpool(
+                    lambda: supa.table("tracked_colleges")
+                    .update({"status": "contacted",
+                             "follow_up_needed": follow_up_needed,
+                             "follow_up_date": follow_up_date or None})
+                    .eq("user_id", current_user.user_id)
+                    .eq("college_id", college_id)
+                    .execute()
                 )
-        dup = await db.emails.find_one({"user_id": current_user.user_id, "college_id": college_id, "subject": subject, "created_at": dt})
-        if not dup:
-            await db.emails.insert_one({
-                "user_id": current_user.user_id, "college_id": college_id,
-                "direction": direction, "subject": subject, "body": notes,
-                "coach_name": coach_name if "not listed" not in coach_name.lower() else "",
-                "coach_email": coach_email,
-                "follow_up_needed": follow_up_needed, "follow_up_date": follow_up_date,
-                "created_at": dt,
-            })
+
+        dup_result = await run_in_threadpool(
+            lambda: supa.table("emails")
+            .select("id")
+            .eq("user_id", current_user.user_id)
+            .eq("college_id", college_id)
+            .eq("subject", subject)
+            .eq("created_at", dt)
+            .execute()
+        )
+        if not dup_result.data:
+            await run_in_threadpool(
+                lambda: supa.table("emails").insert({
+                    "user_id": current_user.user_id, "college_id": college_id,
+                    "direction": direction, "subject": subject, "body": notes,
+                    "coach_name": coach_name if "not listed" not in coach_name.lower() else "",
+                    "coach_email": coach_email, "created_at": dt,
+                    "follow_up_needed": follow_up_needed,
+                    "follow_up_date": follow_up_date or None,
+                    "message_type": "initial_outreach",
+                }).execute()
+            )
             emails_added += 1
         else:
             duplicates_skipped += 1
 
     return {
         "emails_added": emails_added,
-        "duplicates_skipped": duplicates_skipped, "total_rows": len(rows),
+        "duplicates_skipped": duplicates_skipped,
+        "total_rows": len(rows),
         "message": f"Import complete: {emails_added} emails logged.",
     }
 
 
 @router.post("/emails/log-reply")
 async def log_reply(data: ReplyLogRequest, current_user: UserModel = Depends(get_current_user)):
-    received_at = data.received_date or datetime.now(timezone.utc).isoformat()
+    received_at = data.received_date or _now()
     doc = {
-        "user_id": current_user.user_id, "college_id": data.college_id,
+        "user_id": current_user.user_id,
+        "college_id": data.college_id,
         "direction": "received",
         "subject": data.subject or "Reply from coach",
-        "body": data.body, "coach_name": data.coach_name,
-        "coach_email": data.coach_email, "created_at": received_at,
-        "outcome": data.outcome or "",
+        "body": data.body,
+        "coach_name": data.coach_name or "",
+        "coach_email": data.coach_email or "",
+        "message_type": "coach_reply",
+        "created_at": received_at,
     }
-    result = await db.emails.insert_one(doc)
-    doc["id"] = str(result.inserted_id)
-    doc.pop("_id", None)
+    result = await run_in_threadpool(lambda: supa.table("emails").insert(doc).execute())
+    saved = result.data[0] if result.data else doc
 
-    # Map outcome to tracked_college status
     outcome_status_map = {
         "interested": "replied",
         "schedule_call": "replied",
-        "rejected": "not_interested",
-        "scholarship_offered": "offer_received",
+        "rejected": "replied",
+        "scholarship_offered": "replied",
     }
-    new_status = outcome_status_map.get(data.outcome, "replied")
-    await db.tracked_colleges.update_one(
-        {"user_id": current_user.user_id, "college_id": data.college_id,
-         "status": {"$in": ["interested", "contacted", "replied"]}},
-        {"$set": {"status": new_status, "reply_outcome": data.outcome,
-                  "updated_at": datetime.now(timezone.utc).isoformat()}},
+    new_status = outcome_status_map.get(data.outcome or "", "replied")
+    await run_in_threadpool(
+        lambda: supa.table("tracked_colleges")
+        .update({"status": new_status, "reply_outcome": data.outcome or "", "updated_at": _now()})
+        .eq("user_id", current_user.user_id)
+        .eq("college_id", data.college_id)
+        .in_("status", ["interested", "contacted", "replied"])
+        .execute()
     )
-    return doc
+    return saved
 
 
 @router.get("/responses/summary")
 async def get_response_summary(current_user: UserModel = Depends(get_current_user)):
-    tracked = await db.tracked_colleges.find({"user_id": current_user.user_id}).to_list(500)
-    if not tracked:
+    uid = current_user.user_id
+
+    tracked_result = await run_in_threadpool(
+        lambda: supa.table("tracked_colleges")
+        .select("*, colleges(id,name,division,location,coaches(name,email,title))")
+        .eq("user_id", uid)
+        .execute()
+    )
+    if not tracked_result.data:
         return []
-    college_ids_str = [t["college_id"] for t in tracked]
-    college_ids_obj = []
-    for cid in college_ids_str:
-        try:
-            college_ids_obj.append(ObjectId(cid))
-        except Exception:
-            pass
-    colleges_cursor = await db.colleges.find({"_id": {"$in": college_ids_obj}}).to_list(500)
-    colleges_map = {str(c["_id"]): c for c in colleges_cursor}
-    pipeline = [
-        {"$match": {"user_id": current_user.user_id, "college_id": {"$in": college_ids_str}}},
-        {"$group": {
-            "_id": {"college_id": "$college_id", "direction": "$direction"},
-            "count": {"$sum": 1}, "last_date": {"$max": "$created_at"},
-            "last_subject": {"$last": "$subject"}, "last_body": {"$last": "$body"},
-            "last_coach": {"$last": "$coach_name"},
-        }},
-    ]
-    email_stats_raw = await db.emails.aggregate(pipeline).to_list(1000)
-    email_stats = {}
-    for stat in email_stats_raw:
-        cid = stat["_id"]["college_id"]
-        direction = stat["_id"]["direction"]
-        if cid not in email_stats:
-            email_stats[cid] = {}
-        email_stats[cid][direction] = {
-            "count": stat["count"], "last_date": stat["last_date"],
-            "last_subject": stat["last_subject"], "last_body": stat["last_body"],
-            "last_coach": stat["last_coach"],
-        }
+
+    tracked_list = tracked_result.data
+    college_ids = [t["college_id"] for t in tracked_list]
+
+    emails_result = await run_in_threadpool(
+        lambda: supa.table("emails")
+        .select("college_id,direction,subject,body,coach_name,created_at")
+        .eq("user_id", uid)
+        .in_("college_id", college_ids)
+        .order("created_at", desc=True)
+        .execute()
+    )
+    emails_data = emails_result.data or []
+
+    # Group emails by college + direction
+    from collections import defaultdict
+    email_stats: dict = defaultdict(lambda: defaultdict(dict))
+    for e in emails_data:
+        cid = e["college_id"]
+        direction = e["direction"]
+        if not email_stats[cid][direction]:
+            email_stats[cid][direction] = {
+                "count": 0,
+                "last_date": e.get("created_at"),
+                "last_subject": e.get("subject"),
+                "last_body": e.get("body"),
+                "last_coach": e.get("coach_name"),
+            }
+        email_stats[cid][direction]["count"] += 1
+
     result = []
-    for t in tracked:
-        college = colleges_map.get(t["college_id"])
+    for t in tracked_list:
+        college = t.get("colleges")
         if not college:
             continue
+        cid = t["college_id"]
         result.append({
-            "tracked_id": str(t["_id"]),
-            "college_id": t["college_id"],
-            "college": {
-                "id": str(college["_id"]),
-                "name": college.get("name", ""),
-                "division": college.get("division", ""),
-                "location": college.get("location", ""),
-                "coaches": college.get("coaches", []),
-            },
+            "tracked_id": t["id"],
+            "college_id": cid,
+            "college": college,
             "status": t.get("status", "interested"),
-            "reply_outcome": t.get("reply_outcome", ""),
-            "notes": t.get("notes", ""),
-            "sent": email_stats.get(t["college_id"], {}).get("sent"),
-            "received": email_stats.get(t["college_id"], {}).get("received"),
+            "reply_outcome": t.get("reply_outcome") or "",
+            "notes": t.get("notes") or "",
+            "sent": email_stats[cid].get("sent"),
+            "received": email_stats[cid].get("received"),
         })
     return result
 
 
+# ── Templates ────────────────────────────────────────────────────────────────
+
 @router.get("/templates")
 async def get_templates(current_user: UserModel = Depends(get_current_user)):
-    templates = await db.email_templates.find({"user_id": current_user.user_id}).sort("created_at", -1).to_list(100)
-    for t in templates:
-        t["id"] = str(t.pop("_id"))
-    return templates
+    result = await run_in_threadpool(
+        lambda: supa.table("email_templates")
+        .select("*")
+        .eq("user_id", current_user.user_id)
+        .order("created_at", desc=True)
+        .limit(100)
+        .execute()
+    )
+    return result.data or []
 
 
 @router.post("/templates")
 async def save_template(data: EmailTemplateCreate, current_user: UserModel = Depends(get_current_user)):
     doc = {
-        "user_id": current_user.user_id, "name": data.name,
-        "subject": data.subject, "body": data.body, "message_type": data.message_type,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "user_id": current_user.user_id,
+        "name": data.name,
+        "subject": data.subject,
+        "body": data.body,
+        "message_type": data.message_type,
+        "created_at": _now(),
     }
-    result = await db.email_templates.insert_one(doc)
-    doc["id"] = str(result.inserted_id)
-    doc.pop("_id", None)
-    return doc
+    result = await run_in_threadpool(lambda: supa.table("email_templates").insert(doc).execute())
+    return result.data[0] if result.data else doc
 
 
 @router.delete("/templates/{template_id}")
 async def delete_template(template_id: str, current_user: UserModel = Depends(get_current_user)):
-    await db.email_templates.delete_one({"_id": ObjectId(template_id), "user_id": current_user.user_id})
+    await run_in_threadpool(
+        lambda: supa.table("email_templates")
+        .delete()
+        .eq("id", template_id)
+        .eq("user_id", current_user.user_id)
+        .execute()
+    )
     return {"message": "Deleted"}

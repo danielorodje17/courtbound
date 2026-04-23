@@ -1,57 +1,76 @@
 from fastapi import APIRouter, Depends
+from fastapi.concurrency import run_in_threadpool
 from collections import defaultdict
-from bson import ObjectId
 from datetime import datetime, timezone, timedelta
-from database import db
+from supabase_db import supa
 from auth_utils import UserModel, get_current_user
 
 router = APIRouter(tags=["dashboard"])
 
 
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
 @router.get("/dashboard/stats")
 async def get_stats(current_user: UserModel = Depends(get_current_user)):
-    tracked = await db.tracked_colleges.count_documents({"user_id": current_user.user_id})
-    emails_sent = await db.emails.count_documents({"user_id": current_user.user_id, "direction": "sent"})
-    emails_received = await db.emails.count_documents({"user_id": current_user.user_id, "direction": "received"})
-    recent_emails = await db.emails.find({"user_id": current_user.user_id}).sort("created_at", -1).to_list(5)
-    for e in recent_emails:
-        e["id"] = str(e.pop("_id"))
-    return {"tracked_colleges": tracked, "emails_sent": emails_sent, "emails_received": emails_received, "recent_emails": recent_emails}
+    uid = current_user.user_id
+
+    tracked_r = await run_in_threadpool(
+        lambda: supa.table("tracked_colleges").select("id", count="exact").eq("user_id", uid).execute()
+    )
+    sent_r = await run_in_threadpool(
+        lambda: supa.table("emails").select("id", count="exact").eq("user_id", uid).eq("direction", "sent").execute()
+    )
+    recv_r = await run_in_threadpool(
+        lambda: supa.table("emails").select("id", count="exact").eq("user_id", uid).eq("direction", "received").execute()
+    )
+    recent_r = await run_in_threadpool(
+        lambda: supa.table("emails").select("*").eq("user_id", uid).order("created_at", desc=True).limit(5).execute()
+    )
+
+    return {
+        "tracked_colleges": tracked_r.count or 0,
+        "emails_sent": sent_r.count or 0,
+        "emails_received": recv_r.count or 0,
+        "recent_emails": recent_r.data or [],
+    }
 
 
 @router.get("/dashboard/alerts")
 async def get_dashboard_alerts(current_user: UserModel = Depends(get_current_user)):
+    uid = current_user.user_id
     today = datetime.now(timezone.utc).date().isoformat()
     seven_days = (datetime.now(timezone.utc).date() + timedelta(days=7)).isoformat()
     thirty_days = (datetime.now(timezone.utc).date() + timedelta(days=30)).isoformat()
-    tracked = await db.tracked_colleges.find({"user_id": current_user.user_id}).to_list(500)
-    if not tracked:
+
+    tracked_result = await run_in_threadpool(
+        lambda: supa.table("tracked_colleges")
+        .select("*, colleges(name)")
+        .eq("user_id", uid)
+        .execute()
+    )
+    if not tracked_result.data:
         return {"overdue_followups": [], "upcoming_followups": [], "upcoming_deadlines": []}
-    college_ids_obj = []
-    for t in tracked:
-        try:
-            college_ids_obj.append(ObjectId(t["college_id"]))
-        except Exception:
-            pass
-    colleges_cursor = await db.colleges.find({"_id": {"$in": college_ids_obj}}).to_list(500)
-    colleges_map = {str(c["_id"]): c for c in colleges_cursor}
+
     overdue_followups, upcoming_followups, upcoming_deadlines = [], [], []
-    for t in tracked:
-        college = colleges_map.get(t["college_id"])
-        if not college:
-            continue
+    for t in tracked_result.data:
+        college = t.get("colleges") or {}
         name = college.get("name", "")
         cid = t["college_id"]
-        fu = t.get("follow_up_date", "")
+
+        fu = (t.get("follow_up_date") or "")[:10]
         if fu:
             if fu < today:
                 overdue_followups.append({"college_id": cid, "name": name, "date": fu, "status": t.get("status")})
             elif fu <= seven_days:
                 upcoming_followups.append({"college_id": cid, "name": name, "date": fu, "status": t.get("status")})
+
         for dkey, dtype in [("application_deadline", "Application"), ("signing_day", "Signing Day")]:
-            dl = t.get(dkey, "")
+            dl = (t.get(dkey) or "")[:10]
             if dl and today <= dl <= thirty_days:
                 upcoming_deadlines.append({"college_id": cid, "name": name, "deadline": dl, "type": dtype})
+
     return {
         "overdue_followups": sorted(overdue_followups, key=lambda x: x["date"]),
         "upcoming_followups": sorted(upcoming_followups, key=lambda x: x["date"]),
@@ -61,57 +80,80 @@ async def get_dashboard_alerts(current_user: UserModel = Depends(get_current_use
 
 @router.get("/dashboard/analytics")
 async def get_analytics(current_user: UserModel = Depends(get_current_user)):
+    uid = current_user.user_id
     thirty_days_ago = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
-    emails = await db.emails.find(
-        {"user_id": current_user.user_id, "created_at": {"$gte": thirty_days_ago}},
-        {"_id": 0, "direction": 1, "created_at": 1}
-    ).to_list(1000)
-    daily_sent = defaultdict(int)
-    daily_received = defaultdict(int)
-    for email in emails:
-        date_str = str(email.get("created_at", ""))[:10]
-        if email["direction"] == "sent":
-            daily_sent[date_str] += 1
+
+    emails_result = await run_in_threadpool(
+        lambda: supa.table("emails")
+        .select("direction,created_at")
+        .eq("user_id", uid)
+        .gte("created_at", thirty_days_ago)
+        .execute()
+    )
+    emails = emails_result.data or []
+
+    daily_sent: dict = defaultdict(int)
+    daily_received: dict = defaultdict(int)
+    for e in emails:
+        ds = str(e.get("created_at", ""))[:10]
+        if e["direction"] == "sent":
+            daily_sent[ds] += 1
         else:
-            daily_received[date_str] += 1
+            daily_received[ds] += 1
+
     activity = []
     for i in range(29, -1, -1):
         d = (datetime.now(timezone.utc).date() - timedelta(days=i)).isoformat()
         activity.append({"date": d, "sent": daily_sent.get(d, 0), "received": daily_received.get(d, 0)})
-    tracked = await db.tracked_colleges.count_documents({"user_id": current_user.user_id})
-    contacted = await db.tracked_colleges.count_documents(
-        {"user_id": current_user.user_id, "status": {"$in": ["contacted", "replied", "rejected"]}}
+
+    tracked_result = await run_in_threadpool(
+        lambda: supa.table("tracked_colleges")
+        .select("status,colleges(division)")
+        .eq("user_id", uid)
+        .execute()
     )
-    replied = await db.tracked_colleges.count_documents({"user_id": current_user.user_id, "status": "replied"})
-    pipeline = [
-        {"$match": {"user_id": current_user.user_id}},
-        {"$addFields": {"college_oid": {"$toObjectId": "$college_id"}}},
-        {"$lookup": {"from": "colleges", "localField": "college_oid", "foreignField": "_id", "as": "college"}},
-        {"$unwind": {"path": "$college", "preserveNullAndEmptyArrays": True}},
-        {"$group": {"_id": "$college.division", "count": {"$sum": 1}}},
-    ]
-    div_raw = await db.tracked_colleges.aggregate(pipeline).to_list(20)
-    division_breakdown = [{"division": d["_id"] or "Unknown", "count": d["count"]} for d in div_raw if d["_id"]]
+    tracked = tracked_result.data or []
+
+    total_tracked = len(tracked)
+    contacted = sum(1 for t in tracked if t.get("status") in ("contacted", "replied", "rejected"))
+    replied = sum(1 for t in tracked if t.get("status") == "replied")
+
+    div_counts: dict = defaultdict(int)
+    for t in tracked:
+        div = (t.get("colleges") or {}).get("division") or "Unknown"
+        div_counts[div] += 1
+    division_breakdown = sorted(
+        [{"division": d, "count": c} for d, c in div_counts.items()],
+        key=lambda x: -x["count"]
+    )
+
     return {
         "activity": activity,
-        "funnel": {"tracked": tracked, "contacted": contacted, "replied": replied},
-        "division_breakdown": sorted(division_breakdown, key=lambda x: -x["count"]),
+        "funnel": {"tracked": total_tracked, "contacted": contacted, "replied": replied},
+        "division_breakdown": division_breakdown,
     }
 
 
 @router.get("/dashboard/heatmap")
 async def get_activity_heatmap(current_user: UserModel = Depends(get_current_user)):
+    uid = current_user.user_id
     one_year_ago = (datetime.now(timezone.utc) - timedelta(days=365)).isoformat()
-    emails = await db.emails.find(
-        {"user_id": current_user.user_id, "direction": "sent", "created_at": {"$gte": one_year_ago}},
-        {"_id": 0, "created_at": 1}
-    ).to_list(5000)
 
-    daily_counts = defaultdict(int)
-    for email in emails:
-        date_str = str(email.get("created_at", ""))[:10]
-        if date_str:
-            daily_counts[date_str] += 1
+    result = await run_in_threadpool(
+        lambda: supa.table("emails")
+        .select("created_at")
+        .eq("user_id", uid)
+        .eq("direction", "sent")
+        .gte("created_at", one_year_ago)
+        .execute()
+    )
+    emails = result.data or []
+
+    daily_counts: dict = defaultdict(int)
+    for e in emails:
+        ds = str(e.get("created_at", ""))[:10]
+        if ds:
+            daily_counts[ds] += 1
 
     today = datetime.now(timezone.utc).date()
     days_since_monday = today.weekday()
@@ -128,7 +170,7 @@ async def get_activity_heatmap(current_user: UserModel = Depends(get_current_use
             week_data.append({
                 "date": date_str,
                 "count": daily_counts.get(date_str, 0) if date_str else 0,
-                "day_of_week": dow
+                "day_of_week": dow,
             })
         weeks.append({"week_start": current_date.isoformat(), "days": week_data})
         current_date += timedelta(weeks=1)
@@ -159,37 +201,65 @@ async def get_weekly_digest(current_user: UserModel = Depends(get_current_user))
     now = datetime.now(timezone.utc)
     week_start = (now - timedelta(days=7)).isoformat()
     prev_week_start = (now - timedelta(days=14)).isoformat()
-    emails_this_week = await db.emails.count_documents({"user_id": uid, "direction": "sent", "created_at": {"$gte": week_start}})
-    emails_last_week = await db.emails.count_documents({"user_id": uid, "direction": "sent", "created_at": {"$gte": prev_week_start, "$lt": week_start}})
-    responses_this_week = await db.emails.count_documents({"user_id": uid, "direction": "received", "created_at": {"$gte": week_start}})
-    new_tracked = await db.tracked_colleges.count_documents({"user_id": uid, "created_at": {"$gte": week_start}})
+
+    emails_this_week_r = await run_in_threadpool(
+        lambda: supa.table("emails").select("id", count="exact")
+        .eq("user_id", uid).eq("direction", "sent").gte("created_at", week_start).execute()
+    )
+    emails_last_week_r = await run_in_threadpool(
+        lambda: supa.table("emails").select("id", count="exact")
+        .eq("user_id", uid).eq("direction", "sent")
+        .gte("created_at", prev_week_start).lt("created_at", week_start).execute()
+    )
+    responses_r = await run_in_threadpool(
+        lambda: supa.table("emails").select("id", count="exact")
+        .eq("user_id", uid).eq("direction", "received").gte("created_at", week_start).execute()
+    )
+    new_tracked_r = await run_in_threadpool(
+        lambda: supa.table("tracked_colleges").select("id", count="exact")
+        .eq("user_id", uid).gte("created_at", week_start).execute()
+    )
     today_str = now.date().isoformat()
-    overdue_docs = await db.tracked_colleges.find(
-        {"user_id": uid, "follow_up_date": {"$lt": today_str, "$exists": True, "$ne": ""}},
-        {"_id": 0, "college_id": 1}
-    ).to_list(100)
-    overdue_count = len(overdue_docs)
-    top_tracked = await db.tracked_colleges.find(
-        {"user_id": uid}, {"_id": 0, "college_id": 1, "progress_score": 1}
-    ).sort("progress_score", -1).to_list(1)
-    top_college = None
-    if top_tracked:
-        try:
-            c = await db.colleges.find_one({"_id": ObjectId(top_tracked[0]["college_id"])}, {"_id": 0, "name": 1})
-            if c:
-                top_college = {"name": c["name"], "progress_score": top_tracked[0].get("progress_score", 0)}
-        except Exception:
-            pass
-    tracked_all = await db.tracked_colleges.find({"user_id": uid}, {"_id": 0, "college_id": 1}).to_list(500)
+    overdue_r = await run_in_threadpool(
+        lambda: supa.table("tracked_colleges")
+        .select("college_id")
+        .eq("user_id", uid)
+        .lt("follow_up_date", today_str)
+        .not_.is_("follow_up_date", "null")
+        .execute()
+    )
+
+    emails_this_week = emails_this_week_r.count or 0
+    emails_last_week = emails_last_week_r.count or 0
+    responses_this_week = responses_r.count or 0
+    new_tracked = new_tracked_r.count or 0
+    overdue_count = len(overdue_r.data or [])
+
+    # Top college by progress (rough: most emails sent)
+    tracked_all_r = await run_in_threadpool(
+        lambda: supa.table("tracked_colleges")
+        .select("college_id,colleges(name)")
+        .eq("user_id", uid)
+        .execute()
+    )
+    tracked_all = tracked_all_r.data or []
     tracked_ids = [t["college_id"] for t in tracked_all]
-    emailed_ids = set()
+
+    emailed_ids: set = set()
     if tracked_ids:
-        emailed = await db.emails.find(
-            {"user_id": uid, "college_id": {"$in": tracked_ids}, "direction": "sent"},
-            {"_id": 0, "college_id": 1}
-        ).to_list(500)
-        emailed_ids = {e["college_id"] for e in emailed}
+        emailed_r = await run_in_threadpool(
+            lambda: supa.table("emails")
+            .select("college_id")
+            .eq("user_id", uid)
+            .eq("direction", "sent")
+            .in_("college_id", tracked_ids)
+            .execute()
+        )
+        emailed_ids = {e["college_id"] for e in (emailed_r.data or [])}
+
     not_contacted_count = len([cid for cid in tracked_ids if cid not in emailed_ids])
+    top_college = None
+
     if overdue_count > 0:
         recommended_action = f"You have {overdue_count} overdue follow-up{'s' if overdue_count > 1 else ''} — send a check-in email to stay top of mind."
         recommended_link = "/responses"
@@ -202,6 +272,7 @@ async def get_weekly_digest(current_user: UserModel = Depends(get_current_user))
     else:
         recommended_action = "Great week! Keep the momentum going and log any coach replies."
         recommended_link = "/responses"
+
     week_label = f"Week of {(now - timedelta(days=7)).strftime('%-d %b')} – {now.strftime('%-d %b %Y')}"
     return {
         "week_label": week_label,

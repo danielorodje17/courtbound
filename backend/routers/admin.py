@@ -1,757 +1,532 @@
 import os
 import io
 import csv
-import secrets
-from fastapi import APIRouter, Header, HTTPException, Depends, UploadFile, File
+import uuid
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Cookie, Header
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import StreamingResponse
-from typing import Optional
-from database import db
 from datetime import datetime, timezone, timedelta
+from typing import Optional
+from collections import defaultdict
+from supabase_db import supa
+from models import AdminLogin, CollegeUpdate, CoachEmailFix, DeleteCoach, BulkImportColleges
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
+ADMIN_EMAILS = os.environ.get("ADMIN_EMAILS", "").split(",")
+SESSION_TTL = timedelta(hours=8)
 
-# ── Auth dependency ──────────────────────────────────────────────────────────
 
-async def require_admin_token(authorization: Optional[str] = Header(default=None)):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Admin authentication required")
-    token = authorization.replace("Bearer ", "").strip()
-    session = await db.admin_sessions.find_one({"token": token}, {"_id": 0})
-    if not session:
-        raise HTTPException(status_code=401, detail="Invalid or expired admin session")
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+async def require_admin_token(
+    session_token: Optional[str] = Cookie(default=None),
+    authorization: Optional[str] = Header(default=None),
+):
+    token = session_token
+    if not token and authorization:
+        token = authorization.replace("Bearer ", "").strip()
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    result = await run_in_threadpool(
+        lambda: supa.table("admin_sessions").select("*").eq("token", token).execute()
+    )
+    if not result.data:
+        raise HTTPException(status_code=401, detail="Invalid admin session")
+
+    session = result.data[0]
     exp = session.get("expires_at", "")
     if isinstance(exp, str):
-        exp = datetime.fromisoformat(exp)
+        exp = datetime.fromisoformat(exp.replace("Z", "+00:00"))
     if getattr(exp, "tzinfo", None) is None:
         exp = exp.replace(tzinfo=timezone.utc)
     if exp < datetime.now(timezone.utc):
-        await db.admin_sessions.delete_one({"token": token})
-        raise HTTPException(status_code=401, detail="Admin session expired — please log in again")
-    return {"email": session.get("email", ""), "token": token}
+        raise HTTPException(status_code=401, detail="Session expired")
+    return session
 
-
-# ── Login / Logout / Verify ──────────────────────────────────────────────────
 
 @router.post("/login")
-async def admin_login(body: dict):
-    email    = (body.get("email") or "").strip().lower()
-    password = (body.get("password") or "").strip()
-    if not email or not password:
-        raise HTTPException(status_code=400, detail="Email and password required")
-    admin_email    = (os.environ.get("ADMIN_EMAIL") or "").strip().lower()
-    admin_password = (os.environ.get("ADMIN_PASSWORD") or "").strip()
-    if email != admin_email or password != admin_password:
+async def admin_login(data: AdminLogin):
+    import bcrypt
+    admin_email = os.environ.get("ADMIN_EMAIL", "")
+    admin_hash = os.environ.get("ADMIN_PASSWORD_HASH", "")
+    admin_plain = os.environ.get("ADMIN_PASSWORD", "")
+
+    if data.email.lower() != admin_email.lower():
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    token      = secrets.token_urlsafe(32)
-    expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
-    await db.admin_sessions.insert_one({
-        "token":      token,
-        "email":      email,
-        "expires_at": expires_at.isoformat(),
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    })
-    return {"token": token, "email": email, "expires_at": expires_at.isoformat()}
+
+    if admin_hash:
+        if not bcrypt.checkpw(data.password.encode(), admin_hash.encode()):
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+    elif admin_plain:
+        if data.password != admin_plain:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+    else:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    token = str(uuid.uuid4())
+    expires_at = datetime.now(timezone.utc) + SESSION_TTL
+    await run_in_threadpool(
+        lambda: supa.table("admin_sessions").insert({
+            "token": token, "email": data.email,
+            "created_at": _now(), "expires_at": expires_at.isoformat(),
+        }).execute()
+    )
+    return {"token": token, "email": data.email}
 
 
 @router.post("/logout")
-async def admin_logout(admin=Depends(require_admin_token)):
-    await db.admin_sessions.delete_one({"token": admin["token"]})
+async def admin_logout(session=Depends(require_admin_token)):
+    token = session.get("token")
+    if token:
+        await run_in_threadpool(
+            lambda: supa.table("admin_sessions").delete().eq("token", token).execute()
+        )
     return {"message": "Logged out"}
 
 
 @router.get("/verify")
-async def admin_verify(admin=Depends(require_admin_token)):
-    return {"email": admin["email"], "authenticated": True}
+async def admin_verify(session=Depends(require_admin_token)):
+    return {"email": session.get("email"), "valid": True}
 
-
-# ── Stats ────────────────────────────────────────────────────────────────────
 
 @router.get("/stats")
-async def admin_stats(admin=Depends(require_admin_token)):
-    from bson import ObjectId
-    now   = datetime.now(timezone.utc)
-    ago7  = (now - timedelta(days=7)).isoformat()
-    ago14 = (now - timedelta(days=14)).isoformat()
-    ago30 = (now - timedelta(days=30)).isoformat()
+async def admin_stats(_=Depends(require_admin_token)):
+    now = datetime.now(timezone.utc)
+    seven_days_ago = (now - timedelta(days=7)).isoformat()
+    thirty_days_ago = (now - timedelta(days=30)).isoformat()
 
-    total_users  = await db.users.count_documents({})
-    new_7d       = await db.users.count_documents({"created_at": {"$gte": ago7}})
-    new_30d      = await db.users.count_documents({"created_at": {"$gte": ago30}})
-    active_7d    = await db.users.count_documents({"last_active": {"$gte": ago7}})
-    active_30d   = await db.users.count_documents({"last_active": {"$gte": ago30}})
+    users_r = await run_in_threadpool(lambda: supa.table("users").select("*").execute())
+    users = users_r.data or []
+    total_users = len(users)
+    new_7d = sum(1 for u in users if (u.get("created_at") or "") >= seven_days_ago)
+    new_30d = sum(1 for u in users if (u.get("created_at") or "") >= thirty_days_ago)
+    active_7d = sum(1 for u in users if (u.get("last_active") or "") >= seven_days_ago)
 
-    sub_raw = await db.users.aggregate([
-        {"$group": {"_id": {"$ifNull": ["$subscription_tier", "free"]}, "count": {"$sum": 1}}}
-    ]).to_list(20)
-    subscription_breakdown = {r["_id"]: r["count"] for r in sub_raw}
+    tier_counts: dict = defaultdict(int)
+    for u in users:
+        tier_counts[u.get("subscription_tier", "free")] += 1
 
-    total_sent     = await db.emails.count_documents({"direction": "sent"})
-    total_received = await db.emails.count_documents({"direction": "received"})
-    sent_7d        = await db.emails.count_documents({"direction": "sent", "created_at": {"$gte": ago7}})
-    total_tracked  = await db.tracked_colleges.count_documents({})
+    emails_r = await run_in_threadpool(lambda: supa.table("emails").select("user_id,created_at").execute())
+    emails = emails_r.data or []
+    emails_7d = sum(1 for e in emails if (e.get("created_at") or "") >= seven_days_ago)
 
-    top_raw = await db.tracked_colleges.aggregate([
-        {"$group": {"_id": "$college_id", "count": {"$sum": 1}}},
-        {"$sort": {"count": -1}}, {"$limit": 10},
-    ]).to_list(10)
+    tracked_r = await run_in_threadpool(lambda: supa.table("tracked_colleges").select("college_id,user_id").execute())
+    tracked = tracked_r.data or []
+
+    cid_counts: dict = defaultdict(int)
+    for t in tracked:
+        cid_counts[t["college_id"]] += 1
+    top_cids = sorted(cid_counts.items(), key=lambda x: -x[1])[:10]
+
     top_colleges = []
-    for r in top_raw:
-        try:
-            c = await db.colleges.find_one(
-                {"_id": ObjectId(r["_id"])}, {"_id": 0, "name": 1, "division": 1}
-            )
-            if c:
-                top_colleges.append({"name": c["name"], "division": c.get("division", ""), "count": r["count"]})
-        except Exception:
-            pass
+    if top_cids:
+        cids = [cid for cid, _ in top_cids]
+        cols_r = await run_in_threadpool(lambda: supa.table("colleges").select("id,name,division").in_("id", cids).execute())
+        cname_map = {c["id"]: c for c in (cols_r.data or [])}
+        for cid, cnt in top_cids:
+            college = cname_map.get(cid, {})
+            top_colleges.append({"name": college.get("name", "Unknown"), "division": college.get("division", ""), "count": cnt})
 
-    signup_trend_raw = await db.users.aggregate([
-        {"$match": {"created_at": {"$gte": ago30}}},
-        {"$group": {"_id": {"$substr": ["$created_at", 0, 10]}, "count": {"$sum": 1}}},
-        {"$sort": {"_id": 1}},
-    ]).to_list(30)
-    signup_trend = [{"date": r["_id"], "signups": r["count"]} for r in signup_trend_raw]
+    # Signup trend (last 30 days)
+    signup_trend: dict = defaultdict(int)
+    for u in users:
+        ds = str(u.get("created_at", ""))[:10]
+        if ds >= thirty_days_ago[:10]:
+            signup_trend[ds] += 1
+    today = now.date()
+    trend_data = []
+    for i in range(29, -1, -1):
+        d = (today - timedelta(days=i)).isoformat()
+        trend_data.append({"date": d, "count": signup_trend.get(d, 0)})
 
-    email_trend_raw = await db.emails.aggregate([
-        {"$match": {"direction": "sent", "created_at": {"$gte": ago14}}},
-        {"$group": {"_id": {"$substr": ["$created_at", 0, 10]}, "count": {"$sum": 1}}},
-        {"$sort": {"_id": 1}},
-    ]).to_list(14)
-    email_trend = [{"date": r["_id"], "emails": r["count"]} for r in email_trend_raw]
+    reports_r = await run_in_threadpool(
+        lambda: supa.table("college_reports").select("id", count="exact").eq("status", "open").execute()
+    )
+    pending_reports = reports_r.count or 0
 
     return {
-        "users": {
-            "total": total_users, "new_7d": new_7d, "new_30d": new_30d,
-            "active_7d": active_7d, "active_30d": active_30d,
-        },
-        "subscriptions": subscription_breakdown,
-        "emails": {
-            "total_sent": total_sent, "total_received": total_received, "sent_7d": sent_7d,
-        },
-        "colleges_tracked": total_tracked,
+        "total_users": total_users,
+        "new_users_7d": new_7d,
+        "new_users_30d": new_30d,
+        "active_users_7d": active_7d,
+        "subscription_breakdown": dict(tier_counts),
+        "emails_sent_7d": emails_7d,
+        "total_emails": len(emails),
+        "total_tracked": len(tracked),
+        "pending_reports": pending_reports,
         "top_colleges": top_colleges,
-        "signup_trend": signup_trend,
-        "email_trend": email_trend,
+        "signup_trend": trend_data,
     }
 
 
-# ── Users ────────────────────────────────────────────────────────────────────
-
 @router.get("/users")
-async def admin_users(admin=Depends(require_admin_token)):
-    users = await db.users.find({}, {"_id": 0}).to_list(1000)
-    result = []
+async def admin_users(_=Depends(require_admin_token)):
+    users_r = await run_in_threadpool(lambda: supa.table("users").select("*").order("created_at", desc=True).execute())
+    users = users_r.data or []
+
+    all_emails_r = await run_in_threadpool(lambda: supa.table("emails").select("user_id,direction").execute())
+    all_tracked_r = await run_in_threadpool(lambda: supa.table("tracked_colleges").select("user_id").execute())
+
+    email_sent_counts: dict = defaultdict(int)
+    for e in (all_emails_r.data or []):
+        if e.get("direction") == "sent":
+            email_sent_counts[e["user_id"]] += 1
+    tracked_counts: dict = defaultdict(int)
+    for t in (all_tracked_r.data or []):
+        tracked_counts[t["user_id"]] += 1
+
     for u in users:
-        uid = u.get("user_id", "")
-        emails_sent      = await db.emails.count_documents({"user_id": uid, "direction": "sent"})
-        colleges_tracked = await db.tracked_colleges.count_documents({"user_id": uid})
-        result.append({
-            "user_id":           uid,
-            "name":              u.get("name", ""),
-            "email":             u.get("email", ""),
-            "picture":           u.get("picture", ""),
-            "subscription_tier": u.get("subscription_tier", "free"),
-            "created_at":        u.get("created_at", ""),
-            "last_active":       u.get("last_active", u.get("updated_at", "")),
-            "emails_sent":       emails_sent,
-            "colleges_tracked":  colleges_tracked,
-        })
-    result.sort(key=lambda x: str(x.get("created_at", "")), reverse=True)
-    return result
+        uid = u["id"]
+        u["emails_sent"] = email_sent_counts.get(uid, 0)
+        u["colleges_tracked"] = tracked_counts.get(uid, 0)
+        u.pop("password_hash", None)
+    return users
 
 
 @router.delete("/users/{user_id}")
-async def delete_user(user_id: str, admin=Depends(require_admin_token)):
-    """Permanently delete a user and all their associated data."""
-    user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "email": 1})
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    # Delete all user data across every collection
-    await db.users.delete_one({"user_id": user_id})
-    await db.emails.delete_many({"user_id": user_id})
-    await db.tracked_colleges.delete_many({"user_id": user_id})
-    await db.profiles.delete_many({"user_id": user_id})
-    await db.goals.delete_many({"user_id": user_id})
-    await db.email_templates.delete_many({"user_id": user_id})
-    await db.college_reports.delete_many({"user_id": user_id})
-    await db.user_notifications.delete_many({"user_id": user_id})
-    return {"ok": True, "deleted_user": user.get("email", user_id)}
+async def admin_delete_user(user_id: str, _=Depends(require_admin_token)):
+    # CASCADE delete handles all related tables
+    await run_in_threadpool(lambda: supa.table("users").delete().eq("id", user_id).execute())
+    return {"message": "User deleted"}
 
 
 @router.patch("/users/{user_id}/subscription")
-async def update_subscription(user_id: str, body: dict, admin=Depends(require_admin_token)):
-    tier = body.get("subscription_tier", "free")
-    if tier not in ["free", "pro", "elite"]:
-        raise HTTPException(status_code=400, detail="Invalid tier — must be free, pro, or elite")
-    await db.users.update_one({"user_id": user_id}, {"$set": {"subscription_tier": tier}})
-    return {"message": "Subscription updated", "user_id": user_id, "subscription_tier": tier}
+async def admin_update_subscription(user_id: str, body: dict, _=Depends(require_admin_token)):
+    await run_in_threadpool(
+        lambda: supa.table("users").update({"subscription_tier": body.get("tier", "free")}).eq("id", user_id).execute()
+    )
+    return {"message": "Subscription updated"}
 
-
-# ── User Activity Detail ────────────────────────────────────────────────────
 
 @router.get("/users/{user_id}/activity")
-async def admin_user_activity(user_id: str, admin=Depends(require_admin_token)):
-    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    profile = await db.profiles.find_one({"user_id": user_id}, {"_id": 0}) or {}
-    emails_all   = await db.emails.find({"user_id": user_id}, {"_id": 0}).sort("created_at", -1).to_list(200)
-    tracked_docs = await db.tracked_colleges.find({"user_id": user_id}, {"_id": 0}).to_list(200)
-    from bson import ObjectId
-    # Enrich tracked with college names
-    enriched_tracked = []
-    for t in tracked_docs:
-        cid = t.get("college_id", "")
-        try:
-            c = await db.colleges.find_one({"_id": ObjectId(cid)}, {"_id": 0, "name": 1, "division": 1, "region": 1})
-        except Exception:
-            c = None
-        enriched_tracked.append({
-            **t,
-            "college_name":     c.get("name", "Unknown") if c else "Unknown",
-            "college_division": c.get("division", "") if c else "",
-            "college_region":   c.get("region", "") if c else "",
-        })
-    sent_emails     = [e for e in emails_all if e.get("direction") == "sent"]
-    received_emails = [e for e in emails_all if e.get("direction") == "received"]
-    # Reply outcomes
-    positive_outcomes = ["interested", "call_requested", "scholarship_offered", "after_call", "after_visit"]
-    positive_replies = [
-        t for t in tracked_docs
-        if t.get("reply_outcome") and t.get("reply_outcome") in positive_outcomes
-    ]
+async def admin_user_activity(user_id: str, _=Depends(require_admin_token)):
+    tracked_r = await run_in_threadpool(
+        lambda: supa.table("tracked_colleges").select("*, colleges(name,division)").eq("user_id", user_id).execute()
+    )
+    emails_r = await run_in_threadpool(
+        lambda: supa.table("emails").select("*").eq("user_id", user_id).order("created_at", desc=True).limit(50).execute()
+    )
+    profile_r = await run_in_threadpool(
+        lambda: supa.table("profiles").select("*").eq("user_id", user_id).execute()
+    )
+    user_r = await run_in_threadpool(
+        lambda: supa.table("users").select("id,email,name,created_at,last_active,subscription_tier,role").eq("id", user_id).execute()
+    )
     return {
-        "user": {
-            "user_id":           user.get("user_id"),
-            "name":              user.get("name", ""),
-            "email":             user.get("email", ""),
-            "picture":           user.get("picture", ""),
-            "subscription_tier": user.get("subscription_tier", "free"),
-            "created_at":        user.get("created_at", ""),
-            "last_active":       user.get("last_active", ""),
-        },
-        "profile": {
-            "full_name":         profile.get("full_name", ""),
-            "primary_position":  profile.get("primary_position") or profile.get("position", ""),
-            "current_team":      profile.get("current_team", ""),
-            "highlight_tape_url": profile.get("highlight_tape_url", ""),
-            "bio":               profile.get("bio", ""),
-        },
-        "stats": {
-            "emails_sent":       len(sent_emails),
-            "emails_received":   len(received_emails),
-            "colleges_tracked":  len(tracked_docs),
-            "positive_replies":  len(positive_replies),
-            "reply_rate":        round(len(received_emails) / len(sent_emails) * 100) if sent_emails else 0,
-        },
-        "recent_emails":    emails_all[:30],
-        "tracked_colleges": enriched_tracked,
-        "positive_colleges": [
-            {
-                "college_name":   t.get("college_name", ""),
-                "division":       t.get("college_division", ""),
-                "reply_outcome":  t.get("reply_outcome", ""),
-            }
-            for t in enriched_tracked
-            if t.get("reply_outcome") in positive_outcomes
-        ],
+        "user": user_r.data[0] if user_r.data else None,
+        "profile": profile_r.data[0] if profile_r.data else None,
+        "tracked_colleges": tracked_r.data or [],
+        "recent_emails": emails_r.data or [],
     }
 
 
-# ── Reports ─────────────────────────────────────────────────────────────────
-
 @router.get("/reports")
-async def admin_reports(admin=Depends(require_admin_token)):
-    reports = await db.college_reports.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
-    return reports
+async def admin_get_reports(_=Depends(require_admin_token)):
+    result = await run_in_threadpool(
+        lambda: supa.table("college_reports").select("*, colleges(id,name,division), users(id,email,name)").order("created_at", desc=True).limit(100).execute()
+    )
+    return result.data or []
 
 
 @router.patch("/reports/{report_id}")
-async def update_report(report_id: str, body: dict, admin=Depends(require_admin_token)):
-    import uuid
-    status         = body.get("status", "")
-    admin_response = body.get("admin_response", "")
-    if status not in ["pending", "investigating", "fixed", "invalid"]:
-        raise HTTPException(status_code=400, detail="Invalid status")
-    now = datetime.now(timezone.utc).isoformat()
-    await db.college_reports.update_one(
-        {"id": report_id},
-        {"$set": {"status": status, "admin_response": admin_response, "updated_at": now}},
+async def admin_update_report(report_id: str, body: dict, _=Depends(require_admin_token)):
+    update_fields = {"status": body.get("status", "in_review"), "updated_at": _now()}
+    if body.get("admin_notes"):
+        update_fields["admin_response"] = body["admin_notes"]
+    await run_in_threadpool(
+        lambda: supa.table("college_reports").update(update_fields).eq("id", report_id).execute()
     )
-    # Send notification to user if admin wrote a response
-    if admin_response.strip():
-        report = await db.college_reports.find_one({"id": report_id}, {"_id": 0})
-        if report:
-            notif = {
-                "id":         str(uuid.uuid4()),
-                "user_id":    report["user_id"],
-                "report_id":  report_id,
-                "college_name": report.get("college_name", ""),
-                "message":    admin_response,
-                "status":     status,
-                "read":       False,
-                "created_at": now,
-            }
-            await db.user_notifications.insert_one(notif)
-            del notif["_id"]
-    return {"ok": True, "report_id": report_id, "status": status}
 
+    if body.get("notify_user"):
+        report_r = await run_in_threadpool(lambda: supa.table("college_reports").select("user_id,college_id,issue_type").eq("id", report_id).execute())
+        if report_r.data:
+            rpt = report_r.data[0]
+            await run_in_threadpool(
+                lambda: supa.table("user_notifications").insert({
+                    "user_id": rpt["user_id"], "report_id": report_id,
+                    "message": body.get("notification_message", "Your college report has been reviewed."),
+                    "created_at": _now(),
+                }).execute()
+            )
+    return {"message": "Report updated"}
 
-# ── College Coach Email Fix ───────────────────────────────────────────────────
 
 @router.delete("/colleges/{college_id}/coaches")
-async def delete_coach(college_id: str, body: dict, admin=Depends(require_admin_token)):
-    """Remove a coach from a college by name."""
-    from bson import ObjectId
-    coach_name = (body.get("coach_name") or "").strip()
-    if not coach_name:
-        raise HTTPException(status_code=400, detail="coach_name is required")
-    try:
-        oid = ObjectId(college_id)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid college_id")
-
-    result = await db.colleges.update_one(
-        {"_id": oid},
-        {"$pull": {"coaches": {"name": coach_name}}},
+async def admin_delete_coach(college_id: str, data: DeleteCoach, _=Depends(require_admin_token)):
+    await run_in_threadpool(
+        lambda: supa.table("coaches").delete()
+        .eq("college_id", college_id).eq("name", data.coach_name).execute()
     )
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="College not found")
-    return {"ok": True, "removed_coach": coach_name}
+    return {"message": "Coach removed"}
 
 
 @router.patch("/colleges/{college_id}/coach-email")
-async def fix_coach_email(college_id: str, body: dict, admin=Depends(require_admin_token)):
-    """Admin: update a coach's name and/or email, and delete all sent emails to the old address."""
-    from bson import ObjectId
-    coach_name     = (body.get("coach_name") or "").strip()
-    new_coach_name = (body.get("new_coach_name") or "").strip()
-    new_email      = (body.get("new_email") or "").strip()
-    if not coach_name:
-        raise HTTPException(status_code=400, detail="coach_name is required")
-    if not new_coach_name and not new_email:
-        raise HTTPException(status_code=400, detail="Provide new_coach_name or new_email")
-    try:
-        oid = ObjectId(college_id)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid college_id")
+async def admin_fix_coach_email(college_id: str, data: CoachEmailFix, _=Depends(require_admin_token)):
+    update_fields: dict = {}
+    if data.new_coach_email is not None:
+        update_fields["email"] = data.new_coach_email
+    if data.new_coach_name is not None:
+        update_fields["name"] = data.new_coach_name
+    if not update_fields:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    update_fields["last_verified"] = datetime.now(timezone.utc).date().isoformat()
 
-    # Find current coach data before overwriting
-    college = await db.colleges.find_one(
-        {"_id": oid, "coaches.name": coach_name},
-        {"coaches.$": 1}
+    result = await run_in_threadpool(
+        lambda: supa.table("coaches")
+        .update(update_fields)
+        .eq("college_id", college_id)
+        .eq("name", data.old_coach_name)
+        .execute()
     )
-    if not college:
-        raise HTTPException(status_code=404, detail="College or coach not found")
 
-    old_email = college["coaches"][0].get("email", "") if college.get("coaches") else ""
-
-    # Build the update fields
-    set_fields = {}
-    if new_email:
-        set_fields["coaches.$.email"] = new_email
-    if new_coach_name:
-        set_fields["coaches.$.name"] = new_coach_name
-    # last_verified: use provided value or auto-stamp today
-    lv = (body.get("last_verified") or "").strip() or datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    set_fields["coaches.$.last_verified"] = lv
-
-    result = await db.colleges.update_one(
-        {"_id": oid, "coaches.name": coach_name},
-        {"$set": set_fields},
-    )
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="College or coach not found")
-
-    # Delete sent emails that used the old (bounced) email address
-    deleted = 0
-    if new_email and old_email and old_email != new_email:
-        res = await db.emails.delete_many({
-            "college_id": college_id,
-            "coach_email": old_email,
-        })
-        deleted = res.deleted_count
-
-    return {
-        "ok": True,
-        "college_id": college_id,
-        "old_coach_name": coach_name,
-        "new_coach_name": new_coach_name or coach_name,
-        "old_email": old_email,
-        "new_email": new_email or old_email,
-        "emails_deleted": deleted,
-    }
+    if data.old_coach_email and data.new_coach_email and data.old_coach_email != data.new_coach_email:
+        await run_in_threadpool(
+            lambda: supa.table("emails")
+            .update({"coach_email": data.new_coach_email})
+            .eq("college_id", college_id)
+            .eq("coach_email", data.old_coach_email)
+            .execute()
+        )
+    return {"message": "Coach updated", "updated": len(result.data) if result.data else 0}
 
 
 @router.get("/colleges-contacts")
-async def admin_colleges_contacts(admin=Depends(require_admin_token)):
-    """Return all colleges with their coach contact info for admin review."""
-    colleges = await db.colleges.find(
-        {},
-        {"_id": 1, "name": 1, "division": 1, "coaches": 1}
-    ).sort("name", 1).to_list(length=None)
-
-    suspicious_patterns = ["athletics@", "info@", "admin@", "basketball@",
-                           "sports@", "recruiting@", "coaches@", "contact@"]
-
-    result = []
-    for c in colleges:
-        cid = str(c["_id"])
-        for coach in (c.get("coaches") or []):
-            email = coach.get("email", "")
-            is_suspicious = any(email.lower().startswith(p) for p in suspicious_patterns) or not email
-            result.append({
-                "college_id": cid,
-                "college_name": c.get("name", ""),
-                "division": c.get("division", ""),
-                "coach_name": coach.get("name", ""),
-                "coach_title": coach.get("title", ""),
-                "email": email,
-                "phone": coach.get("phone", ""),
-                "last_verified": coach.get("last_verified", ""),
-                "suspicious": is_suspicious,
-            })
-    return result
+async def admin_colleges_contacts(_=Depends(require_admin_token), division: str = None, verified_only: bool = False):
+    query = supa.table("colleges").select("id,name,division,conference,location,state,foreign_friendly,website,coaches(*)")
+    if division:
+        query = query.eq("division", division)
+    result = await run_in_threadpool(lambda: query.order("name").execute())
+    colleges = result.data or []
+    if verified_only:
+        colleges = [c for c in colleges if any(ch.get("last_verified") for ch in (c.get("coaches") or []))]
+    return colleges
 
 
 @router.post("/colleges/{college_id}/upload-image")
-async def upload_college_image(college_id: str, file: UploadFile = File(...), admin=Depends(require_admin_token)):
-    """Upload a PNG/JPG logo for a college. Stores in static/college_images/ and updates image_url."""
-    import os
-    from bson import ObjectId
-
-    allowed_types = {"image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif"}
-    if file.content_type not in allowed_types:
-        raise HTTPException(status_code=400, detail="Only PNG, JPG, WEBP images are allowed")
-
-    try:
-        oid = ObjectId(college_id)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid college_id")
-
-    college = await db.colleges.find_one({"_id": oid}, {"name": 1})
-    if not college:
-        raise HTTPException(status_code=404, detail="College not found")
-
-    # Save file
-    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else "png"
-    filename = f"{college_id}.{ext}"
-    static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "backend", "static", "college_images")
-    # Resolve relative to this file
-    static_dir = os.path.join(os.path.dirname(__file__), "static", "college_images")
+async def upload_college_image(college_id: str, file: UploadFile = File(...), _=Depends(require_admin_token)):
+    import shutil
+    ext = (file.filename or ".jpg").rsplit(".", 1)[-1].lower()
+    if ext not in ("jpg", "jpeg", "png", "webp", "gif"):
+        raise HTTPException(status_code=400, detail="Unsupported image format")
+    static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "college_images")
     os.makedirs(static_dir, exist_ok=True)
-
-    file_path = os.path.join(static_dir, filename)
-    content = await file.read()
-    with open(file_path, "wb") as f:
-        f.write(content)
-
-    # Update image_url in DB to the static path (frontend constructs full URL)
-    image_url = f"/static/college_images/{filename}"
-    await db.colleges.update_one({"_id": oid}, {"$set": {"image_url": image_url}})
-
-    return {"ok": True, "image_url": image_url, "college_name": college.get("name", "")}
+    fname = f"{college_id}.{ext}"
+    fpath = os.path.join(static_dir, fname)
+    with open(fpath, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+    image_url = f"/api/static/college_images/{fname}"
+    await run_in_threadpool(lambda: supa.table("colleges").update({"image_url": image_url}).eq("id", college_id).execute())
+    return {"image_url": image_url}
 
 
 @router.patch("/colleges/{college_id}/details")
-async def update_college_details(college_id: str, body: dict, admin=Depends(require_admin_token)):
-    """Admin: update any top-level college fields and/or full coaches array."""
-    from bson import ObjectId
-    try:
-        oid = ObjectId(college_id)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid college_id")
-
-    allowed = {
-        "name", "location", "state", "division", "conference", "region",
-        "foreign_friendly", "scholarship_info", "acceptance_rate",
-        "notable_alumni", "ranking", "website", "image_url", "coaches",
-    }
-    updates = {k: v for k, v in body.items() if k in allowed}
-    if not updates:
-        raise HTTPException(status_code=400, detail="No valid fields provided")
-
-    updates["updated_at"] = datetime.now(timezone.utc).isoformat()
-    result = await db.colleges.update_one({"_id": oid}, {"$set": updates})
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="College not found")
-    return {"ok": True, "college_id": college_id, "fields_updated": list(updates.keys())}
+async def admin_update_college(college_id: str, data: CollegeUpdate, _=Depends(require_admin_token)):
+    update_fields: dict = {k: v for k, v in data.dict(exclude_none=True).items()}
+    if not update_fields:
+        raise HTTPException(status_code=400, detail="No fields provided")
+    await run_in_threadpool(lambda: supa.table("colleges").update(update_fields).eq("id", college_id).execute())
+    return {"message": "Updated"}
 
 
 @router.get("/colleges/bulk-export")
-async def bulk_export_colleges(admin=Depends(require_admin_token)):
-    """Export all colleges as CSV (one row per college, first coach flattened)."""
-    colleges = await db.colleges.find({}).sort("name", 1).to_list(length=None)
-
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow([
-        "college_id", "name", "location", "state", "division", "conference",
-        "region", "foreign_friendly", "scholarship_info", "acceptance_rate",
-        "notable_alumni", "ranking", "website", "image_url",
-        "coach1_name", "coach1_title", "coach1_email", "coach1_phone", "coach1_last_verified",
-        "coach2_name", "coach2_title", "coach2_email", "coach2_phone", "coach2_last_verified",
-    ])
+async def bulk_export_colleges(_=Depends(require_admin_token)):
+    result = await run_in_threadpool(
+        lambda: supa.table("colleges").select("*, coaches(*)").order("name").execute()
+    )
+    colleges = result.data or []
+    rows = []
     for c in colleges:
-        coaches = c.get("coaches") or []
-        c1 = coaches[0] if len(coaches) > 0 else {}
-        c2 = coaches[1] if len(coaches) > 1 else {}
-        writer.writerow([
-            str(c["_id"]),
-            c.get("name", ""),
-            c.get("location", ""),
-            c.get("state", ""),
-            c.get("division", ""),
-            c.get("conference", ""),
-            c.get("region", "USA"),
-            "yes" if c.get("foreign_friendly") else "no",
-            c.get("scholarship_info", ""),
-            c.get("acceptance_rate", ""),
-            c.get("notable_alumni", ""),
-            c.get("ranking", ""),
-            c.get("website", ""),
-            c.get("image_url", ""),
-            c1.get("name",""), c1.get("title",""), c1.get("email",""), c1.get("phone",""), c1.get("last_verified",""),
-            c2.get("name",""), c2.get("title",""), c2.get("email",""), c2.get("phone",""), c2.get("last_verified",""),
-        ])
-
+        for coach in (c.get("coaches") or [{}]):
+            rows.append({
+                "ID": c.get("id", ""),
+                "Name": c.get("name", ""),
+                "Division": c.get("division", ""),
+                "Conference": c.get("conference", ""),
+                "Location": c.get("location", ""),
+                "State": c.get("state", ""),
+                "Region": c.get("region", ""),
+                "Country": c.get("country", ""),
+                "Foreign Friendly": "Yes" if c.get("foreign_friendly") else "No",
+                "Ranking": c.get("ranking", ""),
+                "Acceptance Rate": c.get("acceptance_rate", ""),
+                "Scholarship Info": c.get("scholarship_info", ""),
+                "Website": c.get("website", ""),
+                "Language of Study": c.get("language_of_study", ""),
+                "Scholarship Type": c.get("scholarship_type", ""),
+                "Coach Name": coach.get("name", ""),
+                "Coach Email": coach.get("email", ""),
+                "Coach Title": coach.get("title", ""),
+                "Coach Phone": coach.get("phone", ""),
+                "Coach Last Verified": coach.get("last_verified", ""),
+            })
+    if not rows:
+        rows = [{"Name": "No colleges found"}]
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=list(rows[0].keys()))
+    writer.writeheader()
+    writer.writerows(rows)
     output.seek(0)
-    filename = f"courtbound_colleges_{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv"
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
+        headers={"Content-Disposition": "attachment; filename=colleges_export.csv"},
     )
 
 
 @router.post("/colleges/bulk-import")
-async def bulk_import_colleges(file: UploadFile = File(...), admin=Depends(require_admin_token)):
-    """Bulk import colleges from CSV. Empty college_id = create new. Existing id = update."""
-    from bson import ObjectId
-
-    content = await file.read()
-    try:
-        text = content.decode("utf-8-sig")
-    except Exception:
-        raise HTTPException(status_code=400, detail="Could not decode file — use UTF-8 CSV")
-
-    reader = csv.DictReader(io.StringIO(text))
-    required = {"name", "division"}
-    if not required.issubset(set(reader.fieldnames or [])):
-        raise HTTPException(status_code=400, detail="CSV must have at minimum: name, division")
-
-    created = 0
-    updated = 0
-    skipped = 0
-    errors = []
-
-    for row in reader:
-        name = (row.get("name") or "").strip()
-        if not name:
-            skipped += 1
-            continue
-
-        # Build coaches array
-        coaches = []
-        for prefix in ("coach1", "coach2"):
-            cname = (row.get(f"{prefix}_name") or "").strip()
-            if cname:
-                coaches.append({
-                    "name": cname,
-                    "title": (row.get(f"{prefix}_title") or "Head Coach").strip(),
-                    "email": (row.get(f"{prefix}_email") or "").strip(),
-                    "phone": (row.get(f"{prefix}_phone") or "").strip(),
-                    "last_verified": (row.get(f"{prefix}_last_verified") or "").strip(),
-                })
-
-        def boolify(v):
-            return str(v).strip().lower() in ("yes", "true", "1")
-
-        college_doc = {
-            "name":            name,
-            "location":        (row.get("location") or "").strip(),
-            "state":           (row.get("state") or "").strip(),
-            "division":        (row.get("division") or "").strip(),
-            "conference":      (row.get("conference") or "").strip(),
-            "region":          (row.get("region") or "USA").strip(),
-            "foreign_friendly": boolify(row.get("foreign_friendly", "no")),
-            "scholarship_info": (row.get("scholarship_info") or "").strip(),
-            "acceptance_rate":  (row.get("acceptance_rate") or "").strip(),
-            "notable_alumni":   (row.get("notable_alumni") or "").strip(),
-            "ranking":          int(row["ranking"]) if str(row.get("ranking", "")).strip().isdigit() else None,
-            "website":          (row.get("website") or "").strip(),
-            "image_url":        (row.get("image_url") or "").strip(),
-            "coaches":          coaches,
-        }
-
-        college_id = (row.get("college_id") or "").strip()
-        if college_id:
-            # Update existing
-            try:
-                oid = ObjectId(college_id)
-            except Exception:
-                errors.append(f"Invalid id for {name}")
-                skipped += 1
+async def bulk_import_colleges(data: BulkImportColleges, _=Depends(require_admin_token)):
+    from fastapi.concurrency import run_in_threadpool
+    inserted = updated = errors = 0
+    for row in data.colleges:
+        try:
+            college_doc = {
+                "name": (row.get("name") or row.get("Name", "")).strip(),
+                "division": (row.get("division") or row.get("Division", "")).strip(),
+                "conference": (row.get("conference") or row.get("Conference", "")).strip(),
+                "location": (row.get("location") or row.get("Location", "")).strip(),
+                "state": (row.get("state") or row.get("State", "")).strip(),
+                "region": (row.get("region") or row.get("Region", "")).strip(),
+                "country": (row.get("country") or row.get("Country", "")).strip(),
+                "foreign_friendly": (row.get("foreign_friendly") or row.get("Foreign Friendly", "")).strip().lower() in ("yes", "true", "1"),
+                "ranking": int(row.get("ranking") or row.get("Ranking") or 9999),
+                "acceptance_rate": str(row.get("acceptance_rate") or row.get("Acceptance Rate", "")).strip(),
+                "scholarship_info": (row.get("scholarship_info") or row.get("Scholarship Info", "")).strip(),
+                "website": (row.get("website") or row.get("Website", "")).strip(),
+                "language_of_study": (row.get("language_of_study") or row.get("Language of Study", "")).strip(),
+                "scholarship_type": (row.get("scholarship_type") or row.get("Scholarship Type", "")).strip(),
+            }
+            name = college_doc["name"]
+            if not name:
+                errors += 1
                 continue
-            college_doc["updated_at"] = datetime.now(timezone.utc).isoformat()
-            res = await db.colleges.update_one({"_id": oid}, {"$set": college_doc})
-            if res.matched_count:
+
+            existing_r = await run_in_threadpool(
+                lambda n=name: supa.table("colleges").select("id").ilike("name", n).execute()
+            )
+            if existing_r.data:
+                college_id = existing_r.data[0]["id"]
+                await run_in_threadpool(lambda cid=college_id, cd=college_doc: supa.table("colleges").update(cd).eq("id", cid).execute())
                 updated += 1
             else:
-                errors.append(f"Not found: {college_id}")
-                skipped += 1
-        else:
-            # Create new
-            college_doc["created_at"] = datetime.now(timezone.utc).isoformat()
-            await db.colleges.insert_one(college_doc)
-            created += 1
+                ins_r = await run_in_threadpool(lambda cd=college_doc: supa.table("colleges").insert(cd).execute())
+                college_id = ins_r.data[0]["id"] if ins_r.data else None
+                inserted += 1
 
-    return {"ok": True, "created": created, "updated": updated, "skipped": skipped, "errors": errors[:20]}
+            if not college_id:
+                continue
+
+            coach_name = (row.get("coach_name") or row.get("Coach Name", "")).strip()
+            if coach_name:
+                coach_doc = {
+                    "college_id": college_id, "name": coach_name,
+                    "email": (row.get("coach_email") or row.get("Coach Email", "")).strip(),
+                    "title": (row.get("coach_title") or row.get("Coach Title", "Head Coach")).strip(),
+                    "phone": (row.get("coach_phone") or row.get("Coach Phone", "")).strip(),
+                    "last_verified": (row.get("coach_last_verified") or row.get("Coach Last Verified", "")).strip() or None,
+                }
+                await run_in_threadpool(
+                    lambda cid=college_id, cd=coach_doc: supa.table("coaches")
+                    .upsert(cd, on_conflict="college_id,name").execute()
+                )
+        except Exception:
+            errors += 1
+    return {"inserted": inserted, "updated": updated, "errors": errors}
 
 
 @router.get("/colleges-contacts/export")
-async def export_contacts(filter: Optional[str] = "suspicious", admin=Depends(require_admin_token)):
-    """Export college coach contacts as CSV. filter=suspicious|all"""
-    colleges = await db.colleges.find(
-        {}, {"_id": 1, "name": 1, "division": 1, "coaches": 1}
-    ).sort("name", 1).to_list(length=None)
-
-    suspicious_patterns = ["athletics@", "info@", "admin@", "basketball@",
-                           "sports@", "recruiting@", "coaches@", "contact@"]
-
-    def is_suspicious(email):
-        return not email or any(email.lower().startswith(p) for p in suspicious_patterns)
-
+async def export_contacts(_=Depends(require_admin_token)):
+    result = await run_in_threadpool(
+        lambda: supa.table("coaches").select("*, colleges(name,division,conference,state)").order("last_verified", desc=True).execute()
+    )
+    coaches = result.data or []
+    rows = []
+    for c in coaches:
+        college = c.get("colleges") or {}
+        rows.append({
+            "College": college.get("name", ""),
+            "Division": college.get("division", ""),
+            "Conference": college.get("conference", ""),
+            "State": college.get("state", ""),
+            "Coach Name": c.get("name", ""),
+            "Coach Email": c.get("email", ""),
+            "Coach Title": c.get("title", ""),
+            "Coach Phone": c.get("phone", ""),
+            "Last Verified": c.get("last_verified", ""),
+        })
+    if not rows:
+        rows = [{"College": "No coaches found"}]
     output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow([
-        "college_id", "college_name", "division",
-        "coach_name", "coach_title", "email", "phone", "last_verified", "suspicious"
-    ])
-    for c in colleges:
-        for coach in (c.get("coaches") or []):
-            email = coach.get("email", "")
-            susp  = is_suspicious(email)
-            if filter == "suspicious" and not susp:
-                continue
-            writer.writerow([
-                str(c["_id"]),
-                c.get("name", ""),
-                c.get("division", ""),
-                coach.get("name", ""),
-                coach.get("title", ""),
-                email,
-                coach.get("phone", ""),
-                coach.get("last_verified", ""),
-                "yes" if susp else "no",
-            ])
-
+    writer = csv.DictWriter(output, fieldnames=list(rows[0].keys()))
+    writer.writeheader()
+    writer.writerows(rows)
     output.seek(0)
-    filename = f"courtbound_contacts_{filter}_{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv"
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
+        headers={"Content-Disposition": "attachment; filename=contacts_export.csv"},
     )
 
 
 @router.post("/colleges-contacts/import")
-async def import_contacts(file: UploadFile = File(...), admin=Depends(require_admin_token)):
-    """Import updated coach contacts from CSV. Matches by college_id + coach_name."""
-    from bson import ObjectId
-
+async def import_contacts(file: UploadFile = File(...), _=Depends(require_admin_token)):
     content = await file.read()
     try:
         text = content.decode("utf-8-sig")
-    except Exception:
-        raise HTTPException(status_code=400, detail="Could not decode file — use UTF-8 CSV")
-
+    except UnicodeDecodeError:
+        text = content.decode("latin-1")
     reader = csv.DictReader(io.StringIO(text))
-    if not {"college_id", "coach_name", "email"}.issubset(set(reader.fieldnames or [])):
-        raise HTTPException(status_code=400, detail="CSV must have columns: college_id, coach_name, email")
-
-    updated = 0
-    skipped = 0
-    emails_deleted = 0
-    errors = []
-
-    for row in reader:
-        college_id = (row.get("college_id") or "").strip()
-        coach_name = (row.get("coach_name") or "").strip()
-        new_email  = (row.get("email") or "").strip()
-        new_title  = (row.get("coach_title") or "").strip()
-        new_lv     = (row.get("last_verified") or "").strip()
-
-        if not college_id or not coach_name:
+    rows = list(reader)
+    if not rows:
+        raise HTTPException(status_code=400, detail="CSV is empty or unreadable")
+    updated = skipped = 0
+    for row in rows:
+        row = {k.strip(): v.strip() for k, v in row.items()}
+        college_name = row.get("College", "")
+        coach_name = row.get("Coach Name", "")
+        coach_email = row.get("Coach Email", "")
+        if not college_name or not coach_name:
             skipped += 1
             continue
-        try:
-            oid = ObjectId(college_id)
-        except Exception:
-            errors.append(f"Invalid college_id: {college_id}")
-            skipped += 1
-            continue
-
-        college = await db.colleges.find_one(
-            {"_id": oid, "coaches.name": coach_name}, {"coaches.$": 1}
+        col_r = await run_in_threadpool(
+            lambda cn=college_name: supa.table("colleges").select("id").ilike("name", cn).execute()
         )
-        if not college or not college.get("coaches"):
-            errors.append(f"Not found: {coach_name} @ {college_id}")
+        if not col_r.data:
             skipped += 1
             continue
-
-        old_email = college["coaches"][0].get("email", "")
-        set_fields = {}
-        if new_email:
-            set_fields["coaches.$.email"] = new_email
-        if new_title:
-            set_fields["coaches.$.title"] = new_title
-        if new_lv:
-            set_fields["coaches.$.last_verified"] = new_lv
-        if not set_fields:
-            skipped += 1
-            continue
-
-        await db.colleges.update_one(
-            {"_id": oid, "coaches.name": coach_name},
-            {"$set": set_fields},
+        college_id = col_r.data[0]["id"]
+        await run_in_threadpool(
+            lambda: supa.table("coaches").upsert({
+                "college_id": college_id, "name": coach_name,
+                "email": coach_email,
+                "title": row.get("Coach Title", "Head Coach"),
+                "phone": row.get("Coach Phone", ""),
+                "last_verified": row.get("Last Verified", None) or None,
+            }, on_conflict="college_id,name").execute()
         )
         updated += 1
+    return {"updated": updated, "skipped": skipped}
 
-        if new_email and old_email and old_email != new_email:
-            res = await db.emails.delete_many({"college_id": college_id, "coach_email": old_email})
-            emails_deleted += res.deleted_count
-
-    return {
-        "ok": True,
-        "updated": updated,
-        "skipped": skipped,
-        "emails_deleted": emails_deleted,
-        "errors": errors[:20],
-    }
-
-
-# ── App Settings ─────────────────────────────────────────────────────────────
 
 @router.get("/settings")
-async def get_settings(admin=Depends(require_admin_token)):
-    doc = await db.app_settings.find_one({"key": "global"}, {"_id": 0})
-    if not doc:
-        return {"show_european": True}
-    return {"show_european": doc.get("show_european", True)}
+async def admin_get_settings(_=Depends(require_admin_token)):
+    result = await run_in_threadpool(
+        lambda: supa.table("app_settings").select("*").eq("key", "global").execute()
+    )
+    if result.data:
+        return result.data[0]
+    return {"key": "global", "show_european": True}
 
 
 @router.patch("/settings")
-async def update_settings(body: dict, admin=Depends(require_admin_token)):
-    updates = {}
-    if "show_european" in body:
-        updates["show_european"] = bool(body["show_european"])
-    if not updates:
-        raise HTTPException(status_code=400, detail="No valid settings provided")
-    await db.app_settings.update_one(
-        {"key": "global"},
-        {"$set": updates},
-        upsert=True,
+async def admin_update_settings(body: dict, _=Depends(require_admin_token)):
+    await run_in_threadpool(
+        lambda: supa.table("app_settings").upsert(
+            {"key": "global", "show_european": body.get("show_european", True), "updated_at": _now()},
+            on_conflict="key",
+        ).execute()
     )
-    return {"ok": True, **updates}
+    return {"message": "Settings updated"}

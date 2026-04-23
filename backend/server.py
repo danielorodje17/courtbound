@@ -8,8 +8,10 @@ from fastapi import APIRouter
 from fastapi.staticfiles import StaticFiles
 import os
 
-from database import db, client
-from seed_data import seed_colleges, seed_extended_colleges, _seed_european_colleges_startup
+# MongoDB imports kept as comments for rollback reference:
+# from database import db, client
+# from seed_data import seed_colleges, seed_extended_colleges, _seed_european_colleges_startup
+
 from routers import auth, colleges, tracked, emails, dashboard, goals, ai, profile, admin, reports
 
 logging.basicConfig(level=logging.INFO)
@@ -47,39 +49,14 @@ app.mount("/static/college_images", StaticFiles(directory=STATIC_DIR), name="col
 
 @app.on_event("startup")
 async def startup():
-    count = await db.colleges.count_documents({})
-    if count == 0:
-        await seed_colleges()
-    await seed_extended_colleges()
-    await _seed_european_colleges_startup()
-    await _stamp_verified_coaches()
-    logger.info("CourtBound API started")
-
-
-async def _stamp_verified_coaches():
-    """
-    One-time idempotent migration: stamp every coach that is missing
-    a last_verified field.  Runs on every startup but only modifies
-    colleges that still have un-stamped coaches, so it costs almost
-    nothing after the first run.
-    """
-    try:
-        result = await db.colleges.update_many(
-            {"coaches": {"$elemMatch": {"last_verified": {"$exists": False}}}},
-            {"$set": {"coaches.$[coach].last_verified": "2026-04-22"}},
-            array_filters=[{"coach.last_verified": {"$exists": False}}],
-        )
-        if result.modified_count:
-            logger.info(f"Verified-coach migration: stamped {result.modified_count} college(s)")
-    except Exception as e:
-        logger.warning(f"Verified-coach migration failed (non-fatal): {e}")
+    logger.info("CourtBound API started — Supabase backend active")
 
 
 @app.on_event("shutdown")
 async def shutdown():
-    client.close()
+    logger.info("CourtBound API shutting down")
 
 
 @app.get("/")
 async def root():
-    return {"message": "CourtBound API is running"}
+    return {"message": "CourtBound API is running", "backend": "supabase"}

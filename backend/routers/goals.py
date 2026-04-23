@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
+from fastapi.concurrency import run_in_threadpool
 from datetime import datetime, timezone, timedelta
-from database import db
+from supabase_db import supa
 from auth_utils import UserModel, get_current_user
 from models import WeeklyGoalsUpdate
 
@@ -12,29 +13,47 @@ def _current_week_start():
     return today - timedelta(days=today.weekday())
 
 
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
 async def _compute_progress(uid: str, ws, we):
     ws_str, we_str = ws.isoformat(), we.isoformat()
-    emails_sent = await db.emails.count_documents({
-        "user_id": uid, "direction": "sent",
-        "created_at": {"$gte": ws_str, "$lt": we_str},
-    })
-    follow_ups = await db.emails.count_documents({
-        "user_id": uid, "direction": "sent", "message_type": "follow_up",
-        "created_at": {"$gte": ws_str, "$lt": we_str},
-    })
-    new_tracks = await db.tracked_colleges.count_documents({
-        "user_id": uid, "created_at": {"$gte": ws_str, "$lt": we_str},
-    })
-    all_tracked = await db.tracked_colleges.find(
-        {"user_id": uid, "call_notes": {"$exists": True, "$ne": []}},
-        {"_id": 0, "call_notes": 1}
-    ).to_list(500)
+
+    e_sent_r = await run_in_threadpool(
+        lambda: supa.table("emails").select("id", count="exact")
+        .eq("user_id", uid).eq("direction", "sent")
+        .gte("created_at", ws_str).lt("created_at", we_str).execute()
+    )
+    e_fup_r = await run_in_threadpool(
+        lambda: supa.table("emails").select("id", count="exact")
+        .eq("user_id", uid).eq("direction", "sent").eq("message_type", "follow_up")
+        .gte("created_at", ws_str).lt("created_at", we_str).execute()
+    )
+    track_r = await run_in_threadpool(
+        lambda: supa.table("tracked_colleges").select("id", count="exact")
+        .eq("user_id", uid)
+        .gte("created_at", ws_str).lt("created_at", we_str).execute()
+    )
+    # Count calls from call_notes within this week
+    notes_r = await run_in_threadpool(
+        lambda: supa.table("tracked_colleges")
+        .select("call_notes")
+        .eq("user_id", uid)
+        .not_.is_("call_notes", "null")
+        .execute()
+    )
     calls = sum(
-        1 for t in all_tracked
+        1 for t in (notes_r.data or [])
         for cn in (t.get("call_notes") or [])
         if cn.get("created_at") and ws_str <= cn["created_at"][:10] < we_str
     )
-    return {"emails_sent": emails_sent, "follow_ups": follow_ups, "new_tracks": new_tracks, "calls": calls}
+    return {
+        "emails_sent": e_sent_r.count or 0,
+        "follow_ups": e_fup_r.count or 0,
+        "new_tracks": track_r.count or 0,
+        "calls": calls,
+    }
 
 
 @router.get("/goals/current")
@@ -43,23 +62,34 @@ async def get_current_goals(current_user: UserModel = Depends(get_current_user))
     ws = _current_week_start()
     we = ws + timedelta(days=7)
     week_label = f"{ws.strftime('%-d %b')} – {(we - timedelta(days=1)).strftime('%-d %b %Y')}"
-    goals_doc = await db.weekly_goals.find_one({"user_id": uid, "week_start": ws.isoformat()}, {"_id": 0})
-    goals = goals_doc["goals"] if goals_doc else {"emails_sent": 0, "follow_ups": 0, "new_tracks": 0, "calls": 0}
+
+    goals_r = await run_in_threadpool(
+        lambda: supa.table("weekly_goals").select("goals")
+        .eq("user_id", uid).eq("week_start", ws.isoformat()).execute()
+    )
+    goals = goals_r.data[0]["goals"] if goals_r.data else {"emails_sent": 0, "follow_ups": 0, "new_tracks": 0, "calls": 0}
     progress = await _compute_progress(uid, ws, we)
 
     four_weeks_ago = ws - timedelta(weeks=4)
-    past_emails = await db.emails.find(
-        {"user_id": uid, "direction": "sent", "created_at": {"$gte": four_weeks_ago.isoformat(), "$lt": ws.isoformat()}},
-        {"_id": 0, "created_at": 1, "message_type": 1}
-    ).to_list(1000)
-    past_tracked = await db.tracked_colleges.find(
-        {"user_id": uid, "created_at": {"$gte": four_weeks_ago.isoformat(), "$lt": ws.isoformat()}},
-        {"_id": 0, "created_at": 1}
-    ).to_list(500)
-    past_calls_docs = await db.tracked_colleges.find(
-        {"user_id": uid, "call_notes": {"$exists": True, "$ne": []}},
-        {"_id": 0, "call_notes": 1}
-    ).to_list(500)
+    past_emails_r = await run_in_threadpool(
+        lambda: supa.table("emails").select("created_at,message_type")
+        .eq("user_id", uid).eq("direction", "sent")
+        .gte("created_at", four_weeks_ago.isoformat()).lt("created_at", ws.isoformat()).execute()
+    )
+    past_tracked_r = await run_in_threadpool(
+        lambda: supa.table("tracked_colleges").select("created_at")
+        .eq("user_id", uid)
+        .gte("created_at", four_weeks_ago.isoformat()).lt("created_at", ws.isoformat()).execute()
+    )
+    past_calls_r = await run_in_threadpool(
+        lambda: supa.table("tracked_colleges").select("call_notes")
+        .eq("user_id", uid).not_.is_("call_notes", "null").execute()
+    )
+
+    past_emails = past_emails_r.data or []
+    past_tracked = past_tracked_r.data or []
+    past_calls_docs = past_calls_r.data or []
+
     past_weeks = [(ws - timedelta(weeks=i), ws - timedelta(weeks=i - 1)) for i in range(4, 0, -1)]
     totals = {"emails_sent": 0, "follow_ups": 0, "new_tracks": 0, "calls": 0}
     active_weeks = 0
@@ -85,9 +115,12 @@ async def get_current_goals(current_user: UserModel = Depends(get_current_user))
             suggestions[k] = 3 if k == "emails_sent" else (2 if k == "follow_ups" else 1)
 
     return {
-        "week_start": ws.isoformat(), "week_label": week_label,
-        "goals": goals, "progress": progress,
-        "suggestions": suggestions, "has_history": active_weeks > 0,
+        "week_start": ws.isoformat(),
+        "week_label": week_label,
+        "goals": goals,
+        "progress": progress,
+        "suggestions": suggestions,
+        "has_history": active_weeks > 0,
     }
 
 
@@ -95,12 +128,22 @@ async def get_current_goals(current_user: UserModel = Depends(get_current_user))
 async def set_current_goals(data: WeeklyGoalsUpdate, current_user: UserModel = Depends(get_current_user)):
     uid = current_user.user_id
     ws = _current_week_start()
-    goals = {"emails_sent": data.emails_sent, "follow_ups": data.follow_ups, "new_tracks": data.new_tracks, "calls": data.calls}
-    await db.weekly_goals.update_one(
-        {"user_id": uid, "week_start": ws.isoformat()},
-        {"$set": {"goals": goals, "updated_at": datetime.now(timezone.utc).isoformat()},
-         "$setOnInsert": {"created_at": datetime.now(timezone.utc).isoformat()}},
-        upsert=True,
+    goals = {
+        "emails_sent": data.emails_sent,
+        "follow_ups": data.follow_ups,
+        "new_tracks": data.new_tracks,
+        "calls": data.calls,
+    }
+    await run_in_threadpool(
+        lambda: supa.table("weekly_goals").upsert(
+            {
+                "user_id": uid,
+                "week_start": ws.isoformat(),
+                "goals": goals,
+                "updated_at": _now(),
+            },
+            on_conflict="user_id,week_start",
+        ).execute()
     )
     return {"week_start": ws.isoformat(), "goals": goals}
 
@@ -112,18 +155,24 @@ async def get_goals_history(current_user: UserModel = Depends(get_current_user))
     current_ws = today - timedelta(days=today.weekday())
     weeks = [(current_ws - timedelta(weeks=i), current_ws - timedelta(weeks=i) + timedelta(days=7)) for i in range(8)]
     eight_weeks_ago = (current_ws - timedelta(weeks=7)).isoformat()
-    emails_all = await db.emails.find(
-        {"user_id": uid, "direction": "sent", "created_at": {"$gte": eight_weeks_ago}},
-        {"_id": 0, "created_at": 1, "message_type": 1}
-    ).to_list(2000)
-    tracked_all = await db.tracked_colleges.find(
-        {"user_id": uid}, {"_id": 0, "created_at": 1, "call_notes": 1}
-    ).to_list(500)
+
+    emails_all_r = await run_in_threadpool(
+        lambda: supa.table("emails").select("created_at,message_type")
+        .eq("user_id", uid).eq("direction", "sent").gte("created_at", eight_weeks_ago).execute()
+    )
+    tracked_all_r = await run_in_threadpool(
+        lambda: supa.table("tracked_colleges").select("created_at,call_notes").eq("user_id", uid).execute()
+    )
     week_starts = [ws.isoformat() for ws, _ in weeks]
-    goals_docs = await db.weekly_goals.find(
-        {"user_id": uid, "week_start": {"$in": week_starts}}, {"_id": 0}
-    ).to_list(8)
-    goals_map = {g["week_start"]: g.get("goals", {}) for g in goals_docs}
+    goals_r = await run_in_threadpool(
+        lambda: supa.table("weekly_goals").select("week_start,goals")
+        .eq("user_id", uid).in_("week_start", week_starts).execute()
+    )
+
+    emails_all = emails_all_r.data or []
+    tracked_all = tracked_all_r.data or []
+    goals_map = {g["week_start"]: g.get("goals", {}) for g in (goals_r.data or [])}
+
     history = []
     for ws, we in weeks:
         ws_str, we_str = ws.isoformat(), we.isoformat()
@@ -134,7 +183,8 @@ async def get_goals_history(current_user: UserModel = Depends(get_current_user))
         goals = goals_map.get(ws_str, {})
         set_goals = {k: v for k, v in goals.items() if v > 0}
         if set_goals:
-            met = sum(1 for k, v in set_goals.items() if {"emails_sent": emails_sent, "follow_ups": follow_ups, "new_tracks": new_tracks, "calls": calls}.get(k, 0) >= v)
+            actual = {"emails_sent": emails_sent, "follow_ups": follow_ups, "new_tracks": new_tracks, "calls": calls}
+            met = sum(1 for k, v in set_goals.items() if actual.get(k, 0) >= v)
             achievement_pct = round((met / len(set_goals)) * 100)
         else:
             achievement_pct = None

@@ -1,8 +1,10 @@
 import os
+import uuid
 from fastapi import APIRouter, Response, Cookie, Header, HTTPException
+from fastapi.concurrency import run_in_threadpool
 from datetime import datetime, timezone, timedelta
 from typing import Optional
-from database import db
+from supabase_db import supa
 from auth_utils import UserModel, get_current_user
 from fastapi import Depends
 
@@ -14,12 +16,10 @@ EMERGENT_AUTH_URL = os.environ.get("EMERGENT_AUTH_URL", "https://demobackend.eme
 @router.post("/session")
 async def exchange_session(body: dict, response: Response):
     import httpx
-    # Frontend sends session_id from OAuth hash fragment
     session_id = body.get("session_id") or body.get("session_token")
     if not session_id:
         raise HTTPException(status_code=400, detail="session_id required")
 
-    # Call Emergent auth to exchange session_id → persistent session_token
     async with httpx.AsyncClient() as client_http:
         r = await client_http.get(
             f"{EMERGENT_AUTH_URL}/auth/v1/env/oauth/session-data",
@@ -29,7 +29,7 @@ async def exchange_session(body: dict, response: Response):
         raise HTTPException(status_code=401, detail="Invalid session from auth provider")
 
     user_data = r.json()
-    user_id = user_data.get("id") or user_data.get("user_id")
+    google_id = user_data.get("id") or user_data.get("user_id")
     email = user_data.get("email", "")
     name = user_data.get("name", "")
     picture = user_data.get("picture", "") or user_data.get("avatar", "")
@@ -37,30 +37,48 @@ async def exchange_session(body: dict, response: Response):
 
     now_iso = datetime.now(timezone.utc).isoformat()
 
-    # Look up existing user by email first (stable unique key from Google)
-    existing = await db.users.find_one({"email": email}, {"_id": 0, "user_id": 1})
-    if existing:
-        user_id = existing["user_id"]
-
-    await db.users.update_one(
-        {"email": email},
-        {
-            "$set": {
-                "user_id": user_id, "email": email, "name": name, "picture": picture,
-                "updated_at": now_iso, "last_active": now_iso,
+    # Upsert user by email; get back the Supabase UUID
+    upsert_result = await run_in_threadpool(
+        lambda: supa.table("users").upsert(
+            {
+                "google_id": google_id,
+                "email": email,
+                "name": name,
+                "picture": picture,
+                "role": "player",
             },
-            "$setOnInsert": {"created_at": now_iso},
-        },
-        upsert=True,
+            on_conflict="email",
+        ).select("id").execute()
     )
+
+    if upsert_result.data:
+        user_id = upsert_result.data[0]["id"]
+    else:
+        # Fallback: look up by email
+        lookup = await run_in_threadpool(
+            lambda: supa.table("users").select("id").eq("email", email).execute()
+        )
+        user_id = lookup.data[0]["id"] if lookup.data else str(uuid.uuid4())
+
     expires_at = datetime.now(timezone.utc) + timedelta(days=7)
-    await db.user_sessions.update_one(
-        {"session_token": session_token},
-        {"$set": {"session_token": session_token, "user_id": user_id, "expires_at": expires_at.isoformat()}},
-        upsert=True,
+    await run_in_threadpool(
+        lambda: supa.table("user_sessions").upsert(
+            {
+                "session_token": session_token,
+                "user_id": user_id,
+                "expires_at": expires_at.isoformat(),
+            },
+            on_conflict="session_token",
+        ).execute()
     )
-    # Return session_token so frontend can store it for Bearer auth
-    return {"session_token": session_token, "user_id": user_id, "email": email, "name": name, "picture": picture}
+
+    return {
+        "session_token": session_token,
+        "user_id": user_id,
+        "email": email,
+        "name": name,
+        "picture": picture,
+    }
 
 
 @router.get("/me")
@@ -77,5 +95,7 @@ async def auth_logout(
     if not token and authorization:
         token = authorization.replace("Bearer ", "").strip()
     if token:
-        await db.user_sessions.delete_one({"session_token": token})
+        await run_in_threadpool(
+            lambda: supa.table("user_sessions").delete().eq("session_token", token).execute()
+        )
     return {"message": "Logged out"}

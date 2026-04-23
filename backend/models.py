@@ -177,3 +177,50 @@ class WeeklyGoalsUpdate(BaseModel):
     follow_ups: int = 0
     new_tracks: int = 0
     calls: int = 0
+
+
+class AdminLogin(BaseModel):
+    email: str
+    password: str
+
+
+class CollegeUpdate(BaseModel):
+    name: Optional[str] = None
+    division: Optional[str] = None
+    conference: Optional[str] = None
+    location: Optional[str] = None
+    state: Optional[str] = None
+    region: Optional[str] = None
+    country: Optional[str] = None
+    foreign_friendly: Optional[bool] = None
+    ranking: Optional[int] = None
+    acceptance_rate: Optional[str] = None
+    scholarship_info: Optional[str] = None
+    website: Optional[str] = None
+    language_of_study: Optional[str] = None
+    scholarship_type: Optional[str] = None
+    notable_alumni: Optional[str] = None
+    image_url: Optional[str] = None
+
+
+class CoachEmailFix(BaseModel):
+    old_coach_name: str
+    old_coach_email: Optional[str] = ""
+    new_coach_email: Optional[str] = None
+    new_coach_name: Optional[str] = None
+
+
+class DeleteCoach(BaseModel):
+    coach_name: str
+
+
+class BulkImportColleges(BaseModel):
+    colleges: List[dict]
+
+
+class CollegeReportCreate(BaseModel):
+    college_id: str
+    report_type: str
+    description: str
+    current_value: Optional[str] = ""
+    suggested_value: Optional[str] = ""
