@@ -77,8 +77,9 @@ Build "CourtBound," a web app to track USA and UK college basketball scholarship
 - `/app/memory/supabase_migration_v3.sql` — **PENDING (user must run)**: trial columns, pricing_plans, trial_email_reminders
 
 ## Backend Routes (all prefixed /api)
-- POST /auth/session — exchange Google OAuth session token
-- GET /auth/me — get current user (now includes subscription_tier, trial_end_date)
+- POST /auth/session — legacy Emergent Auth exchange (preview fallback)
+- POST /auth/google-callback — **NEW** Supabase OAuth callback (used by live site)
+- GET /auth/me — get current user (includes subscription_tier, trial_end_date)
 - GET /subscription/plans — public pricing plans
 - GET /subscription/status — user's trial/subscription status
 - POST /subscription/checkout — coming soon placeholder

@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useEffect } from "react";
+import { supabase } from "../supabaseClient";
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -10,10 +11,12 @@ export default function LoginPage() {
     if (!loading && user) navigate("/dashboard");
   }, [user, loading]);
 
-  const handleGoogleLogin = () => {
-    // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
-    const redirectUrl = window.location.origin + "/dashboard";
-    window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
+  const handleGoogleLogin = async () => {
+    const redirectTo = window.location.origin + "/auth/callback";
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo },
+    });
   };
 
   return (
