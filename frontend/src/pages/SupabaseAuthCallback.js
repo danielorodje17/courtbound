@@ -9,29 +9,13 @@ export default function SupabaseAuthCallback() {
   const hasProcessed = useRef(false);
 
   useEffect(() => {
-    if (hasProcessed.current) return;
-    hasProcessed.current = true;
-
-    const run = async () => {
+    const handleSession = async (session) => {
+      if (hasProcessed.current || !session?.access_token) return;
+      hasProcessed.current = true;
       try {
-        // Exchange the PKCE code for a Supabase session (supabase-js handles code_verifier)
-        const { data, error } = await supabase.auth.exchangeCodeForSession(
-          window.location.href
-        );
-
-        if (error || !data?.session?.access_token) {
-          console.error("Supabase code exchange failed:", error?.message, error?.status, JSON.stringify(error));
-          navigate("/login", { replace: true });
-          return;
-        }
-
-        const accessToken = data.session.access_token;
-
-        // Send access_token to our FastAPI backend to create a custom session
         const res = await apiRequest("post", "/auth/google-callback", {
-          access_token: accessToken,
+          access_token: session.access_token,
         });
-
         if (res.data?.session_token) {
           setToken(res.data.session_token);
           await checkAuth();
@@ -45,7 +29,30 @@ export default function SupabaseAuthCallback() {
       }
     };
 
-    run();
+    // Listen for SIGNED_IN or INITIAL_SESSION (implicit flow fires one of these)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_IN" || event === "INITIAL_SESSION") {
+        handleSession(session);
+      }
+    });
+
+    // Fallback: check if session already exists (handles timing race)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      handleSession(session);
+    });
+
+    // Timeout: if nothing fires within 8s, go back to login
+    const timeout = setTimeout(() => {
+      if (!hasProcessed.current) {
+        console.error("Auth callback timeout - no session received");
+        navigate("/login", { replace: true });
+      }
+    }, 8000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, []); // eslint-disable-line
 
   return (

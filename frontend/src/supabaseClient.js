@@ -5,8 +5,8 @@ const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    flowType: "pkce",
-    detectSessionInUrl: false,
-    persistSession: true,
+    flowType: "implicit",
+    detectSessionInUrl: true,
+    persistSession: false,
   },
 });
