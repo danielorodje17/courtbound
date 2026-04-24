@@ -20,7 +20,7 @@ export default function SupabaseAuthCallback() {
         );
 
         if (error || !data?.session?.access_token) {
-          console.error("Supabase code exchange failed:", error?.message);
+          console.error("Supabase code exchange failed:", error?.message, error?.status, JSON.stringify(error));
           navigate("/login", { replace: true });
           return;
         }
