@@ -1436,7 +1436,7 @@ export default function AdminPage() {
               {editForm.image_url && (
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Image Preview</label>
-                  <img src={editForm.image_url.startsWith("/static/") ? `${process.env.REACT_APP_BACKEND_URL}${editForm.image_url}` : editForm.image_url} alt="preview" className="h-24 rounded-lg object-cover border border-slate-200" onError={e => e.target.style.display="none"} />
+                  <img src={editForm.image_url} alt="preview" className="h-24 rounded-lg object-cover border border-slate-200" onError={e => e.target.style.display="none"} />
                 </div>
               )}
 
@@ -1462,7 +1462,7 @@ export default function AdminPage() {
                           body: formData,
                         });
                         const data = await res.json();
-                        if (data.ok) {
+                        if (data.image_url) {
                           setEditForm(p => ({ ...p, image_url: data.image_url }));
                         }
                       } catch {}
@@ -1470,7 +1470,7 @@ export default function AdminPage() {
                     }}
                   />
                 </label>
-                {editForm.image_url?.startsWith("/static/") && (
+                {editForm.image_url?.startsWith("https://") && editForm.image_url.includes("supabase") && (
                   <p className="text-xs text-green-600 font-semibold mt-1">Custom logo uploaded</p>
                 )}
               </div>

@@ -6,7 +6,8 @@ Build "CourtBound," a web app to track USA and UK college basketball scholarship
 ## Tech Stack
 - **Frontend**: React.js (CRA + CRACO), Tailwind CSS, Recharts
 - **Backend**: FastAPI (Python), Supabase (PostgreSQL via supabase-py v2)
-- **Auth**: Emergent-managed Google OAuth
+- **Auth**: Supabase Auth (Google OAuth PKCE flow)
+- **Storage**: Supabase Storage (bucket: college-images, public)
 - **AI**: Emergent LLM Key (OpenAI/Anthropic)
 - **Email**: Resend (API key pending from user)
 - **Scheduler**: APScheduler (trial email reminders)
@@ -26,13 +27,14 @@ Build "CourtBound," a web app to track USA and UK college basketball scholarship
 - [x] Profile management
 - [x] College comparison tool
 - [x] Admin panel: user management, reports, settings, college management
-- [x] Google OAuth login via Emergent Auth
+- [x] Google OAuth login via Supabase Auth (PKCE flow) — replaces Emergent Auth
 - [x] Email address reporting (wrong email clears verification badge)
 - [x] Subscription/Trial system (14-day free trial)
 - [x] Pricing page (/pricing) with 3-tier comparison
 - [x] Trial countdown banner on dashboard
 - [x] Admin pricing management (requires migration v3)
 - [x] Background scheduler for trial email reminders (day 7 + day 11)
+- [x] Admin college image upload → Supabase Storage (bucket: college-images, public)
 
 ## Database Schema (Supabase/PostgreSQL)
 ### users
@@ -85,6 +87,7 @@ Build "CourtBound," a web app to track USA and UK college basketball scholarship
 - POST /subscription/checkout — coming soon placeholder
 - GET /admin/pricing — admin get pricing plans
 - PUT /admin/pricing/{tier} — admin update pricing plan
+- POST /admin/colleges/{id}/upload-image — upload to Supabase Storage bucket `college-images`
 - (all other routes: /colleges, /tracked, /emails, /dashboard, /goals, /ai, /profile, /reports)
 
 ## Environment Variables Required

@@ -386,17 +386,30 @@ async def admin_colleges_contacts(_=Depends(require_admin_token), division: str 
 
 @router.post("/colleges/{college_id}/upload-image")
 async def upload_college_image(college_id: str, file: UploadFile = File(...), _=Depends(require_admin_token)):
-    import shutil
     ext = (file.filename or ".jpg").rsplit(".", 1)[-1].lower()
     if ext not in ("jpg", "jpeg", "png", "webp", "gif"):
         raise HTTPException(status_code=400, detail="Unsupported image format")
-    static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "college_images")
-    os.makedirs(static_dir, exist_ok=True)
+
+    content_type_map = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "webp": "image/webp", "gif": "image/gif"}
+    content_type = content_type_map.get(ext, "image/jpeg")
+
+    file_data = await file.read()
     fname = f"{college_id}.{ext}"
-    fpath = os.path.join(static_dir, fname)
-    with open(fpath, "wb") as f:
-        shutil.copyfileobj(file.file, f)
-    image_url = f"/api/static/college_images/{fname}"
+
+    try:
+        await run_in_threadpool(
+            lambda: supa.storage.from_("college-images").upload(
+                path=fname,
+                file=file_data,
+                file_options={"content-type": content_type, "upsert": "true"},
+            )
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Storage upload failed: {str(e)}")
+
+    image_url = await run_in_threadpool(
+        lambda: supa.storage.from_("college-images").get_public_url(fname)
+    )
     await run_in_threadpool(lambda: supa.table("colleges").update({"image_url": image_url}).eq("id", college_id).execute())
     return {"image_url": image_url}
 
