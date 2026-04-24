@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { apiRequest } from "../context/AuthContext";
+import { apiRequest, useAuth } from "../context/AuthContext";
 import { Trophy, ArrowRight, ChevronRight, CheckCircle2, Sparkles, X } from "lucide-react";
 
 const STEP_IMAGES = [
@@ -54,6 +54,7 @@ function Sel({ value, onChange, options, testId, placeholder = "Select..." }) {
 
 export default function OnboardingPage({ onComplete }) {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
 
@@ -64,6 +65,11 @@ export default function OnboardingPage({ onComplete }) {
     gcse_grades: "", a_level_subjects: "", target_division: "", target_start_year: "",
   });
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const markOnboarded = () => {
+    const key = user?.user_id ? `cb_onboarded_${user.user_id}` : "cb_onboarded";
+    localStorage.setItem(key, "1");
+  };
 
   const saveProfile = async () => {
     setSaving(true);
@@ -76,7 +82,7 @@ export default function OnboardingPage({ onComplete }) {
   const next = async () => {
     if (step === 3) {
       await saveProfile();
-      localStorage.setItem("cb_onboarded", "1");
+      markOnboarded();
       if (onComplete) onComplete();
       navigate("/dashboard");
     } else {
@@ -85,7 +91,7 @@ export default function OnboardingPage({ onComplete }) {
   };
 
   const skip = () => {
-    localStorage.setItem("cb_onboarded", "1");
+    markOnboarded();
     if (onComplete) onComplete();
     navigate("/dashboard");
   };

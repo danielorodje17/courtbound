@@ -258,11 +258,12 @@ function AppRouter() {
   useEffect(() => {
     if (location.hash?.includes("session_id=")) return;
     if (!user) { setNeedsOnboarding(false); return; }
-    if (localStorage.getItem("cb_onboarded")) { setNeedsOnboarding(false); return; }
+    const onboardedKey = `cb_onboarded_${user.user_id}`;
+    if (localStorage.getItem(onboardedKey)) { setNeedsOnboarding(false); return; }
     apiRequest("get", "/profile")
       .then(r => {
         if (!r.data?.full_name) setNeedsOnboarding(true);
-        else { localStorage.setItem("cb_onboarded", "1"); setNeedsOnboarding(false); }
+        else { localStorage.setItem(onboardedKey, "1"); setNeedsOnboarding(false); }
       })
       .catch(() => setNeedsOnboarding(false));
   }, [user?.user_id]); // eslint-disable-line
