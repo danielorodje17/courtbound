@@ -340,7 +340,48 @@ async def admin_colleges_contacts(_=Depends(require_admin_token), division: str 
     colleges = result.data or []
     if verified_only:
         colleges = [c for c in colleges if any(ch.get("last_verified") for ch in (c.get("coaches") or []))]
-    return colleges
+
+    # Flatten: one row per coach (frontend expects flat list with college_id, college_name, coach_name, email)
+    rows = []
+    for college in colleges:
+        coaches = college.get("coaches") or []
+        if not coaches:
+            # Include colleges with no coaches so they appear in the admin list
+            rows.append({
+                "college_id": college["id"],
+                "college_name": college.get("name", ""),
+                "division": college.get("division"),
+                "conference": college.get("conference"),
+                "location": college.get("location"),
+                "state": college.get("state"),
+                "foreign_friendly": college.get("foreign_friendly"),
+                "website": college.get("website"),
+                "coach_name": "",
+                "email": "",
+                "phone": "",
+                "title": "",
+                "last_verified": None,
+                "sort_order": 0,
+            })
+        else:
+            for coach in coaches:
+                rows.append({
+                    "college_id": college["id"],
+                    "college_name": college.get("name", ""),
+                    "division": college.get("division"),
+                    "conference": college.get("conference"),
+                    "location": college.get("location"),
+                    "state": college.get("state"),
+                    "foreign_friendly": college.get("foreign_friendly"),
+                    "website": college.get("website"),
+                    "coach_name": coach.get("name", ""),
+                    "email": coach.get("email", ""),
+                    "phone": coach.get("phone", ""),
+                    "title": coach.get("title", ""),
+                    "last_verified": coach.get("last_verified"),
+                    "sort_order": coach.get("sort_order", 0),
+                })
+    return rows
 
 
 @router.post("/colleges/{college_id}/upload-image")
