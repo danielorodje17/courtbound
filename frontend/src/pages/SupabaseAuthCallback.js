@@ -1,12 +1,11 @@
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
-import { useAuth } from "../context/AuthContext";
-import { apiRequest } from "../context/AuthContext";
+import { useAuth, apiRequest, setToken } from "../context/AuthContext";
 
 export default function SupabaseAuthCallback() {
   const navigate = useNavigate();
-  const { setToken, checkAuth } = useAuth();
+  const { checkAuth } = useAuth();
   const hasProcessed = useRef(false);
 
   useEffect(() => {
