@@ -102,6 +102,16 @@ Build "CourtBound," a web app to track USA and UK college basketball scholarship
 
 ## Pending Actions (User Must Do)
 1. **Run supabase_migration_v3.sql** in Supabase Dashboard → SQL Editor
-2. **Provide Resend API key** (re_...) for trial email reminders
-3. **Set SENDER_EMAIL** in backend/.env for email from address
-4. **Set FRONTEND_URL** in backend/.env (e.g., https://your-app.vercel.app)
+2. **Run supabase_migration_v4.sql** in Supabase Dashboard → SQL Editor (adds basketball_gender to profiles, program_gender to colleges)
+3. **Provide Resend API key** (re_...) for trial email reminders
+4. **Set SENDER_EMAIL** in backend/.env for email from address
+5. **Set FRONTEND_URL** in backend/.env (e.g., https://your-app.vercel.app)
+
+## Women's Basketball Division (Added Feb 2026)
+- Gender selector on onboarding step 0 (Men's / Women's)
+- Women's theme: rose accent (#e11d48), indigo sidebar (#1e1b4b), Outfit/DM Sans fonts, pill-shaped buttons
+- Men's theme: orange accent (#f97316), slate sidebar, Barlow Condensed font, sharp buttons
+- ThemeContext persists division in localStorage; reads basketball_gender from profile on login
+- Social media step (Instagram + X/Twitter) on onboarding step 4
+- CollegesPage + Dashboard are fully theme-aware
+- program_gender column on colleges table (default 'both') enables future women's-only college tagging by admin

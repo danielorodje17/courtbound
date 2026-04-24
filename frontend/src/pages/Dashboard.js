@@ -228,8 +228,9 @@ export default function Dashboard() {
 
             {/* Recommended action */}
             <div
-              className="flex items-start gap-3 bg-orange-500 rounded-lg px-4 py-3 cursor-pointer hover:bg-orange-600 transition-colors"
+              className="flex items-start gap-3 rounded-lg px-4 py-3 cursor-pointer transition-opacity hover:opacity-90"
               data-testid="digest-recommended-action"
+              style={{ background: theme.accent }}
               onClick={() => navigate(digest.recommended_link)}
             >
               <CheckCircle className="w-4 h-4 text-white flex-shrink-0 mt-0.5" />
@@ -419,7 +420,8 @@ export default function Dashboard() {
               {stats.recent_emails.map((email) => (
                 <div key={email.id} className="p-4 hover:bg-slate-50 transition-colors">
                   <div className="flex items-start gap-2.5">
-                    <span className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${email.direction === "sent" ? "bg-orange-400" : "bg-green-400"}`} />
+                    <span className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${email.direction === "sent" ? "" : "bg-green-400"}`}
+                      style={email.direction === "sent" ? { background: theme.accent } : {}} />
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-slate-800 truncate">{email.subject}</p>
                       <p className="text-xs text-slate-400 mt-0.5">{email.direction === "sent" ? "Sent" : "Received"} · {new Date(email.created_at).toLocaleDateString()}</p>
