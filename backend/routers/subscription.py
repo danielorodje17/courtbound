@@ -50,14 +50,6 @@ async def get_status(current_user: UserModel = Depends(get_current_user)):
         "effective_tier": "premium" if is_trial_active else tier,
     }
 
-    return {
-        "subscription_tier": tier,
-        "trial_end_date": trial_end_date,
-        "trial_days_remaining": trial_days_remaining,
-        "is_trial_active": is_trial_active,
-        "effective_tier": "premium" if is_trial_active else tier,
-    }
-
 
 @router.post("/checkout")
 async def checkout(body: dict, current_user: UserModel = Depends(get_current_user)):
