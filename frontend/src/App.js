@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { AuthProvider, useAuth, apiRequest } from "./context/AuthContext";
+import { ThemeProvider, useTheme, DIVISION_THEME } from "./context/ThemeContext";
 import Dashboard from "./pages/Dashboard";
 import CollegesPage from "./pages/CollegesPage";
 import CollegeDetailPage from "./pages/CollegeDetailPage";
@@ -141,20 +142,25 @@ function NotificationBell() {
 function AppLayout({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
+  const { division, setDivision } = useTheme();
+  const theme = DIVISION_THEME[division] || DIVISION_THEME.mens;
 
   return (
-    <div className="min-h-screen bg-slate-50" style={{ fontFamily: "Manrope, sans-serif" }}>
+    <div className="min-h-screen bg-slate-50" style={{ fontFamily: "var(--font-body, Manrope, sans-serif)" }}>
       {/* Top Nav */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-4">
           {/* Logo */}
           <NavLink to="/dashboard" className="flex items-center gap-2 flex-shrink-0 mr-2">
-            <div className="w-7 h-7 bg-orange-500 rounded-lg flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: theme.accent }}>
               <Trophy className="w-4 h-4 text-white" />
             </div>
-            <span className="font-black text-slate-900 text-sm" style={{ fontFamily: "Barlow Condensed, sans-serif", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            <span className="font-black text-slate-900 text-sm" style={{ fontFamily: "var(--font-heading, 'Barlow Condensed', sans-serif)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
               CourtBound
             </span>
+            {division === "womens" && (
+              <span className="hidden sm:inline text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: theme.accentLight, color: theme.accentText }}>Women's</span>
+            )}
           </NavLink>
 
           {/* Desktop nav */}
@@ -165,9 +171,10 @@ function AppLayout({ children }) {
                 to={path}
                 className={({ isActive }) =>
                   `flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                    isActive ? "bg-orange-50 text-orange-600" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                    isActive ? "font-bold" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                   }`
                 }
+                style={({ isActive }) => isActive ? { background: theme.accentLight, color: theme.accentText } : {}}
               >
                 <Icon className="w-3.5 h-3.5" />
                 {label}
@@ -194,9 +201,10 @@ function AppLayout({ children }) {
                 onClick={() => setMobileOpen(false)}
                 className={({ isActive }) =>
                   `flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold ${
-                    isActive ? "bg-orange-50 text-orange-600" : "text-slate-600 hover:bg-slate-50"
+                    isActive ? "font-bold" : "text-slate-600 hover:bg-slate-50"
                   }`
                 }
+                style={({ isActive }) => isActive ? { background: theme.accentLight, color: theme.accentText } : {}}
               >
                 <Icon className="w-3.5 h-3.5" />
                 {label}
@@ -218,7 +226,7 @@ function ProtectedRoute({ children }) {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-10 w-10 border-4 border-orange-500 border-t-transparent" />
+        <div className="animate-spin rounded-full h-10 w-10 border-4 border-t-transparent division-spinner" />
       </div>
     );
   }
@@ -231,7 +239,7 @@ function ProtectedAppRoute({ children, needsOnboarding }) {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-10 w-10 border-4 border-orange-500 border-t-transparent" />
+        <div className="animate-spin rounded-full h-10 w-10 border-4 border-t-transparent division-spinner" />
       </div>
     );
   }
@@ -244,7 +252,9 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppRouter />
+        <ThemeProvider>
+          <AppRouter />
+        </ThemeProvider>
       </AuthProvider>
     </BrowserRouter>
   );

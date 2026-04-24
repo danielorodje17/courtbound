@@ -2,6 +2,63 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Men's Division (default) ─── */
+:root {
+  --accent: #f97316;          /* orange-500 */
+  --accent-hover: #ea580c;    /* orange-600 */
+  --accent-light: #fff7ed;    /* orange-50 */
+  --accent-text: #c2410c;     /* orange-700 */
+  --sidebar-bg: #0f172a;      /* slate-900 */
+  --sidebar-active: rgba(249,115,22,0.12);
+  --spinner-color: #f97316;
+  --font-heading: 'Barlow Condensed', sans-serif;
+  --font-body: 'Manrope', sans-serif;
+  --card-radius: 0.75rem;     /* rounded-xl */
+  --btn-radius: 0.75rem;
+}
+
+/* ─── Women's Division Override ─── */
+[data-division="womens"] {
+  --accent: #e11d48;          /* rose-600 */
+  --accent-hover: #be123c;    /* rose-700 */
+  --accent-light: #fff1f2;    /* rose-50 */
+  --accent-text: #9f1239;     /* rose-800 */
+  --sidebar-bg: #1e1b4b;      /* indigo-950 */
+  --sidebar-active: rgba(225,29,72,0.12);
+  --spinner-color: #e11d48;
+  --font-heading: 'Outfit', sans-serif;
+  --font-body: 'DM Sans', sans-serif;
+  --card-radius: 1rem;        /* rounded-2xl */
+  --btn-radius: 9999px;       /* rounded-full */
+}
+
+/* Apply division fonts globally */
+[data-division="womens"] body,
+[data-division="womens"] p,
+[data-division="womens"] span:not(.icon),
+[data-division="womens"] li,
+[data-division="womens"] td,
+[data-division="womens"] label {
+  font-family: var(--font-body);
+}
+
+/* Division-aware spinner */
+.division-spinner {
+  border-color: var(--accent);
+  border-top-color: transparent;
+}
+
+/* Division-aware button */
+.btn-division {
+  background-color: var(--accent);
+  border-radius: var(--btn-radius);
+  transition: background-color 0.15s, transform 0.1s;
+}
+.btn-division:hover {
+  background-color: var(--accent-hover);
+  transform: translateY(-1px);
+}
+
 body {
     margin: 0;
     font-family:
