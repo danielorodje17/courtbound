@@ -70,7 +70,7 @@ export default function OnboardingPage({ onComplete }) {
     height_ft: "", height_cm: "",
     ppg: "", apg: "", rpg: "", current_team: "", club_team: "", highlight_tape_url: "",
     gcse_grades: "", a_level_subjects: "", target_division: "", target_start_year: "",
-    instagram_url: "", twitter_url: "",
+    instagram: "", twitter: "",
   });
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -316,7 +316,7 @@ export default function OnboardingPage({ onComplete }) {
                 <Field label="Instagram">
                   <div className="relative">
                     <Instagram className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                    <input data-testid="ob-instagram" value={form.instagram_url} onChange={e => set("instagram_url", e.target.value)}
+                    <input data-testid="ob-instagram" value={form.instagram} onChange={e => set("instagram", e.target.value)}
                       placeholder="@yourusername or profile URL"
                       className="w-full bg-white/5 border border-white/10 rounded-lg pl-10 pr-4 py-2.5 text-white placeholder-slate-600 text-sm focus:outline-none focus:border-white/30 transition-colors" />
                   </div>
@@ -324,7 +324,7 @@ export default function OnboardingPage({ onComplete }) {
                 <Field label="X (Twitter)">
                   <div className="relative">
                     <Twitter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                    <input data-testid="ob-twitter" value={form.twitter_url} onChange={e => set("twitter_url", e.target.value)}
+                    <input data-testid="ob-twitter" value={form.twitter} onChange={e => set("twitter", e.target.value)}
                       placeholder="@yourusername or profile URL"
                       className="w-full bg-white/5 border border-white/10 rounded-lg pl-10 pr-4 py-2.5 text-white placeholder-slate-600 text-sm focus:outline-none focus:border-white/30 transition-colors" />
                   </div>

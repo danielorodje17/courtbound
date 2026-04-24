@@ -139,6 +139,7 @@ class PlayerProfile(BaseModel):
     bio: Optional[str] = ""
     instagram: Optional[str] = ""
     twitter: Optional[str] = ""
+    basketball_gender: Optional[str] = ""
 
 
 class NCAACHeckRequest(BaseModel):

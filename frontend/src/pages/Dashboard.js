@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiRequest } from "../context/AuthContext";
 import { useAuth } from "../context/AuthContext";
+import { useTheme, DIVISION_THEME } from "../context/ThemeContext";
 import { Trophy, Mail, BookOpen, TrendingUp, ChevronRight, Bell, Plus, AlertTriangle, Clock, Calendar, CheckCircle, BarChart2, Newspaper, ArrowUp, ArrowDown, Minus } from "lucide-react";
 import WeeklyGoalsWidget from "../components/WeeklyGoalsWidget";
 import ActivityHeatmap from "../components/ActivityHeatmap";
@@ -44,6 +45,8 @@ function CustomTooltip({ active, payload, label }) {
 export default function Dashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { division } = useTheme();
+  const theme = DIVISION_THEME[division] || DIVISION_THEME.mens;
   const [stats, setStats] = useState(null);
   const [tracked, setTracked] = useState([]);
   const [alerts, setAlerts] = useState(null);
@@ -121,16 +124,17 @@ export default function Dashboard() {
           className="absolute inset-0 w-full h-full object-cover opacity-30"
         />
         <div className="relative z-10 p-8">
-          <span className="text-xs tracking-[0.2em] uppercase font-bold text-orange-400">Recruitment Dashboard</span>
-          <h1 className="text-3xl font-bold text-white mt-1" style={{ fontFamily: "Barlow Condensed, sans-serif", textTransform: "uppercase" }}>
+          <span className="text-xs tracking-[0.2em] uppercase font-bold" style={{ color: theme.accent }}>Recruitment Dashboard</span>
+          <h1 className="text-3xl font-bold text-white mt-1" style={{ fontFamily: theme.fontHeading, textTransform: "uppercase" }}>
             Your Scholarship Tracker
           </h1>
-          <p className="text-white/60 mt-1">European | Basketball Scholarship Tracker</p>
+          <p className="text-white/60 mt-1">{division === "womens" ? "Women's" : "European"} | Basketball Scholarship Tracker</p>
           <div className="flex gap-3 mt-5">
             <button
               data-testid="dashboard-find-colleges-btn"
               onClick={() => navigate("/colleges")}
-              className="bg-orange-500 text-white font-bold uppercase tracking-wider rounded-lg px-5 py-2.5 hover:bg-orange-600 transition-all text-sm flex items-center gap-2"
+              className="text-white font-bold uppercase tracking-wider rounded-lg px-5 py-2.5 transition-all text-sm flex items-center gap-2"
+              style={{ background: theme.accent }}
             >
               <Plus className="w-4 h-4" /> Find Colleges
             </button>
@@ -327,7 +331,7 @@ export default function Dashboard() {
             <h2 className="font-bold text-slate-900" style={{ fontFamily: "Barlow Condensed, sans-serif", fontSize: "1.1rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>
               My Colleges
             </h2>
-            <button onClick={() => navigate("/colleges")} className="text-sm text-orange-500 font-semibold hover:text-orange-600 flex items-center gap-1">
+            <button onClick={() => navigate("/colleges")} className="text-sm font-semibold hover:opacity-75 flex items-center gap-1" style={{ color: theme.accent }}>
               Browse all <ChevronRight className="w-4 h-4" />
             </button>
           </div>
@@ -335,7 +339,7 @@ export default function Dashboard() {
             <div className="p-8 text-center">
               <Trophy className="w-10 h-10 text-slate-300 mx-auto mb-3" />
               <p className="text-slate-500 text-sm">No colleges tracked yet.</p>
-              <button onClick={() => navigate("/colleges")} className="mt-3 text-orange-500 font-semibold text-sm hover:text-orange-600">
+              <button onClick={() => navigate("/colleges")} className="mt-3 font-semibold text-sm" style={{ color: theme.accent }}>
                 Find colleges to target →
               </button>
             </div>
@@ -398,7 +402,7 @@ export default function Dashboard() {
             <h2 className="font-bold text-slate-900" style={{ fontFamily: "Barlow Condensed, sans-serif", fontSize: "1.1rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>
               Recent Emails
             </h2>
-            <button onClick={() => navigate("/communications")} className="text-sm text-orange-500 font-semibold hover:text-orange-600 flex items-center gap-1">
+            <button onClick={() => navigate("/communications")} className="text-sm font-semibold hover:opacity-75 flex items-center gap-1" style={{ color: theme.accent }}>
               All <ChevronRight className="w-4 h-4" />
             </button>
           </div>
@@ -406,7 +410,7 @@ export default function Dashboard() {
             <div className="p-6 text-center">
               <Mail className="w-8 h-8 text-slate-300 mx-auto mb-2" />
               <p className="text-slate-500 text-sm">No emails logged yet.</p>
-              <button onClick={() => navigate("/compose")} className="mt-2 text-orange-500 font-semibold text-sm hover:text-orange-600">
+              <button onClick={() => navigate("/compose")} className="mt-2 font-semibold text-sm" style={{ color: theme.accent }}>
                 Draft your first email →
               </button>
             </div>

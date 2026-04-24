@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { apiRequest } from "../context/AuthContext";
+import { useTheme, DIVISION_THEME } from "../context/ThemeContext";
 import { getCollegeImage } from "../utils/collegeImages";
 import { Search, MapPin, Users, Globe, Plus, Check, Flag, BarChart2, ArrowLeft, ShieldCheck } from "lucide-react";
 
@@ -8,6 +9,8 @@ export default function CollegesPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const trackedOnly = searchParams.get("view") === "tracked";
+  const { division: basketballDivision } = useTheme();
+  const theme = DIVISION_THEME[basketballDivision] || DIVISION_THEME.mens;
   const [colleges, setColleges] = useState([]);
   const [allColleges, setAllColleges] = useState([]);
   const [tracked, setTracked] = useState(new Set());
@@ -15,7 +18,7 @@ export default function CollegesPage() {
   const [compareSet, setCompareSet] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [division, setDivision] = useState("");
+  const [ncaaDivision, setNcaaDivision] = useState("");
   const [region, setRegion] = useState("");
   const [foreignOnly, setForeignOnly] = useState(false);
   const [verifiedOnly, setVerifiedOnly] = useState(false);
@@ -28,7 +31,7 @@ export default function CollegesPage() {
 
   useEffect(() => {
     applyFilters();
-  }, [search, division, region, foreignOnly, verifiedOnly, state, allColleges, trackedOnly, trackedData, tracked]);
+  }, [search, ncaaDivision, region, foreignOnly, verifiedOnly, state, allColleges, trackedOnly, trackedData, tracked, basketballDivision]);
 
   const fetchAllColleges = async () => {
     try {
@@ -45,9 +48,15 @@ export default function CollegesPage() {
     let filtered = allColleges;
     // trackedOnly is a pipeline view — only apply it when not using discovery filters
     if (trackedOnly && !verifiedOnly && !foreignOnly) filtered = filtered.filter(c => tracked.has(c.id));
+    // Filter by basketball program gender (graceful: null/undefined = show for all)
+    filtered = filtered.filter(c => {
+      if (!c.program_gender) return true;
+      if (basketballDivision === "womens") return c.program_gender === "womens" || c.program_gender === "both";
+      return c.program_gender === "mens" || c.program_gender === "both";
+    });
     if (region) filtered = filtered.filter(c => (c.region || "USA") === region);
     if (search) filtered = filtered.filter(c => c.name.toLowerCase().includes(search.toLowerCase()) || c.location.toLowerCase().includes(search.toLowerCase()) || c.country?.toLowerCase().includes(search.toLowerCase()));
-    if (division) filtered = filtered.filter(c => c.division === division);
+    if (ncaaDivision) filtered = filtered.filter(c => c.division === ncaaDivision);
     if (foreignOnly) filtered = filtered.filter(c => c.foreign_friendly);
     if (verifiedOnly) filtered = filtered.filter(c => (c.coaches || []).some(coach => coach.last_verified));
     if (state) filtered = filtered.filter(c => c.state?.toLowerCase().includes(state.toLowerCase()) || c.location?.toLowerCase().includes(state.toLowerCase()) || c.country?.toLowerCase().includes(state.toLowerCase()));
@@ -119,8 +128,10 @@ export default function CollegesPage() {
           </>
         ) : (
           <>
-            <span className="text-xs tracking-[0.2em] uppercase font-bold text-orange-600">College Directory</span>
-            <h1 className="text-3xl font-bold text-slate-900 mt-1" style={{ fontFamily: "Barlow Condensed, sans-serif", textTransform: "uppercase" }}>
+            <span className="text-xs tracking-[0.2em] uppercase font-bold" style={{ color: theme.accentText }}>
+              {basketballDivision === "womens" ? "Women's Division" : "College Directory"}
+            </span>
+            <h1 className="text-3xl font-bold text-slate-900 mt-1" style={{ fontFamily: theme.fontHeading, textTransform: "uppercase" }}>
               Find Your College
             </h1>
             <p className="text-slate-500 mt-1">Browse {allColleges.length} colleges with basketball programs</p>
@@ -181,8 +192,8 @@ export default function CollegesPage() {
           </div>
           <select
             data-testid="college-division-filter"
-            value={division}
-            onChange={e => setDivision(e.target.value)}
+            value={ncaaDivision}
+            onChange={e => setNcaaDivision(e.target.value)}
             className="border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 outline-none text-slate-700 bg-white"
           >
             <option value="">All Divisions / Leagues</option>
@@ -212,9 +223,9 @@ export default function CollegesPage() {
             <ShieldCheck className="w-3.5 h-3.5" />
             Email Verified {verifiedOnly && `(${colleges.length})`}
           </button>
-          {(search || division || foreignOnly || verifiedOnly || state) && (
+          {(search || ncaaDivision || foreignOnly || verifiedOnly || state) && (
             <button
-              onClick={() => { setSearch(""); setDivision(""); setForeignOnly(false); setVerifiedOnly(false); setState(""); }}
+              onClick={() => { setSearch(""); setNcaaDivision(""); setForeignOnly(false); setVerifiedOnly(false); setState(""); }}
               className="px-3 py-2.5 text-xs text-slate-500 hover:text-slate-700 font-medium border border-slate-200 rounded-lg hover:bg-slate-50 transition-all"
             >
               Clear filters
@@ -247,7 +258,7 @@ export default function CollegesPage() {
           ) : (
             <>
               <p className="text-slate-500 font-medium">No colleges match your filters.</p>
-              <button onClick={() => { setSearch(""); setDivision(""); setForeignOnly(false); setState(""); }} className="mt-3 text-orange-500 font-semibold text-sm hover:text-orange-600">
+              <button onClick={() => { setSearch(""); setNcaaDivision(""); setForeignOnly(false); setState(""); }} style={{ color: theme.accent }} className="mt-3 font-semibold text-sm">
                 Clear all filters
               </button>
             </>
@@ -349,8 +360,9 @@ export default function CollegesPage() {
                   className={`w-full flex items-center justify-center gap-2 py-2 rounded-lg font-bold uppercase tracking-wider text-xs transition-all ${
                     tracked.has(college.id)
                       ? "bg-green-50 text-green-700 border-2 border-green-300 hover:bg-red-50 hover:text-red-600 hover:border-red-300"
-                      : "bg-orange-500 text-white hover:bg-orange-600"
+                      : "text-white"
                   }`}
+                  style={!tracked.has(college.id) ? { background: theme.accent, borderRadius: `var(--btn-radius, 0.5rem)` } : {}}
                 >
                   {tracked.has(college.id) ? <><Check className="w-3.5 h-3.5" /> Tracking</> : <><Plus className="w-3.5 h-3.5" /> Add to My List</>}
                 </button>
