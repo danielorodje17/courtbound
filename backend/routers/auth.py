@@ -1,5 +1,6 @@
 import os
 import uuid
+import logging
 from fastapi import APIRouter, Response, Cookie, Header, HTTPException
 from fastapi.concurrency import run_in_threadpool
 from datetime import datetime, timezone, timedelta
@@ -8,6 +9,7 @@ from supabase_db import supa
 from auth_utils import UserModel, get_current_user
 from fastapi import Depends
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 EMERGENT_AUTH_URL = os.environ.get("EMERGENT_AUTH_URL", "https://demobackend.emergentagent.com")
@@ -26,6 +28,7 @@ async def exchange_session(body: dict, response: Response):
             headers={"X-Session-ID": session_id},
         )
     if r.status_code != 200:
+        logger.warning(f"Auth provider returned {r.status_code}: {r.text[:200]}")
         raise HTTPException(status_code=401, detail="Invalid session from auth provider")
 
     user_data = r.json()
@@ -35,9 +38,7 @@ async def exchange_session(body: dict, response: Response):
     picture = user_data.get("picture", "") or user_data.get("avatar", "")
     session_token = user_data.get("session_token", session_id)
 
-    now_iso = datetime.now(timezone.utc).isoformat()
-
-    # Upsert user by email; get back the Supabase UUID
+    # Upsert user by email — supabase-py v2 does NOT support .select() chained on .upsert()
     upsert_result = await run_in_threadpool(
         lambda: supa.table("users").upsert(
             {
@@ -48,11 +49,37 @@ async def exchange_session(body: dict, response: Response):
                 "role": "player",
             },
             on_conflict="email",
-        ).select("id").execute()
+        ).execute()
     )
 
-    if upsert_result.data:
-        user_id = upsert_result.data[0]["id"]
+    user_row = upsert_result.data[0] if upsert_result.data else None
+    if user_row:
+        user_id = user_row["id"]
+        try:
+            # Start 14-day trial for brand-new users
+            if not user_row.get("trial_start_date"):
+                trial_end = datetime.now(timezone.utc) + timedelta(days=14)
+                await run_in_threadpool(
+                    lambda: supa.table("users").update({
+                        "subscription_tier": "trial",
+                        "trial_start_date": datetime.now(timezone.utc).isoformat(),
+                        "trial_end_date": trial_end.isoformat(),
+                    }).eq("id", user_id).execute()
+                )
+            elif user_row.get("subscription_tier") == "trial":
+                # Check if trial has expired and downgrade if so
+                trial_end_raw = user_row.get("trial_end_date")
+                if trial_end_raw:
+                    ted = datetime.fromisoformat(str(trial_end_raw).replace("Z", "+00:00"))
+                    if getattr(ted, "tzinfo", None) is None:
+                        ted = ted.replace(tzinfo=timezone.utc)
+                    if ted < datetime.now(timezone.utc):
+                        await run_in_threadpool(
+                            lambda: supa.table("users").update({"subscription_tier": "free"}).eq("id", user_id).execute()
+                        )
+        except Exception as e:
+            # Trial columns may not exist yet — requires supabase_migration_v3.sql
+            logger.warning(f"Trial setup skipped (run supabase_migration_v3.sql): {e}")
     else:
         # Fallback: look up by email
         lookup = await run_in_threadpool(

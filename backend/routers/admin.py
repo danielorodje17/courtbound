@@ -202,6 +202,43 @@ async def admin_update_subscription(user_id: str, body: dict, _=Depends(require_
     return {"message": "Subscription updated"}
 
 
+# ── Pricing management ────────────────────────────────────────────────────────
+
+@router.get("/pricing")
+async def admin_get_pricing(_=Depends(require_admin_token)):
+    try:
+        result = await run_in_threadpool(
+            lambda: supa.table("pricing_plans").select("*").execute()
+        )
+        return result.data or []
+    except Exception:
+        return []
+
+
+@router.put("/pricing/{tier}")
+async def admin_update_pricing(tier: str, body: dict, _=Depends(require_admin_token)):
+    if tier not in ("basic", "premium"):
+        raise HTTPException(status_code=400, detail="Invalid tier")
+    update_data = {"updated_at": _now()}
+    if "price_monthly" in body:
+        update_data["price_monthly"] = float(body["price_monthly"])
+    if "currency" in body:
+        update_data["currency"] = body["currency"]
+    if "description" in body:
+        update_data["description"] = body["description"]
+    if "features" in body:
+        update_data["features"] = body["features"]
+    if "name" in body:
+        update_data["name"] = body["name"]
+    try:
+        await run_in_threadpool(
+            lambda: supa.table("pricing_plans").update(update_data).eq("tier", tier).execute()
+        )
+    except Exception:
+        raise HTTPException(status_code=503, detail="Run supabase_migration_v3.sql first")
+    return {"message": "Pricing updated"}
+
+
 @router.get("/users/{user_id}/activity")
 async def admin_user_activity(user_id: str, _=Depends(require_admin_token)):
     tracked_r = await run_in_threadpool(

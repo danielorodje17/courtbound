@@ -12,7 +12,7 @@ import os
 # from database import db, client
 # from seed_data import seed_colleges, seed_extended_colleges, _seed_european_colleges_startup
 
-from routers import auth, colleges, tracked, emails, dashboard, goals, ai, profile, admin, reports
+from routers import auth, colleges, tracked, emails, dashboard, goals, ai, profile, admin, reports, subscription
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -38,6 +38,7 @@ api_router.include_router(ai.router)
 api_router.include_router(profile.router)
 api_router.include_router(admin.router)
 api_router.include_router(reports.router)
+api_router.include_router(subscription.router)
 
 app.include_router(api_router)
 
@@ -49,11 +50,15 @@ app.mount("/static/college_images", StaticFiles(directory=STATIC_DIR), name="col
 
 @app.on_event("startup")
 async def startup():
+    from scheduler import start_scheduler
+    start_scheduler()
     logger.info("CourtBound API started — Supabase backend active")
 
 
 @app.on_event("shutdown")
 async def shutdown():
+    from scheduler import stop_scheduler
+    stop_scheduler()
     logger.info("CourtBound API shutting down")
 
 

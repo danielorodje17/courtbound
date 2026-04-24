@@ -25,9 +25,10 @@ const adminReq = async (method, path, data) => {
 };
 
 const TIER_CONFIG = {
-  free:  { label: "Free",  bg: "bg-slate-100 text-slate-600",    dot: "bg-slate-400",  bar: "#94a3b8" },
-  pro:   { label: "Pro",   bg: "bg-orange-100 text-orange-700",  dot: "bg-orange-500", bar: "#f97316" },
-  elite: { label: "Elite", bg: "bg-purple-100 text-purple-700",  dot: "bg-purple-500", bar: "#a855f7" },
+  free:    { label: "Free",    bg: "bg-slate-100 text-slate-600",    dot: "bg-slate-400",  bar: "#94a3b8" },
+  trial:   { label: "Trial",   bg: "bg-blue-100 text-blue-700",      dot: "bg-blue-500",   bar: "#3b82f6" },
+  basic:   { label: "Basic",   bg: "bg-orange-100 text-orange-700",  dot: "bg-orange-500", bar: "#f97316" },
+  premium: { label: "Premium", bg: "bg-purple-100 text-purple-700",  dot: "bg-purple-500", bar: "#a855f7" },
 };
 
 function StatCard({ icon: Icon, label, value, sub, color = "text-orange-500" }) {
@@ -73,8 +74,9 @@ function TierSelect({ userId, current, onChange }) {
       className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700 font-semibold focus:ring-2 focus:ring-orange-500 outline-none disabled:opacity-60 cursor-pointer"
     >
       <option value="free">Free</option>
-      <option value="pro">Pro</option>
-      <option value="elite">Elite</option>
+      <option value="trial">Trial</option>
+      <option value="basic">Basic</option>
+      <option value="premium">Premium</option>
     </select>
   );
 }
@@ -111,6 +113,12 @@ export default function AdminPage() {
   const [appSettings, setAppSettings] = useState({ show_european: true });
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsSaved, setSettingsSaved] = useState(false);
+  // Pricing management
+  const [pricingPlans, setPricingPlans] = useState([]);
+  const [editingPlan, setEditingPlan] = useState(null);
+  const [pricingForm, setPricingForm] = useState({});
+  const [pricingSaving, setPricingSaving] = useState(false);
+  const [pricingSaved, setPricingSaved] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null); // {user_id, name, email}
   const [deleting, setDeleting] = useState(false);
   const [fixingEmail, setFixingEmail] = useState(null); // report id
@@ -143,16 +151,18 @@ export default function AdminPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [sRes, uRes, rRes, setRes] = await Promise.all([
+      const [sRes, uRes, rRes, setRes, pRes] = await Promise.all([
         adminReq("get", "/admin/stats"),
         adminReq("get", "/admin/users"),
         adminReq("get", "/admin/reports"),
         adminReq("get", "/admin/settings"),
+        adminReq("get", "/admin/pricing"),
       ]);
       setStats(sRes.data);
       setUsers(uRes.data);
       setReports(rRes.data);
       setAppSettings(setRes.data);
+      setPricingPlans(pRes.data || []);
       setRefreshedAt(new Date());
     } catch (e) {
       if (e?.response?.status === 401) {
@@ -190,6 +200,25 @@ export default function AdminPage() {
       setTimeout(() => setSettingsSaved(false), 3000);
     } catch {}
     setSavingSettings(false);
+  };
+
+  const savePricing = async (tier) => {
+    setPricingSaving(true);
+    try {
+      const featuresArr = typeof pricingForm.features === "string"
+        ? pricingForm.features.split("\n").map(f => f.trim()).filter(Boolean)
+        : pricingForm.features;
+      await adminReq("put", `/admin/pricing/${tier}`, {
+        ...pricingForm,
+        price_monthly: parseFloat(pricingForm.price_monthly),
+        features: featuresArr,
+      });
+      setPricingPlans(prev => prev.map(p => p.tier === tier ? { ...p, ...pricingForm, features: featuresArr } : p));
+      setPricingSaved(tier);
+      setEditingPlan(null);
+      setTimeout(() => setPricingSaved(null), 3000);
+    } catch {}
+    setPricingSaving(false);
   };
 
   const deleteUser = async () => {
@@ -433,8 +462,8 @@ export default function AdminPage() {
       return sort.dir === "asc" ? cmp : -cmp;
     });
 
-  const subData = stats
-    ? Object.entries(stats.subscriptions).map(([name, value]) => ({
+  const subData = stats && stats.subscription_breakdown
+    ? Object.entries(stats.subscription_breakdown).map(([name, value]) => ({
         name: TIER_CONFIG[name]?.label || name, value,
         color: TIER_CONFIG[name]?.bar || "#94a3b8",
       }))
@@ -485,6 +514,7 @@ export default function AdminPage() {
           { id: "users",     label: `Users (${users.length})` },
           { id: "reports",   label: `Reports${reports.filter(r => r.status === "pending").length > 0 ? ` (${reports.filter(r => r.status === "pending").length})` : ""}` },
           { id: "colleges",  label: "Colleges" },
+          { id: "pricing",   label: "Pricing" },
           { id: "settings",  label: "Settings" },
         ].map(t => (
           <button key={t.id} onClick={() => { setActiveTab(t.id); if (t.id === "colleges") loadContacts(); }}
@@ -1191,6 +1221,112 @@ export default function AdminPage() {
       })()}
 
       {/* ── SETTINGS TAB ─────────────────────────────────────── */}
+      {activeTab === "pricing" && (
+        <div className="max-w-2xl space-y-6">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-orange-600">Pricing Management</span>
+          </div>
+          <h2 className="text-xl font-black text-slate-900 mb-4" style={{ fontFamily: "Barlow Condensed, sans-serif", textTransform: "uppercase" }}>
+            Subscription Plans
+          </h2>
+
+          {pricingSaved && (
+            <div className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 text-sm font-semibold px-4 py-3 rounded-lg">
+              <CheckCircle2 className="w-4 h-4" />
+              Pricing updated — changes are live immediately.
+            </div>
+          )}
+
+          {pricingPlans.length === 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-700">
+              Run <code className="bg-amber-100 px-1 rounded">supabase_migration_v3.sql</code> in Supabase to enable pricing management.
+            </div>
+          )}
+
+          {pricingPlans.map(plan => {
+            const isEditing = editingPlan === plan.tier;
+            const features = Array.isArray(plan.features) ? plan.features : JSON.parse(plan.features || "[]");
+            return (
+              <div key={plan.tier} className="bg-white border border-slate-200 rounded-xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full ${TIER_CONFIG[plan.tier]?.bg || "bg-slate-100 text-slate-600"}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${TIER_CONFIG[plan.tier]?.dot || "bg-slate-400"}`} />
+                      {plan.name}
+                    </span>
+                    <span className="text-lg font-black text-slate-900">{plan.currency === "GBP" ? "£" : plan.currency}{Number(plan.price_monthly).toFixed(2)}<span className="text-sm text-slate-400 font-normal">/mo</span></span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setEditingPlan(plan.tier);
+                      setPricingForm({
+                        name: plan.name,
+                        price_monthly: plan.price_monthly,
+                        currency: plan.currency,
+                        description: plan.description,
+                        features: features.join("\n"),
+                      });
+                    }}
+                    data-testid={`edit-pricing-${plan.tier}`}
+                    className="text-xs font-bold text-orange-600 hover:text-orange-800 px-3 py-1.5 border border-orange-200 hover:border-orange-400 rounded-lg transition-colors"
+                  >
+                    Edit
+                  </button>
+                </div>
+
+                {!isEditing ? (
+                  <>
+                    <p className="text-sm text-slate-500 mb-3">{plan.description}</p>
+                    <ul className="space-y-1">
+                      {features.map((f, i) => <li key={i} className="text-xs text-slate-600 flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-orange-400 flex-shrink-0" />{f}</li>)}
+                    </ul>
+                  </>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-500 mb-1">Plan Name</label>
+                        <input data-testid={`pricing-name-${plan.tier}`} value={pricingForm.name || ""} onChange={e => setPricingForm(p => ({ ...p, name: e.target.value }))} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-500 mb-1">Monthly Price</label>
+                        <div className="flex gap-2">
+                          <select data-testid={`pricing-currency-${plan.tier}`} value={pricingForm.currency || "GBP"} onChange={e => setPricingForm(p => ({ ...p, currency: e.target.value }))} className="border border-slate-200 rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none">
+                            <option value="GBP">GBP £</option>
+                            <option value="USD">USD $</option>
+                            <option value="EUR">EUR €</option>
+                          </select>
+                          <input data-testid={`pricing-price-${plan.tier}`} type="number" step="0.01" min="0" value={pricingForm.price_monthly || ""} onChange={e => setPricingForm(p => ({ ...p, price_monthly: e.target.value }))} className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none" />
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 mb-1">Description</label>
+                      <input data-testid={`pricing-desc-${plan.tier}`} value={pricingForm.description || ""} onChange={e => setPricingForm(p => ({ ...p, description: e.target.value }))} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 mb-1">Features (one per line)</label>
+                      <textarea data-testid={`pricing-features-${plan.tier}`} rows={5} value={pricingForm.features || ""} onChange={e => setPricingForm(p => ({ ...p, features: e.target.value }))} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none resize-none" />
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => savePricing(plan.tier)}
+                        disabled={pricingSaving}
+                        data-testid={`pricing-save-${plan.tier}`}
+                        className="bg-orange-500 hover:bg-orange-600 text-white font-bold text-sm px-4 py-2 rounded-lg transition-colors disabled:opacity-60"
+                      >
+                        {pricingSaving ? "Saving..." : "Save Changes"}
+                      </button>
+                      <button onClick={() => setEditingPlan(null)} className="text-slate-500 hover:text-slate-700 text-sm font-semibold px-4 py-2 rounded-lg border border-slate-200 hover:border-slate-400 transition-colors">Cancel</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {activeTab === "settings" && (
         <div className="max-w-xl">
           <div className="bg-white border border-slate-200 rounded-xl p-6">

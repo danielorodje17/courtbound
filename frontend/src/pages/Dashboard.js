@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiRequest } from "../context/AuthContext";
+import { useAuth } from "../context/AuthContext";
 import { Trophy, Mail, BookOpen, TrendingUp, ChevronRight, Bell, Plus, AlertTriangle, Clock, Calendar, CheckCircle, BarChart2, Newspaper, ArrowUp, ArrowDown, Minus } from "lucide-react";
 import WeeklyGoalsWidget from "../components/WeeklyGoalsWidget";
 import ActivityHeatmap from "../components/ActivityHeatmap";
+import TrialBanner from "../components/TrialBanner";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell
@@ -41,6 +43,7 @@ function CustomTooltip({ active, payload, label }) {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [stats, setStats] = useState(null);
   const [tracked, setTracked] = useState([]);
   const [alerts, setAlerts] = useState(null);
@@ -107,6 +110,9 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8" style={{ fontFamily: "Manrope, sans-serif" }}>
+      {/* Trial / Upgrade Banner */}
+      <TrialBanner user={user} />
+
       {/* Header Banner */}
       <div className="relative rounded-xl overflow-hidden bg-slate-900">
         <img

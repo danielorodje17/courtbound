@@ -19,8 +19,9 @@ import OnboardingPage from "./pages/OnboardingPage";
 import AdminPage from "./pages/AdminPage";
 import AdminLoginPage from "./pages/AdminLoginPage";
 import AdminUserDetailPage from "./pages/AdminUserDetailPage";
+import PricingPage from "./pages/PricingPage";
 import HelpWidget from "./components/HelpWidget";
-import { Trophy, Home, BookOpen, Mail, Wand2, Lightbulb, Menu, X, ShieldCheck, UserCircle, MessageSquare, LogOut, ChevronDown, Sparkles, Bell } from "lucide-react";
+import { Trophy, Home, BookOpen, Mail, Wand2, Lightbulb, Menu, X, ShieldCheck, UserCircle, MessageSquare, LogOut, ChevronDown, Sparkles, Bell, CreditCard } from "lucide-react";
 
 const NAV_ITEMS = [
   { path: "/dashboard", label: "Dashboard", icon: Home },
@@ -31,7 +32,8 @@ const NAV_ITEMS = [
   { path: "/ai-match", label: "AI Match", icon: Sparkles },
   { path: "/compose", label: "Compose", icon: Wand2 },
   { path: "/strategy", label: "Strategy", icon: Lightbulb },
-  { path: "/ncaa", label: "NCAA Check", icon: ShieldCheck }
+  { path: "/ncaa", label: "NCAA Check", icon: ShieldCheck },
+  { path: "/pricing", label: "Pricing", icon: CreditCard },
 ];
 
 function UserMenu() {
@@ -295,6 +297,7 @@ function AppRouter() {
         <Route path="/admin/login" element={<AdminLoginPage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/admin/users/:userId" element={<AdminUserDetailPage />} />
+        <Route path="/pricing" element={<PricingPage />} />
       </Routes>
       <HelpWidget />
     </>

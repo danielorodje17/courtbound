@@ -1,0 +1,43 @@
+{
+  "summary": "Tested subscription/trial/pricing system and auth upsert fix. All 14 backend tests passed. Frontend Pricing page works correctly. Fixed a critical AdminPage runtime crash due to wrong field name (stats.subscriptions vs stats.subscription_breakdown).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "subscription.py line 53-59",
+        "issue": "Duplicate return statement in /api/subscription/status (dead code after first return). Lines 53-59 are unreachable but harmless.",
+        "priority": "LOW"
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_subscription_pricing.py",
+    "/app/test_reports/pytest/pytest_iteration21.xml"
+  ],
+  "action_items": [
+    "Remove dead duplicate return block in /app/backend/routers/subscription.py lines 53-59 (cosmetic fix)",
+    "Run supabase_migration_v3.sql in Supabase Dashboard to enable trial columns and pricing_plans table"
+  ],
+  "critical_code_review_comments": [
+    "FIXED: AdminPage.js crashed with 'Cannot convert undefined or null to object' due to referencing stats.subscriptions instead of stats.subscription_breakdown (the API field name). Fixed by changing Object.entries(stats.subscriptions) to Object.entries(stats.subscription_breakdown) with null guard.",
+    "subscription.py has duplicate return statement (lines 53-59 are dead code after the first return on line 45)"
+  ],
+  "updated_files": [
+    "/app/frontend/src/pages/AdminPage.js"
+  ],
+  "success_rate": {
+    "backend": "100% (14/14)",
+    "frontend": "100% - Pricing page renders correctly, Coming Soon modal works, Admin Pricing tab works after fix"
+  },
+  "test_credentials": "admin@courtbound.com / admin123, test session: test_session_ai_99999",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "All new features working. Auth upsert fix confirmed (no .select() chain issue). Pricing page at /pricing has 3-column layout with £0/£9.99/£19.99, Coming Soon modal on Get Basic/Get Premium. Admin Pricing tab shows migration message. Admin tier dropdown includes free/trial/basic/premium. TrialBanner component exists and loads from /subscription/status. Migration v3 SQL still not run - trial columns and pricing_plans table absent, backend handles gracefully with fallbacks.",
+  "rca of the issue": "AdminPage was calling Object.entries(stats.subscriptions) but /api/admin/stats returns subscription_breakdown not subscriptions. This caused a TypeError crash on admin load. Fixed by updating the key reference and adding a null guard."
+}
