@@ -25,10 +25,12 @@ const adminReq = async (method, path, data) => {
 };
 
 const TIER_CONFIG = {
-  free:    { label: "Free",    bg: "bg-slate-100 text-slate-600",    dot: "bg-slate-400",  bar: "#94a3b8" },
-  trial:   { label: "Trial",   bg: "bg-blue-100 text-blue-700",      dot: "bg-blue-500",   bar: "#3b82f6" },
-  basic:   { label: "Basic",   bg: "bg-orange-100 text-orange-700",  dot: "bg-orange-500", bar: "#f97316" },
-  premium: { label: "Premium", bg: "bg-purple-100 text-purple-700",  dot: "bg-purple-500", bar: "#a855f7" },
+  free:       { label: "Free",        bg: "bg-slate-100 text-slate-600",    dot: "bg-slate-400",  bar: "#94a3b8" },
+  trial:      { label: "Trial",       bg: "bg-blue-100 text-blue-700",      dot: "bg-blue-500",   bar: "#3b82f6" },
+  basic:      { label: "Recruit",     bg: "bg-orange-100 text-orange-700",  dot: "bg-orange-500", bar: "#f97316" },
+  premium:    { label: "Scholarship", bg: "bg-purple-100 text-purple-700",  dot: "bg-purple-500", bar: "#a855f7" },
+  recruit:    { label: "Recruit",     bg: "bg-orange-100 text-orange-700",  dot: "bg-orange-500", bar: "#f97316" },
+  scholarship:{ label: "Scholarship", bg: "bg-purple-100 text-purple-700",  dot: "bg-purple-500", bar: "#a855f7" },
 };
 
 function StatCard({ icon: Icon, label, value, sub, color = "text-orange-500" }) {
@@ -75,8 +77,8 @@ function TierSelect({ userId, current, onChange }) {
     >
       <option value="free">Free</option>
       <option value="trial">Trial</option>
-      <option value="basic">Basic</option>
-      <option value="premium">Premium</option>
+      <option value="basic">Recruit</option>
+      <option value="premium">Scholarship</option>
     </select>
   );
 }
@@ -230,6 +232,15 @@ export default function AdminPage() {
       setConfirmDelete(null);
     } catch {}
     setDeleting(false);
+  };
+
+  const toggleDisableUser = async (userId, currentlyDisabled) => {
+    try {
+      await adminReq("patch", `/admin/users/${userId}/disable`, { disabled: !currentlyDisabled });
+      setUsers(prev => prev.map(u => u.user_id === userId ? { ...u, is_disabled: !currentlyDisabled } : u));
+    } catch (e) {
+      alert(e?.response?.data?.detail || "Run migration first: ALTER TABLE users ADD COLUMN IF NOT EXISTS is_disabled BOOLEAN DEFAULT FALSE;");
+    }
   };
 
   const exportContacts = async (filterType) => {
@@ -725,13 +736,23 @@ export default function AdminPage() {
                         View <ChevronRight className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        data-testid={`delete-user-btn-${u.user_id}`}
-                        onClick={() => setConfirmDelete({ user_id: u.user_id, name: u.name, email: u.email })}
-                        className="p-1 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
-                        title="Delete user"
+                        data-testid={`disable-user-btn-${u.user_id}`}
+                        onClick={() => toggleDisableUser(u.user_id, u.is_disabled)}
+                        className={`p-1 rounded transition-colors text-xs font-bold ${u.is_disabled ? "text-green-600 hover:bg-green-50" : "text-amber-500 hover:bg-amber-50"}`}
+                        title={u.is_disabled ? "Enable user" : "Disable user"}
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        {u.is_disabled ? "Enable" : "Disable"}
                       </button>
+                      {(u.emails_sent === 0 && u.colleges_tracked === 0) && (
+                        <button
+                          data-testid={`delete-user-btn-${u.user_id}`}
+                          onClick={() => setConfirmDelete({ user_id: u.user_id, name: u.name, email: u.email })}
+                          className="p-1 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                          title="Delete user (no history)"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -797,13 +818,23 @@ export default function AdminPage() {
                           View <ChevronRight className="w-3.5 h-3.5" />
                         </button>
                         <button
-                          data-testid={`delete-user-btn-${u.user_id}`}
-                          onClick={() => setConfirmDelete({ user_id: u.user_id, name: u.name, email: u.email })}
-                          className="p-1 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
-                          title="Delete user"
+                          data-testid={`disable-user-btn-${u.user_id}`}
+                          onClick={() => toggleDisableUser(u.user_id, u.is_disabled)}
+                          className={`p-1 rounded transition-colors text-xs font-bold ${u.is_disabled ? "text-green-600 hover:bg-green-50" : "text-amber-500 hover:bg-amber-50"}`}
+                          title={u.is_disabled ? "Enable user" : "Disable user"}
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          {u.is_disabled ? "Enable" : "Disable"}
                         </button>
+                        {(u.emails_sent === 0 && u.colleges_tracked === 0) && (
+                          <button
+                            data-testid={`delete-user-btn-${u.user_id}`}
+                            onClick={() => setConfirmDelete({ user_id: u.user_id, name: u.name, email: u.email })}
+                            className="p-1 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                            title="Delete user (no history)"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

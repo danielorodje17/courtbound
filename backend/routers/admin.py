@@ -181,6 +181,7 @@ async def admin_users(_=Depends(require_admin_token)):
 
     for u in users:
         uid = u["id"]
+        u["user_id"] = uid  # alias so frontend can use user_id consistently
         u["emails_sent"] = email_sent_counts.get(uid, 0)
         u["colleges_tracked"] = tracked_counts.get(uid, 0)
         u.pop("password_hash", None)
@@ -189,9 +190,26 @@ async def admin_users(_=Depends(require_admin_token)):
 
 @router.delete("/users/{user_id}")
 async def admin_delete_user(user_id: str, _=Depends(require_admin_token)):
-    # CASCADE delete handles all related tables
+    # Manually cascade-delete related records before removing the user
+    for table in ["user_sessions", "emails", "tracked_colleges", "goals", "templates", "profiles"]:
+        try:
+            await run_in_threadpool(lambda t=table: supa.table(t).delete().eq("user_id", user_id).execute())
+        except Exception:
+            pass
     await run_in_threadpool(lambda: supa.table("users").delete().eq("id", user_id).execute())
     return {"message": "User deleted"}
+
+
+@router.patch("/users/{user_id}/disable")
+async def admin_toggle_disable(user_id: str, body: dict, _=Depends(require_admin_token)):
+    disabled = bool(body.get("disabled", True))
+    try:
+        await run_in_threadpool(
+            lambda: supa.table("users").update({"is_disabled": disabled}).eq("id", user_id).execute()
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Column not ready — run migration: ALTER TABLE users ADD COLUMN IF NOT EXISTS is_disabled BOOLEAN DEFAULT FALSE; ({e})")
+    return {"message": "User updated", "disabled": disabled}
 
 
 @router.patch("/users/{user_id}/subscription")
@@ -217,7 +235,7 @@ async def admin_get_pricing(_=Depends(require_admin_token)):
 
 @router.put("/pricing/{tier}")
 async def admin_update_pricing(tier: str, body: dict, _=Depends(require_admin_token)):
-    if tier not in ("basic", "premium"):
+    if tier not in ("basic", "premium", "recruit", "scholarship"):
         raise HTTPException(status_code=400, detail="Invalid tier")
     update_data = {"updated_at": _now()}
     if "price_monthly" in body:

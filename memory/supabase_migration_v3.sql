@@ -7,6 +7,9 @@
 ALTER TABLE users ADD COLUMN IF NOT EXISTS trial_start_date TIMESTAMPTZ DEFAULT NULL;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS trial_end_date   TIMESTAMPTZ DEFAULT NULL;
 
+-- 1b. Add is_disabled column (admin can disable users)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_disabled BOOLEAN DEFAULT FALSE;
+
 -- 2. Pricing plans table (admin-editable)
 CREATE TABLE IF NOT EXISTS pricing_plans (
     tier            TEXT        PRIMARY KEY,           -- 'basic' | 'premium'
@@ -18,14 +21,14 @@ CREATE TABLE IF NOT EXISTS pricing_plans (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Default pricing plans
+-- Default pricing plans (renamed to Recruit / Scholarship)
 INSERT INTO pricing_plans (tier, name, price_monthly, currency, description, features)
 VALUES
-  ('basic', 'Basic', 9.99, 'GBP', 'Perfect for serious players',
+  ('basic', 'Recruit', 9.99, 'GBP', 'Perfect for serious players',
    '["Unlimited college tracking","Email logging & history","Response tracker","Profile management","College comparison tool","Basic dashboard analytics"]'::jsonb),
-  ('premium', 'Premium', 19.99, 'GBP', 'Full access to every feature',
-   '["All Basic features","AI email composer","Recruitment strategy AI","NCAA eligibility checker","AI college match scoring","Bulk email import","CSV export","Priority support"]'::jsonb)
-ON CONFLICT (tier) DO NOTHING;
+  ('premium', 'Scholarship', 19.99, 'GBP', 'Full access to every feature',
+   '["All Recruit features","AI email composer","Recruitment strategy AI","NCAA eligibility checker","AI college match scoring","Bulk email import","CSV export","Priority support"]'::jsonb)
+ON CONFLICT (tier) DO UPDATE SET name = EXCLUDED.name, features = EXCLUDED.features;
 
 -- 3. Trial email reminders tracking (prevents duplicate sends)
 CREATE TABLE IF NOT EXISTS trial_email_reminders (
