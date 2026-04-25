@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiRequest, useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
-import { Trophy, ArrowRight, X, CheckCircle2, ChevronRight, Sparkles, Instagram, Twitter } from "lucide-react";
+import { Trophy, ArrowRight, ArrowLeft, X, CheckCircle2, ChevronRight, Sparkles, Instagram, Twitter } from "lucide-react";
 
 const POSITIONS = ["Point Guard", "Shooting Guard", "Small Forward", "Power Forward", "Center"];
 const DIVISIONS = ["NCAA Division I", "NCAA Division II", "NCAA Division III", "NAIA", "NJCAA", "BUCS (UK)"];
@@ -114,6 +114,15 @@ export default function OnboardingPage({ onComplete }) {
       navigate("/dashboard");
     } else {
       setStep(s => s + 1);
+    }
+  };
+
+  const back = () => {
+    if (step === 1) {
+      setGender(null);
+      setStep(0);
+    } else {
+      setStep(s => s - 1);
     }
   };
 
@@ -346,12 +355,18 @@ export default function OnboardingPage({ onComplete }) {
             className="text-xs text-slate-600 hover:text-slate-400 uppercase tracking-widest font-bold transition-colors flex items-center gap-1.5">
             <X className="w-3.5 h-3.5" /> Skip for now
           </button>
-          <button data-testid="ob-next" onClick={next} disabled={saving}
-            className="flex items-center gap-2 disabled:opacity-60 text-white font-black uppercase tracking-widest px-6 py-3 text-sm transition-all"
-            style={{ background: accent, fontFamily: fontHeading, borderRadius: isWomens ? "9999px" : "4px" }}>
-            {saving ? "Saving..." : step === 4 ? "Go to Dashboard" : "Next"}
-            {!saving && step !== 4 && <ArrowRight className="w-4 h-4" />}
-          </button>
+          <div className="flex items-center gap-2">
+            <button data-testid="ob-back" onClick={back}
+              className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 uppercase tracking-widest font-bold transition-colors px-4 py-3">
+              <ArrowLeft className="w-4 h-4" /> Back
+            </button>
+            <button data-testid="ob-next" onClick={next} disabled={saving}
+              className="flex items-center gap-2 disabled:opacity-60 text-white font-black uppercase tracking-widest px-6 py-3 text-sm transition-all"
+              style={{ background: accent, fontFamily: fontHeading, borderRadius: isWomens ? "9999px" : "4px" }}>
+              {saving ? "Saving..." : step === 4 ? "Go to Dashboard" : "Next"}
+              {!saving && step !== 4 && <ArrowRight className="w-4 h-4" />}
+            </button>
+          </div>
         </div>
       </div>
     </div>
