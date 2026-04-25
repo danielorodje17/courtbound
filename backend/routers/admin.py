@@ -98,21 +98,25 @@ async def admin_stats(_=Depends(require_admin_token)):
     now = datetime.now(timezone.utc)
     seven_days_ago = (now - timedelta(days=7)).isoformat()
     thirty_days_ago = (now - timedelta(days=30)).isoformat()
+    fourteen_days_ago = (now - timedelta(days=14)).isoformat()
 
     users_r = await run_in_threadpool(lambda: supa.table("users").select("*").execute())
     users = users_r.data or []
     total_users = len(users)
-    new_7d = sum(1 for u in users if (u.get("created_at") or "") >= seven_days_ago)
+    new_7d  = sum(1 for u in users if (u.get("created_at") or "") >= seven_days_ago)
     new_30d = sum(1 for u in users if (u.get("created_at") or "") >= thirty_days_ago)
-    active_7d = sum(1 for u in users if (u.get("last_active") or "") >= seven_days_ago)
+    active_7d  = sum(1 for u in users if (u.get("last_active") or "") >= seven_days_ago)
+    active_30d = sum(1 for u in users if (u.get("last_active") or "") >= thirty_days_ago)
 
     tier_counts: dict = defaultdict(int)
     for u in users:
         tier_counts[u.get("subscription_tier", "free")] += 1
 
-    emails_r = await run_in_threadpool(lambda: supa.table("emails").select("user_id,created_at").execute())
+    emails_r = await run_in_threadpool(lambda: supa.table("emails").select("user_id,created_at,direction").execute())
     emails = emails_r.data or []
-    emails_7d = sum(1 for e in emails if (e.get("created_at") or "") >= seven_days_ago)
+    total_sent     = sum(1 for e in emails if e.get("direction") == "sent")
+    total_received = sum(1 for e in emails if e.get("direction") == "received")
+    sent_7d = sum(1 for e in emails if e.get("direction") == "sent" and (e.get("created_at") or "") >= seven_days_ago)
 
     tracked_r = await run_in_threadpool(lambda: supa.table("tracked_colleges").select("college_id,user_id").execute())
     tracked = tracked_r.data or []
@@ -131,17 +135,28 @@ async def admin_stats(_=Depends(require_admin_token)):
             college = cname_map.get(cid, {})
             top_colleges.append({"name": college.get("name", "Unknown"), "division": college.get("division", ""), "count": cnt})
 
-    # Signup trend (last 30 days)
-    signup_trend: dict = defaultdict(int)
+    # Signup trend (last 30 days) — key renamed to "signups" to match frontend chart
+    signup_trend_map: dict = defaultdict(int)
     for u in users:
         ds = str(u.get("created_at", ""))[:10]
         if ds >= thirty_days_ago[:10]:
-            signup_trend[ds] += 1
+            signup_trend_map[ds] += 1
     today = now.date()
-    trend_data = []
+    signup_trend = []
     for i in range(29, -1, -1):
         d = (today - timedelta(days=i)).isoformat()
-        trend_data.append({"date": d, "count": signup_trend.get(d, 0)})
+        signup_trend.append({"date": d, "signups": signup_trend_map.get(d, 0)})
+
+    # Email activity trend (last 14 days)
+    email_trend_map: dict = defaultdict(int)
+    for e in emails:
+        if e.get("direction") == "sent" and (e.get("created_at") or "") >= fourteen_days_ago:
+            ds = str(e.get("created_at", ""))[:10]
+            email_trend_map[ds] += 1
+    email_trend = []
+    for i in range(13, -1, -1):
+        d = (today - timedelta(days=i)).isoformat()
+        email_trend.append({"date": d, "emails": email_trend_map.get(d, 0)})
 
     reports_r = await run_in_threadpool(
         lambda: supa.table("college_reports").select("id", count="exact").eq("status", "open").execute()
@@ -149,17 +164,24 @@ async def admin_stats(_=Depends(require_admin_token)):
     pending_reports = reports_r.count or 0
 
     return {
-        "total_users": total_users,
-        "new_users_7d": new_7d,
-        "new_users_30d": new_30d,
-        "active_users_7d": active_7d,
-        "subscription_breakdown": dict(tier_counts),
-        "emails_sent_7d": emails_7d,
-        "total_emails": len(emails),
-        "total_tracked": len(tracked),
+        "users": {
+            "total": total_users,
+            "new_7d": new_7d,
+            "new_30d": new_30d,
+            "active_7d": active_7d,
+            "active_30d": active_30d,
+        },
+        "emails": {
+            "total_sent": total_sent,
+            "sent_7d": sent_7d,
+            "total_received": total_received,
+        },
+        "colleges_tracked": len(tracked),
         "pending_reports": pending_reports,
         "top_colleges": top_colleges,
-        "signup_trend": trend_data,
+        "signup_trend": signup_trend,
+        "email_trend": email_trend,
+        "subscription_breakdown": dict(tier_counts),
     }
 
 
