@@ -9,7 +9,7 @@ export default function SupabaseAuthCallback() {
   const hasProcessed = useRef(false);
 
   useEffect(() => {
-    const handleSession = async (session) => {
+    const handleSession = async (session, attempt = 0) => {
       if (hasProcessed.current || !session?.access_token) return;
       hasProcessed.current = true;
       try {
@@ -24,8 +24,24 @@ export default function SupabaseAuthCallback() {
           navigate("/login", { replace: true });
         }
       } catch (err) {
-        console.error("Auth callback error:", err);
-        navigate("/login", { replace: true });
+        const status = err?.response?.status;
+        console.error("Auth callback error (attempt " + attempt + "):", status, err?.response?.data);
+
+        // 401 usually means malformed/expired Supabase access_token.
+        // Retry once with a fresh session from Supabase before giving up.
+        if (status === 401 && attempt === 0) {
+          console.warn("Token validation failed — retrying with fresh session...");
+          hasProcessed.current = false; // allow one retry
+          await new Promise(r => setTimeout(r, 1500));
+          const { data: { session: freshSession } } = await supabase.auth.getSession();
+          if (freshSession?.access_token) {
+            handleSession(freshSession, 1);
+          } else {
+            navigate("/login", { replace: true });
+          }
+        } else {
+          navigate("/login", { replace: true });
+        }
       }
     };
 
@@ -41,13 +57,13 @@ export default function SupabaseAuthCallback() {
       handleSession(session);
     });
 
-    // Timeout: if nothing fires within 8s, go back to login
+    // Timeout: if nothing fires within 15s, go back to login
     const timeout = setTimeout(() => {
       if (!hasProcessed.current) {
-        console.error("Auth callback timeout - no session received");
+        console.error("Auth callback timeout - no session received after 15s");
         navigate("/login", { replace: true });
       }
-    }, 8000);
+    }, 15000);
 
     return () => {
       subscription.unsubscribe();

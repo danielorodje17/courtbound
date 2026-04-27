@@ -117,7 +117,7 @@ async def auth_me(current_user: UserModel = Depends(get_current_user)):
 async def google_callback(body: dict):
     """
     Supabase Auth callback — frontend sends the Supabase access_token after
-    completing the PKCE OAuth exchange with supabase-js.
+    completing the OAuth exchange with supabase-js.
     We validate it, upsert the user, create our own session, and return session_token.
     """
     access_token = body.get("access_token")
@@ -125,6 +125,10 @@ async def google_callback(body: dict):
         raise HTTPException(status_code=400, detail="access_token required")
 
     # Validate token with Supabase and get user info
+    # NOTE: supa.auth.get_user() calls /auth/v1/user with the Bearer token.
+    # With supabase-js implicit flow + newer Supabase projects (PKCE default),
+    # the access_token is occasionally malformed (not a 3-segment JWT).
+    # We catch this and return 401 WITHOUT touching sessions.
     try:
         user_response = await run_in_threadpool(
             lambda: supa.auth.get_user(access_token)
@@ -189,13 +193,20 @@ async def google_callback(body: dict):
         )
         internal_user_id = lookup.data[0]["id"] if lookup.data else str(uuid.uuid4())
 
-    # Create our own session (7-day, random token)
+    # Create a new 7-day session.
+    # IMPORTANT: only delete EXPIRED sessions — do NOT wipe valid ones.
+    # Deleting all sessions caused race conditions: concurrent requests would wipe
+    # each other's newly created sessions, locking the user out.
     session_token = uuid.uuid4().hex + uuid.uuid4().hex
     expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+    now_iso = datetime.now(timezone.utc).isoformat()
 
-    # Remove any stale sessions for this user, then insert fresh one
     await run_in_threadpool(
-        lambda: supa.table("user_sessions").delete().eq("user_id", internal_user_id).execute()
+        lambda: supa.table("user_sessions")
+            .delete()
+            .eq("user_id", internal_user_id)
+            .lt("expires_at", now_iso)
+            .execute()
     )
     await run_in_threadpool(
         lambda: supa.table("user_sessions").insert({
