@@ -27,8 +27,14 @@ export function AuthProvider({ children }) {
     try {
       const { data } = await apiRequest("get", "/auth/me");
       setUser(data);
-    } catch {
-      clearToken();
+    } catch (err) {
+      // ONLY wipe the token on an explicit auth rejection (401/403).
+      // Network errors, 502/503 (backend restarting) must NOT clear the token —
+      // a valid 7-day session should survive a pod restart.
+      const status = err?.response?.status;
+      if (status === 401 || status === 403) {
+        clearToken();
+      }
       setUser(null);
     } finally {
       setLoading(false);

@@ -14,7 +14,7 @@ from models import AdminLogin, CollegeUpdate, CoachEmailFix, DeleteCoach, BulkIm
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 ADMIN_EMAILS = os.environ.get("ADMIN_EMAILS", "").split(",")
-SESSION_TTL = timedelta(hours=8)
+SESSION_TTL = timedelta(days=30)
 
 
 def _now() -> str:
