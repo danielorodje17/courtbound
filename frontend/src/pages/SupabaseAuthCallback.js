@@ -9,7 +9,7 @@ export default function SupabaseAuthCallback() {
   const hasProcessed = useRef(false);
 
   useEffect(() => {
-    const handleSession = async (session, attempt = 0) => {
+    const handleSession = async (session) => {
       if (hasProcessed.current || !session?.access_token) return;
       hasProcessed.current = true;
       try {
@@ -24,46 +24,31 @@ export default function SupabaseAuthCallback() {
           navigate("/login", { replace: true });
         }
       } catch (err) {
-        const status = err?.response?.status;
-        console.error("Auth callback error (attempt " + attempt + "):", status, err?.response?.data);
-
-        // 401 usually means malformed/expired Supabase access_token.
-        // Retry once with a fresh session from Supabase before giving up.
-        if (status === 401 && attempt === 0) {
-          console.warn("Token validation failed — retrying with fresh session...");
-          hasProcessed.current = false; // allow one retry
-          await new Promise(r => setTimeout(r, 1500));
-          const { data: { session: freshSession } } = await supabase.auth.getSession();
-          if (freshSession?.access_token) {
-            handleSession(freshSession, 1);
-          } else {
-            navigate("/login", { replace: true });
-          }
-        } else {
-          navigate("/login", { replace: true });
-        }
+        console.error("Auth callback error:", err?.response?.status, err?.response?.data);
+        navigate("/login", { replace: true });
       }
     };
 
-    // Listen for SIGNED_IN or INITIAL_SESSION (implicit flow fires one of these)
+    // PKCE flow: Supabase fires SIGNED_IN after completing the code exchange.
+    // This always produces a valid JWT — no more malformed token errors.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_IN" || event === "INITIAL_SESSION") {
         handleSession(session);
       }
     });
 
-    // Fallback: check if session already exists (handles timing race)
+    // Fallback: session may already be ready before the listener registered
     supabase.auth.getSession().then(({ data: { session } }) => {
       handleSession(session);
     });
 
-    // Timeout: if nothing fires within 15s, go back to login
+    // Timeout: if nothing fires within 20s, go back to login
     const timeout = setTimeout(() => {
       if (!hasProcessed.current) {
-        console.error("Auth callback timeout - no session received after 15s");
+        console.error("Auth callback timeout — no session received after 20s");
         navigate("/login", { replace: true });
       }
-    }, 15000);
+    }, 20000);
 
     return () => {
       subscription.unsubscribe();
