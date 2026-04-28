@@ -115,3 +115,13 @@ Build "CourtBound," a web app to track USA and UK college basketball scholarship
 - Social media step (Instagram + X/Twitter) on onboarding step 4
 - CollegesPage + Dashboard are fully theme-aware
 - program_gender column on colleges table (default 'both') enables future women's-only college tagging by admin
+
+## Lead Source Tracking (Added Feb 2026)
+- "How did you hear about CourtBound?" field on Onboarding Step 1 (required)
+- Options: Instagram, Clubs, Direct, Referral, Other (pill-button UI)
+- Saved to `profiles.lead_source` (TEXT column) — requires migration v5
+- Admin Funnel tab: "Acquisition Channels" horizontal bar chart shows breakdown
+- Backend: `/api/admin/funnel` returns `lead_sources` array with count per source
+
+## Pending Migrations (User Must Run in Supabase SQL Editor)
+- `/app/memory/supabase_migration_v5.sql` — adds `lead_source TEXT` to profiles table
