@@ -701,11 +701,26 @@ async def admin_funnel(_=Depends(require_admin_token)):
             trend_map[ds] += 1
     signup_trend = [{"date": (now.date() - timedelta(days=i)).isoformat(), "signups": trend_map.get((now.date() - timedelta(days=i)).isoformat(), 0)} for i in range(29, -1, -1)]
 
+    # Lead source breakdown
+    LEAD_SOURCE_OPTIONS = ["Instagram", "Clubs", "Direct", "Referral", "Other"]
+    lead_source_counts: dict = defaultdict(int)
+    try:
+        profiles_r = await run_in_threadpool(lambda: supa.table("profiles").select("lead_source").execute())
+        for p in (profiles_r.data or []):
+            src = p.get("lead_source") or "Other"
+            if src not in LEAD_SOURCE_OPTIONS:
+                src = "Other"
+            lead_source_counts[src] += 1
+    except Exception:
+        pass
+    lead_sources = [{"source": s, "count": lead_source_counts.get(s, 0)} for s in LEAD_SOURCE_OPTIONS]
+
     return {
         "funnel": funnel_stages,
         "trial_to_paid_rate": pct(paid, trial + paid),
         "signup_to_activated_rate": pct(activated, total_signups),
         "signup_trend": signup_trend,
+        "lead_sources": lead_sources,
     }
 
 

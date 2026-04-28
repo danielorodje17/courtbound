@@ -140,6 +140,7 @@ class PlayerProfile(BaseModel):
     instagram: Optional[str] = ""
     twitter: Optional[str] = ""
     basketball_gender: Optional[str] = ""
+    lead_source: Optional[str] = ""
 
 
 class NCAACHeckRequest(BaseModel):

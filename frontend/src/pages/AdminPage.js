@@ -1502,6 +1502,45 @@ export default function AdminPage() {
                 <Area type="monotone" dataKey="signups" stroke="#f97316" fill="url(#signupGrad)" strokeWidth={2} />
               </AreaChart>
             </div>
+
+            {/* Lead Source Breakdown */}
+            {funnel.lead_sources && (
+              <div className="bg-white border border-slate-200 rounded-xl p-6" data-testid="admin-lead-source-chart">
+                <h3 className="font-black text-slate-900 mb-1 uppercase tracking-wide text-sm">Acquisition Channels</h3>
+                <p className="text-xs text-slate-400 mb-5">How users heard about CourtBound</p>
+                {funnel.lead_sources.every(s => s.count === 0) ? (
+                  <p className="text-sm text-slate-400 text-center py-6">No lead source data yet — data appears as users complete onboarding.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {funnel.lead_sources
+                      .filter(s => s.count > 0)
+                      .sort((a, b) => b.count - a.count)
+                      .map(s => {
+                        const total = funnel.lead_sources.reduce((acc, x) => acc + x.count, 0);
+                        const pct = total ? Math.round((s.count / total) * 100) : 0;
+                        const colorMap = { Instagram: "#e11d48", Clubs: "#7c3aed", Direct: "#0ea5e9", Referral: "#16a34a", Other: "#94a3b8" };
+                        const color = colorMap[s.source] || "#f97316";
+                        return (
+                          <div key={s.source} data-testid={`lead-source-row-${s.source.toLowerCase()}`}>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">{s.source}</span>
+                              <span className="text-xs font-black text-slate-800">{s.count} <span className="font-normal text-slate-400">({pct}%)</span></span>
+                            </div>
+                            <div className="h-7 bg-slate-100 rounded-lg overflow-hidden">
+                              <div
+                                className="h-full rounded-lg flex items-center px-3 transition-all duration-700"
+                                style={{ width: `${Math.max(pct, 3)}%`, background: color }}
+                              >
+                                {pct >= 8 && <span className="text-white text-xs font-black">{pct}%</span>}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+              </div>
+            )}
           </>)}
         </div>
       )}

@@ -71,7 +71,9 @@ export default function OnboardingPage({ onComplete }) {
     ppg: "", apg: "", rpg: "", current_team: "", club_team: "", highlight_tape_url: "",
     gcse_grades: "", a_level_subjects: "", target_division: "", target_start_year: "",
     instagram: "", twitter: "",
+    lead_source: "",
   });
+  const [step1Error, setStep1Error] = useState("");
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const isWomens = gender === "women";
@@ -107,6 +109,11 @@ export default function OnboardingPage({ onComplete }) {
   };
 
   const next = async () => {
+    if (step === 1 && !form.lead_source) {
+      setStep1Error("Please tell us how you heard about CourtBound.");
+      return;
+    }
+    setStep1Error("");
     if (step === 4) {
       await saveProfile();
       markOnboarded();
@@ -269,6 +276,25 @@ export default function OnboardingPage({ onComplete }) {
                   <Field label="Height (ft/in)"><Input value={form.height_ft} onChange={v => set("height_ft", v)} placeholder={isWomens ? "5ft 10in" : "6ft 4in"} testId="ob-height-ft" /></Field>
                   <Field label="Height (cm)"><Input value={form.height_cm} onChange={v => set("height_cm", v)} placeholder={isWomens ? "178" : "193"} testId="ob-height-cm" /></Field>
                 </div>
+                <Field label={<span>How did you hear about CourtBound? <span style={{ color: accent }}>*</span></span>}>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" data-testid="ob-lead-source-group">
+                    {["Instagram", "Clubs", "Direct", "Referral", "Other"].map(src => (
+                      <button
+                        key={src}
+                        type="button"
+                        data-testid={`ob-lead-source-${src.toLowerCase()}`}
+                        onClick={() => { set("lead_source", src); setStep1Error(""); }}
+                        className="py-2.5 px-3 rounded-lg text-sm font-bold transition-all border"
+                        style={{
+                          background: form.lead_source === src ? accent : "rgba(255,255,255,0.05)",
+                          borderColor: form.lead_source === src ? accent : "rgba(255,255,255,0.1)",
+                          color: form.lead_source === src ? "#fff" : "#94a3b8",
+                        }}
+                      >{src}</button>
+                    ))}
+                  </div>
+                  {step1Error && <p className="text-xs mt-1.5 font-bold" style={{ color: accent }} data-testid="ob-lead-source-error">{step1Error}</p>}
+                </Field>
               </>
             )}
 

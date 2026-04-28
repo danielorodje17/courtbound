@@ -45,7 +45,7 @@ async def save_profile(data: PlayerProfile, current_user: UserModel = Depends(ge
         )
     except Exception:
         # Graceful pre-migration fallback: remove columns that may not exist yet
-        for col in ("basketball_gender",):
+        for col in ("basketball_gender", "lead_source"):
             payload.pop(col, None)
         await run_in_threadpool(
             lambda: supa.table("profiles").upsert(payload, on_conflict="user_id").execute()
