@@ -661,3 +661,196 @@ async def admin_update_settings(body: dict, _=Depends(require_admin_token)):
         ).execute()
     )
     return {"message": "Settings updated"}
+
+
+# ──────────────────────────────────────────────
+#  FUNNEL ANALYTICS
+# ──────────────────────────────────────────────
+@router.get("/funnel")
+async def admin_funnel(_=Depends(require_admin_token)):
+    users_r = await run_in_threadpool(lambda: supa.table("users").select("id,subscription_tier,created_at,last_active").execute())
+    users = users_r.data or []
+    total_signups = len(users)
+
+    emails_r = await run_in_threadpool(lambda: supa.table("emails").select("user_id").eq("direction", "sent").execute())
+    users_with_emails = {e["user_id"] for e in (emails_r.data or [])}
+
+    tracked_r = await run_in_threadpool(lambda: supa.table("tracked_colleges").select("user_id").execute())
+    users_with_tracked = {t["user_id"] for t in (tracked_r.data or [])}
+
+    activated = len({u["id"] for u in users if u["id"] in users_with_emails or u["id"] in users_with_tracked})
+    trial = sum(1 for u in users if u.get("subscription_tier") == "trial")
+    paid  = sum(1 for u in users if u.get("subscription_tier") in ("basic", "premium", "recruit", "scholarship"))
+
+    def pct(n, d): return round(n / d * 100, 1) if d else 0
+
+    funnel_stages = [
+        {"stage": "Sign-ups",  "count": total_signups, "pct": 100},
+        {"stage": "Activated", "count": activated,     "pct": pct(activated, total_signups)},
+        {"stage": "Trial",     "count": trial,         "pct": pct(trial, total_signups)},
+        {"stage": "Paid",      "count": paid,          "pct": pct(paid, total_signups)},
+    ]
+
+    # 30-day signup trend
+    now = datetime.now(timezone.utc)
+    thirty_days_ago = (now - timedelta(days=30)).isoformat()
+    trend_map: dict = defaultdict(int)
+    for u in users:
+        ds = str(u.get("created_at", ""))[:10]
+        if ds >= thirty_days_ago[:10]:
+            trend_map[ds] += 1
+    signup_trend = [{"date": (now.date() - timedelta(days=i)).isoformat(), "signups": trend_map.get((now.date() - timedelta(days=i)).isoformat(), 0)} for i in range(29, -1, -1)]
+
+    return {
+        "funnel": funnel_stages,
+        "trial_to_paid_rate": pct(paid, trial + paid),
+        "signup_to_activated_rate": pct(activated, total_signups),
+        "signup_trend": signup_trend,
+    }
+
+
+# ──────────────────────────────────────────────
+#  OUTREACH ANALYTICS
+# ──────────────────────────────────────────────
+@router.get("/outreach")
+async def admin_outreach(_=Depends(require_admin_token)):
+    emails_r = await run_in_threadpool(lambda: supa.table("emails").select("user_id,direction,created_at").execute())
+    emails = emails_r.data or []
+
+    users_r = await run_in_threadpool(lambda: supa.table("users").select("id,name,email").execute())
+    user_map = {u["id"]: u for u in (users_r.data or [])}
+
+    user_sent: dict = defaultdict(int)
+    user_recv: dict = defaultdict(int)
+    for e in emails:
+        uid = e.get("user_id")
+        if e.get("direction") == "sent":     user_sent[uid] += 1
+        elif e.get("direction") == "received": user_recv[uid] += 1
+
+    total_sent = sum(user_sent.values())
+    total_recv = sum(user_recv.values())
+    reply_rate = round(total_recv / total_sent * 100, 1) if total_sent else 0
+
+    # 14-day trend
+    now = datetime.now(timezone.utc)
+    fourteen_ago = (now - timedelta(days=14)).isoformat()
+    trend_map: dict = defaultdict(int)
+    for e in emails:
+        if e.get("direction") == "sent" and (e.get("created_at") or "") >= fourteen_ago:
+            trend_map[str(e.get("created_at", ""))[:10]] += 1
+    email_trend = [{"date": (now.date() - timedelta(days=i)).isoformat(), "emails": trend_map.get((now.date() - timedelta(days=i)).isoformat(), 0)} for i in range(13, -1, -1)]
+
+    # Per-user table
+    all_uids = set(list(user_sent.keys()) + list(user_recv.keys()))
+    per_user = []
+    for uid in all_uids:
+        s, r = user_sent[uid], user_recv[uid]
+        u = user_map.get(uid, {})
+        per_user.append({
+            "user_id": uid,
+            "name": u.get("name", "Unknown"),
+            "email": u.get("email", ""),
+            "emails_sent": s,
+            "replies_received": r,
+            "reply_rate": round(r / s * 100, 1) if s else 0,
+        })
+    per_user.sort(key=lambda x: -x["emails_sent"])
+
+    return {
+        "aggregate": {"total_sent": total_sent, "total_received": total_recv, "reply_rate": reply_rate},
+        "per_user": per_user[:20],
+        "email_trend": email_trend,
+    }
+
+
+# ──────────────────────────────────────────────
+#  USER ACTIVITY
+# ──────────────────────────────────────────────
+@router.get("/activity")
+async def admin_activity(_=Depends(require_admin_token)):
+    users_r = await run_in_threadpool(lambda: supa.table("users").select("id,name,email,subscription_tier,last_active,created_at").execute())
+    users = users_r.data or []
+
+    emails_r = await run_in_threadpool(lambda: supa.table("emails").select("user_id").eq("direction", "sent").execute())
+    email_counts: dict = defaultdict(int)
+    for e in (emails_r.data or []):
+        email_counts[e["user_id"]] += 1
+
+    now = datetime.now(timezone.utc)
+    seven_ago  = (now - timedelta(days=7)).isoformat()
+    thirty_ago = (now - timedelta(days=30)).isoformat()
+
+    result = []
+    for u in users:
+        la = u.get("last_active") or ""
+        if la >= seven_ago:     status = "active"
+        elif la >= thirty_ago:  status = "idle"
+        else:                   status = "dormant"
+        result.append({
+            "user_id":           u["id"],
+            "name":              u.get("name", ""),
+            "email":             u.get("email", ""),
+            "subscription_tier": u.get("subscription_tier", "free"),
+            "last_active":       la,
+            "created_at":        u.get("created_at", ""),
+            "emails_sent":       email_counts[u["id"]],
+            "status":            status,
+        })
+    return {"users": result}
+
+
+# ──────────────────────────────────────────────
+#  NUDGE EMAILS
+# ──────────────────────────────────────────────
+@router.post("/nudge")
+async def admin_nudge(body: dict, _=Depends(require_admin_token)):
+    import resend as _resend
+    user_ids = body.get("user_ids", [])
+    if not user_ids:
+        raise HTTPException(status_code=400, detail="user_ids required")
+
+    RESEND_KEY    = os.environ.get("RESEND_API_KEY")
+    SENDER        = os.environ.get("SENDER_EMAIL", "onboarding@resend.dev")
+    FRONTEND_URL  = os.environ.get("FRONTEND_URL", "https://getcourtbound.com")
+    if not RESEND_KEY:
+        raise HTTPException(status_code=500, detail="Resend not configured")
+
+    _resend.api_key = RESEND_KEY
+
+    users_r = await run_in_threadpool(lambda: supa.table("users").select("id,name,email").in_("id", user_ids).execute())
+    emails_r = await run_in_threadpool(lambda: supa.table("emails").select("user_id").eq("direction", "sent").in_("user_id", user_ids).execute())
+    email_counts: dict = defaultdict(int)
+    for e in (emails_r.data or []):
+        email_counts[e["user_id"]] += 1
+
+    logger = __import__("logging").getLogger(__name__)
+    sent_count = 0
+    for user in (users_r.data or []):
+        uid  = user["id"]
+        name = (user.get("name") or "there").split()[0]
+        addr = user.get("email", "")
+        if not addr: continue
+        has_used = email_counts[uid] > 0
+        if has_used:
+            subject = "Still chasing your scholarship?"
+            html = f"""<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:32px 24px">
+              <h2 style="color:#0f172a">Hey {name},</h2>
+              <p style="color:#475569;line-height:1.6">We noticed you haven't been on CourtBound in a while — but your scholarship journey isn't over.</p>
+              <p style="color:#475569;line-height:1.6">Coaches are actively reviewing players right now. Log back in to track new colleges and send follow-up emails.</p>
+              <a href="{FRONTEND_URL}/dashboard" style="display:inline-block;background:#f97316;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;margin:16px 0">Back to CourtBound →</a>
+              <p style="color:#94a3b8;font-size:12px;margin-top:24px">CourtBound · <a href="{FRONTEND_URL}" style="color:#94a3b8">getcourtbound.com</a></p></div>"""
+        else:
+            subject = "Your first coach email is one click away"
+            html = f"""<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:32px 24px">
+              <h2 style="color:#0f172a">Hey {name},</h2>
+              <p style="color:#475569;line-height:1.6">You signed up for CourtBound but haven't reached out to any coaches yet.</p>
+              <p style="color:#475569;line-height:1.6">The players who get scholarships are the ones who make first contact. It takes less than 2 minutes to send your first email.</p>
+              <a href="{FRONTEND_URL}/colleges" style="display:inline-block;background:#f97316;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;margin:16px 0">Find a college and email a coach →</a>
+              <p style="color:#94a3b8;font-size:12px;margin-top:24px">CourtBound · <a href="{FRONTEND_URL}" style="color:#94a3b8">getcourtbound.com</a></p></div>"""
+        try:
+            _resend.Emails.send({"from": f"CourtBound <{SENDER}>", "to": [addr], "subject": subject, "html": html})
+            sent_count += 1
+        except Exception as e:
+            logger.warning(f"Nudge failed for {addr}: {e}")
+
+    return {"sent": sent_count, "total": len(user_ids)}

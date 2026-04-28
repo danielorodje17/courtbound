@@ -3,13 +3,13 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer,
+  AreaChart, Area, ResponsiveContainer,
 } from "recharts";
 import {
   Users, Mail, BookMarked, TrendingUp, RefreshCw, LogOut,
   Star, CircleDot, ArrowUpRight, ChevronUp, ChevronDown, ShieldCheck,
   Flag, Clock, CheckCircle2, AlertTriangle, XCircle, ChevronRight, Settings, Globe, Trash2,
-  Download, Upload,
+  Download, Upload, Target, Zap, Activity, Send, Bell,
 } from "lucide-react";
 
 const API = process.env.REACT_APP_BACKEND_URL;
@@ -121,12 +121,20 @@ export default function AdminPage() {
   const [pricingForm, setPricingForm] = useState({});
   const [pricingSaving, setPricingSaving] = useState(false);
   const [pricingSaved, setPricingSaved] = useState(null);
-  const [confirmDelete, setConfirmDelete] = useState(null); // {user_id, name, email}
+  const [confirmDelete, setConfirmDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
-  const [fixingEmail, setFixingEmail] = useState(null); // report id
+  const [fixingEmail, setFixingEmail] = useState(null);
   const [emailFixValue, setEmailFixValue] = useState("");
   const [emailFixSaving, setEmailFixSaving] = useState(false);
-  const [emailFixDone, setEmailFixDone] = useState(null); // report id
+  const [emailFixDone, setEmailFixDone] = useState(null);
+  // Analytics tabs
+  const [funnel, setFunnel]     = useState(null);
+  const [outreach, setOutreach] = useState(null);
+  const [activity, setActivity] = useState(null);
+  const [activityFilter, setActivityFilter] = useState("all");
+  const [selectedUsers, setSelectedUsers] = useState(new Set());
+  const [nudging, setNudging]   = useState(false);
+  const [nudgeResult, setNudgeResult] = useState(null);
   // Colleges contacts tab
   const [contacts, setContacts] = useState([]);
   const [contactsLoaded, setContactsLoaded] = useState(false);
@@ -174,6 +182,20 @@ export default function AdminPage() {
     }
     setLoading(false);
   }, [navigate]);
+
+  const loadFunnel   = useCallback(async () => { try { const r = await adminReq("get", "/admin/funnel");   setFunnel(r.data);   } catch {} }, []);
+  const loadOutreach = useCallback(async () => { try { const r = await adminReq("get", "/admin/outreach"); setOutreach(r.data); } catch {} }, []);
+  const loadActivity = useCallback(async () => { try { const r = await adminReq("get", "/admin/activity"); setActivity(r.data); } catch {} }, []);
+
+  const sendNudge = async (userIds) => {
+    setNudging(true); setNudgeResult(null);
+    try {
+      const r = await adminReq("post", "/admin/nudge", { user_ids: userIds });
+      setNudgeResult(`Sent ${r.data.sent} nudge email${r.data.sent !== 1 ? "s" : ""} successfully`);
+      setSelectedUsers(new Set());
+    } catch { setNudgeResult("Failed to send — check Resend config"); }
+    setNudging(false);
+  };
 
   useEffect(() => {
     if (!localStorage.getItem("cb_admin_token")) {
@@ -523,12 +545,21 @@ export default function AdminPage() {
         {[
           { id: "overview",  label: "Overview" },
           { id: "users",     label: `Users (${users.length})` },
+          { id: "funnel",    label: "Funnel" },
+          { id: "outreach",  label: "Outreach" },
+          { id: "activity",  label: "Activity" },
           { id: "reports",   label: `Reports${reports.filter(r => r.status === "pending").length > 0 ? ` (${reports.filter(r => r.status === "pending").length})` : ""}` },
           { id: "colleges",  label: "Colleges" },
           { id: "pricing",   label: "Pricing" },
           { id: "settings",  label: "Settings" },
         ].map(t => (
-          <button key={t.id} onClick={() => { setActiveTab(t.id); if (t.id === "colleges") loadContacts(); }}
+          <button key={t.id} onClick={() => {
+            setActiveTab(t.id);
+            if (t.id === "colleges") loadContacts();
+            if (t.id === "funnel"   && !funnel)   loadFunnel();
+            if (t.id === "outreach" && !outreach) loadOutreach();
+            if (t.id === "activity" && !activity) loadActivity();
+          }}
             className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${activeTab === t.id ? "bg-slate-900 text-white" : "text-slate-500 hover:text-slate-700"}`}>
             {t.label}
           </button>
@@ -1409,6 +1440,263 @@ export default function AdminPage() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* ── FUNNEL TAB ─────────────────────────────────────────── */}
+      {activeTab === "funnel" && (
+        <div className="space-y-6">
+          {!funnel ? (
+            <div className="flex items-center justify-center h-40"><div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" /></div>
+          ) : (<>
+            {/* KPI Row */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[
+                { label: "Trial → Paid Rate", value: `${funnel.trial_to_paid_rate}%`, color: "text-green-600", icon: Target },
+                { label: "Sign-up → Activated", value: `${funnel.signup_to_activated_rate}%`, color: "text-blue-600", icon: Zap },
+                { label: "Total Sign-ups", value: funnel.funnel[0]?.count ?? 0, color: "text-slate-900", icon: Users },
+                { label: "Paid Users", value: funnel.funnel[3]?.count ?? 0, color: "text-orange-600", icon: Star },
+              ].map(k => (
+                <div key={k.label} className="bg-white border border-slate-200 rounded-xl p-5">
+                  <div className="flex items-center gap-2 mb-2"><k.icon className={`w-4 h-4 ${k.color}`} /><span className="text-xs font-bold uppercase tracking-wider text-slate-500">{k.label}</span></div>
+                  <p className={`text-3xl font-black ${k.color}`}>{k.value}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Visual Funnel */}
+            <div className="bg-white border border-slate-200 rounded-xl p-6">
+              <h3 className="font-black text-slate-900 mb-6 uppercase tracking-wide text-sm">Conversion Funnel</h3>
+              <div className="space-y-3">
+                {funnel.funnel.map((stage, i) => {
+                  const colors = ["bg-blue-500","bg-indigo-500","bg-orange-500","bg-green-500"];
+                  const next = funnel.funnel[i + 1];
+                  const dropOff = next ? stage.count - next.count : 0;
+                  return (
+                    <div key={stage.stage}>
+                      <div className="flex items-center gap-4 mb-1">
+                        <span className="text-xs font-bold uppercase tracking-wider text-slate-500 w-24">{stage.stage}</span>
+                        <div className="flex-1 bg-slate-100 rounded-full h-8 relative overflow-hidden">
+                          <div className={`h-full ${colors[i]} rounded-full transition-all duration-700 flex items-center px-3`} style={{ width: `${Math.max(stage.pct, 4)}%` }}>
+                            <span className="text-white text-xs font-black">{stage.count}</span>
+                          </div>
+                        </div>
+                        <span className="text-sm font-bold text-slate-700 w-12 text-right">{stage.pct}%</span>
+                      </div>
+                      {next && <p className="text-xs text-red-400 pl-28 mb-1">▼ {dropOff} dropped off ({(100 - funnel.funnel[i+1].pct).toFixed(1)}% drop)</p>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 30-day Signup Trend */}
+            <div className="bg-white border border-slate-200 rounded-xl p-6">
+              <h3 className="font-black text-slate-900 mb-4 uppercase tracking-wide text-sm">Sign-up Trend — Last 30 Days</h3>
+              <AreaChart width={700} height={180} data={funnel.signup_trend} margin={{ top: 4, right: 20, bottom: 0, left: 0 }}>
+                <defs><linearGradient id="signupGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#f97316" stopOpacity={0.3}/><stop offset="95%" stopColor="#f97316" stopOpacity={0}/></linearGradient></defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={d => d.slice(5)} />
+                <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+                <Tooltip />
+                <Area type="monotone" dataKey="signups" stroke="#f97316" fill="url(#signupGrad)" strokeWidth={2} />
+              </AreaChart>
+            </div>
+          </>)}
+        </div>
+      )}
+
+      {/* ── OUTREACH TAB ───────────────────────────────────────── */}
+      {activeTab === "outreach" && (
+        <div className="space-y-6">
+          {!outreach ? (
+            <div className="flex items-center justify-center h-40"><div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" /></div>
+          ) : (<>
+            {/* KPI Row */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[
+                { label: "Emails Sent", value: outreach.aggregate.total_sent, color: "text-slate-900", icon: Send },
+                { label: "Replies Received", value: outreach.aggregate.total_received, color: "text-blue-600", icon: Mail },
+                { label: "Reply Rate", value: `${outreach.aggregate.reply_rate}%`, color: outreach.aggregate.reply_rate >= 10 ? "text-green-600" : "text-orange-500", icon: TrendingUp },
+                { label: "Open Rate", value: "—", color: "text-slate-400", icon: Activity },
+              ].map(k => (
+                <div key={k.label} className="bg-white border border-slate-200 rounded-xl p-5">
+                  <div className="flex items-center gap-2 mb-2"><k.icon className={`w-4 h-4 ${k.color}`} /><span className="text-xs font-bold uppercase tracking-wider text-slate-500">{k.label}</span></div>
+                  <p className={`text-3xl font-black ${k.color}`}>{k.value}</p>
+                  {k.label === "Open Rate" && <p className="text-xs text-slate-400 mt-1">Requires tracking pixel</p>}
+                </div>
+              ))}
+            </div>
+
+            {/* Insight Banner */}
+            {outreach.aggregate.reply_rate >= 10 && (
+              <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-start gap-3">
+                <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold text-green-800 text-sm">Strong outreach performance</p>
+                  <p className="text-green-700 text-sm">Users are achieving a <strong>{outreach.aggregate.reply_rate}% reply rate</strong> — above the 10% industry average for cold coach outreach. This is a strong marketing proof point.</p>
+                </div>
+              </div>
+            )}
+
+            {/* 14-day Email Trend */}
+            <div className="bg-white border border-slate-200 rounded-xl p-6">
+              <h3 className="font-black text-slate-900 mb-4 uppercase tracking-wide text-sm">Email Activity — Last 14 Days</h3>
+              <BarChart width={700} height={180} data={outreach.email_trend} margin={{ top: 4, right: 20, bottom: 0, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={d => d.slice(5)} />
+                <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+                <Tooltip />
+                <Bar dataKey="emails" fill="#f97316" radius={[4,4,0,0]} />
+              </BarChart>
+            </div>
+
+            {/* Per-user table */}
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-200">
+                <h3 className="font-black text-slate-900 uppercase tracking-wide text-sm">Per-User Breakdown</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead><tr className="bg-slate-50 border-b border-slate-200">
+                    <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">User</th>
+                    <th className="text-right px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Sent</th>
+                    <th className="text-right px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Replies</th>
+                    <th className="text-right px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Reply Rate</th>
+                    <th className="text-right px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Open Rate</th>
+                  </tr></thead>
+                  <tbody>{outreach.per_user.map((u, i) => (
+                    <tr key={u.user_id} className={i % 2 === 0 ? "bg-white" : "bg-slate-50"}>
+                      <td className="px-4 py-3">
+                        <p className="font-semibold text-slate-900">{u.name}</p>
+                        <p className="text-xs text-slate-400">{u.email}</p>
+                      </td>
+                      <td className="px-4 py-3 text-right font-bold text-slate-700">{u.emails_sent}</td>
+                      <td className="px-4 py-3 text-right text-slate-600">{u.replies_received}</td>
+                      <td className="px-4 py-3 text-right">
+                        <span className={`font-bold ${u.reply_rate >= 10 ? "text-green-600" : u.reply_rate > 0 ? "text-orange-500" : "text-slate-400"}`}>{u.reply_rate > 0 ? `${u.reply_rate}%` : "—"}</span>
+                      </td>
+                      <td className="px-4 py-3 text-right text-slate-400 text-xs">—</td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </div>
+            </div>
+          </>)}
+        </div>
+      )}
+
+      {/* ── ACTIVITY TAB ───────────────────────────────────────── */}
+      {activeTab === "activity" && (
+        <div className="space-y-6">
+          {!activity ? (
+            <div className="flex items-center justify-center h-40"><div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" /></div>
+          ) : (() => {
+            const STATUS = { active: { label: "Active", dot: "bg-green-500", text: "text-green-700", bg: "bg-green-50" }, idle: { label: "Idle", dot: "bg-yellow-400", text: "text-yellow-700", bg: "bg-yellow-50" }, dormant: { label: "Dormant", dot: "bg-red-400", text: "text-red-700", bg: "bg-red-50" } };
+            const filters = [
+              { id: "all", label: "All" },
+              { id: "active", label: "Active (7d)" },
+              { id: "idle", label: "Idle (7–30d)" },
+              { id: "dormant", label: "Dormant (30d+)" },
+              { id: "never_emailed", label: "Never Emailed" },
+            ];
+            const filtered = activity.users.filter(u => {
+              if (activityFilter === "all") return true;
+              if (activityFilter === "never_emailed") return u.emails_sent === 0;
+              return u.status === activityFilter;
+            });
+            const counts = { active: activity.users.filter(u => u.status === "active").length, idle: activity.users.filter(u => u.status === "idle").length, dormant: activity.users.filter(u => u.status === "dormant").length, never_emailed: activity.users.filter(u => u.emails_sent === 0).length };
+            const toggleSelect = (uid) => { const s = new Set(selectedUsers); s.has(uid) ? s.delete(uid) : s.add(uid); setSelectedUsers(s); };
+            const selectAll = () => setSelectedUsers(new Set(filtered.map(u => u.user_id)));
+            return (<>
+              {/* Summary Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[
+                  { label: "Active (7d)", count: counts.active, color: "text-green-600", bg: "bg-green-50 border-green-200" },
+                  { label: "Idle (7–30d)", count: counts.idle, color: "text-yellow-600", bg: "bg-yellow-50 border-yellow-200" },
+                  { label: "Dormant (30d+)", count: counts.dormant, color: "text-red-600", bg: "bg-red-50 border-red-200" },
+                  { label: "Never Emailed", count: counts.never_emailed, color: "text-slate-500", bg: "bg-slate-50 border-slate-200" },
+                ].map(c => (
+                  <div key={c.label} className={`border rounded-xl p-5 ${c.bg}`}>
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">{c.label}</p>
+                    <p className={`text-3xl font-black ${c.color}`}>{c.count}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Filter + Bulk Nudge */}
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap gap-2">
+                  {filters.map(f => (
+                    <button key={f.id} onClick={() => { setActivityFilter(f.id); setSelectedUsers(new Set()); }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${activityFilter === f.id ? "bg-slate-900 text-white" : "bg-white border border-slate-200 text-slate-600 hover:border-slate-400"}`}>
+                      {f.label} {counts[f.id] !== undefined ? `(${counts[f.id]})` : `(${activity.users.length})`}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  {selectedUsers.size > 0 && (
+                    <button onClick={() => sendNudge([...selectedUsers])} disabled={nudging}
+                      className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold uppercase tracking-wider px-4 py-2 rounded-lg transition-colors disabled:opacity-60">
+                      <Bell className="w-4 h-4" />
+                      {nudging ? "Sending..." : `Nudge ${selectedUsers.size} user${selectedUsers.size !== 1 ? "s" : ""}`}
+                    </button>
+                  )}
+                  <button onClick={selectAll} className="text-xs font-bold text-slate-500 hover:text-slate-900 px-3 py-2 border border-slate-200 rounded-lg bg-white">Select All</button>
+                </div>
+              </div>
+
+              {nudgeResult && (
+                <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm font-semibold text-green-700 flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4" /> {nudgeResult}
+                </div>
+              )}
+
+              {/* User Table */}
+              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead><tr className="bg-slate-50 border-b border-slate-200">
+                    <th className="px-4 py-3 w-8"><input type="checkbox" onChange={e => e.target.checked ? selectAll() : setSelectedUsers(new Set())} checked={selectedUsers.size === filtered.length && filtered.length > 0} className="rounded" /></th>
+                    <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">User</th>
+                    <th className="text-center px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Status</th>
+                    <th className="text-center px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Tier</th>
+                    <th className="text-right px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Emails Sent</th>
+                    <th className="text-right px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Last Active</th>
+                    <th className="px-4 py-3"></th>
+                  </tr></thead>
+                  <tbody>{filtered.map((u, i) => {
+                    const s = STATUS[u.status] || STATUS.dormant;
+                    return (
+                      <tr key={u.user_id} className={`border-b border-slate-100 ${selectedUsers.has(u.user_id) ? "bg-orange-50" : i % 2 === 0 ? "bg-white" : "bg-slate-50"}`}>
+                        <td className="px-4 py-3"><input type="checkbox" checked={selectedUsers.has(u.user_id)} onChange={() => toggleSelect(u.user_id)} className="rounded" /></td>
+                        <td className="px-4 py-3">
+                          <p className="font-semibold text-slate-900">{u.name || "—"}</p>
+                          <p className="text-xs text-slate-400">{u.email}</p>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${s.bg} ${s.text}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />{s.label}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-center"><span className="text-xs font-bold uppercase tracking-wider text-slate-600">{u.subscription_tier}</span></td>
+                        <td className="px-4 py-3 text-right">
+                          {u.emails_sent === 0 ? <span className="text-xs text-red-400 font-semibold">None sent</span> : <span className="font-bold text-slate-700">{u.emails_sent}</span>}
+                        </td>
+                        <td className="px-4 py-3 text-right text-xs text-slate-400">{u.last_active ? new Date(u.last_active).toLocaleDateString() : "Never"}</td>
+                        <td className="px-4 py-3 text-right">
+                          <button onClick={() => sendNudge([u.user_id])} disabled={nudging}
+                            className="text-xs font-bold text-orange-500 hover:text-orange-700 flex items-center gap-1 ml-auto">
+                            <Bell className="w-3 h-3" /> Nudge
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}</tbody>
+                </table>
+                {filtered.length === 0 && <div className="text-center py-12 text-slate-400 text-sm">No users match this filter</div>}
+              </div>
+            </>);
+          })()}
         </div>
       )}
 
