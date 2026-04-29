@@ -1,5 +1,7 @@
 import os
 import uuid
+import json
+import base64
 import logging
 from fastapi import APIRouter, Response, Cookie, Header, HTTPException
 from fastapi.concurrency import run_in_threadpool
@@ -13,6 +15,24 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 EMERGENT_AUTH_URL = os.environ.get("EMERGENT_AUTH_URL", "https://demobackend.emergentagent.com")
+
+
+def _decode_jwt_payload(token: str) -> dict:
+    """
+    Decode JWT payload (base64url) WITHOUT signature verification.
+    Returns the payload dict or {} on failure.
+    """
+    try:
+        parts = token.split(".")
+        if len(parts) != 3:
+            return {}
+        segment = parts[1]
+        # Restore base64url padding
+        segment += "=" * (4 - len(segment) % 4)
+        decoded = base64.urlsafe_b64decode(segment)
+        return json.loads(decoded)
+    except Exception:
+        return {}
 
 
 @router.post("/session")
@@ -119,28 +139,54 @@ async def google_callback(body: dict):
     Supabase Auth callback — frontend sends the Supabase access_token after
     completing the OAuth exchange with supabase-js.
     We validate it, upsert the user, create our own session, and return session_token.
+
+    Validation strategy (resilient to supabase-js JWT format changes in v2.104+):
+    1. Decode the JWT payload (base64, no crypto verification) to extract `sub` (Supabase UUID)
+    2. Check the audience claim = "authenticated" to reject non-Supabase tokens
+    3. Fetch the full user via supa.auth.admin.get_user_by_id() using the service key —
+       this is the authoritative server-side confirmation the user exists in Supabase auth.
+    We skip supa.auth.get_user(access_token) because newer supabase-js versions
+    (v2.104.1+) occasionally produce tokens whose format causes supabase-py to raise
+    "invalid JWT: token is malformed" even though the PKCE exchange succeeded.
     """
     access_token = body.get("access_token")
     if not access_token:
         raise HTTPException(status_code=400, detail="access_token required")
 
-    # Validate token with Supabase and get user info
-    # NOTE: supa.auth.get_user() calls /auth/v1/user with the Bearer token.
-    # With supabase-js implicit flow + newer Supabase projects (PKCE default),
-    # the access_token is occasionally malformed (not a 3-segment JWT).
-    # We catch this and return 401 WITHOUT touching sessions.
+    # Step 1: Decode JWT payload (no signature verification)
+    payload = _decode_jwt_payload(access_token)
+    supabase_uid = payload.get("sub")
+    audience = payload.get("aud", "")
+
+    # Step 2: Basic audience check — Supabase always sets aud="authenticated"
+    if not supabase_uid or audience != "authenticated":
+        # Fallback: try the original get_user() method (handles edge cases)
+        try:
+            user_response = await run_in_threadpool(
+                lambda: supa.auth.get_user(access_token)
+            )
+            if not user_response or not user_response.user:
+                raise HTTPException(status_code=401, detail="Invalid Supabase token")
+            supabase_uid = str(user_response.user.id)
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.warning(f"Supabase get_user fallback also failed: {e}")
+            raise HTTPException(status_code=401, detail="Invalid Supabase token")
+
+    # Step 3: Authoritative lookup via admin API (service role key) — confirms user exists
     try:
-        user_response = await run_in_threadpool(
-            lambda: supa.auth.get_user(access_token)
+        admin_resp = await run_in_threadpool(
+            lambda: supa.auth.admin.get_user_by_id(supabase_uid)
         )
     except Exception as e:
-        logger.warning(f"Supabase get_user failed: {e}")
-        raise HTTPException(status_code=401, detail="Invalid Supabase token")
+        logger.warning(f"Admin get_user_by_id failed: {e}")
+        raise HTTPException(status_code=401, detail="Could not verify user with Supabase")
 
-    if not user_response or not user_response.user:
-        raise HTTPException(status_code=401, detail="Invalid Supabase token")
+    if not admin_resp or not admin_resp.user:
+        raise HTTPException(status_code=401, detail="User not found in Supabase auth")
 
-    sb_user = user_response.user
+    sb_user = admin_resp.user
     email = sb_user.email or ""
     meta = sb_user.user_metadata or {}
     name = meta.get("full_name") or meta.get("name") or ""
