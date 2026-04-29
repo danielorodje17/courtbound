@@ -146,6 +146,7 @@ export default function AdminPage() {
   const [inlineLvValue, setInlineLvValue] = useState("");
   const [inlineSaving, setInlineSaving] = useState(false);
   const [inlineDone, setInlineDone] = useState({});
+  const [inlineSaveError, setInlineSaveError] = useState("");
   const [importResult, setImportResult] = useState(null);
   const [importing, setImporting] = useState(false);
   // College edit modal
@@ -428,11 +429,12 @@ export default function AdminPage() {
     if (!inlineEdit) return;
     if (!inlineValue.trim() && !inlineNameValue.trim() && !inlineLvValue.trim()) return;
     setInlineSaving(true);
+    setInlineSaveError("");
     try {
       await adminReq("patch", `/admin/colleges/${inlineEdit.college_id}/coach-email`, {
-        coach_name:     inlineEdit.coach_name,
+        old_coach_name: inlineEdit.coach_name,
         new_coach_name: inlineNameValue.trim() || undefined,
-        new_email:      inlineValue.trim() || undefined,
+        new_coach_email: inlineValue.trim() || undefined,
         last_verified:  inlineLvValue.trim() || undefined,
       });
       const key = `${inlineEdit.college_id}-${inlineEdit.coach_name}`;
@@ -449,7 +451,10 @@ export default function AdminPage() {
       setInlineValue("");
       setInlineNameValue("");
       setInlineLvValue("");
-    } catch {}
+    } catch (err) {
+      const msg = err?.response?.data?.detail;
+      setInlineSaveError(typeof msg === "string" ? msg : "Save failed — please try again.");
+    }
     setInlineSaving(false);
   };
 
@@ -457,8 +462,8 @@ export default function AdminPage() {
     setEmailFixSaving(true);
     try {
       await adminReq("patch", `/admin/colleges/${r.college_id}/coach-email`, {
-        coach_name: r.coach_name,
-        new_email: emailFixValue.trim(),
+        old_coach_name: r.coach_name,
+        new_coach_email: emailFixValue.trim(),
       });
       // also auto-mark the report as fixed
       await adminReq("patch", `/admin/reports/${r.id}`, {
@@ -1202,9 +1207,12 @@ export default function AdminPage() {
                                     className="bg-green-600 text-white text-xs font-bold px-2 py-1 rounded hover:bg-green-700 disabled:opacity-60">
                                     {inlineSaving ? "..." : "Save"}
                                   </button>
-                                  <button onClick={() => { setInlineEdit(null); setInlineNameValue(""); setInlineValue(""); setInlineLvValue(""); }}
+                                  <button onClick={() => { setInlineEdit(null); setInlineNameValue(""); setInlineValue(""); setInlineLvValue(""); setInlineSaveError(""); }}
                                     className="text-slate-400 text-xs hover:text-slate-600">✕</button>
                                 </div>
+                                {inlineSaveError && (
+                                  <p className="text-xs text-red-500 font-semibold mt-1" data-testid="inline-save-error">{inlineSaveError}</p>
+                                )}
                                 <div className="flex items-center gap-2">
                                   <label className="text-xs text-slate-500 font-semibold w-24 flex-shrink-0">Last Verified:</label>
                                   <input

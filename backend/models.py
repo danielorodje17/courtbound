@@ -210,6 +210,7 @@ class CoachEmailFix(BaseModel):
     old_coach_email: Optional[str] = ""
     new_coach_email: Optional[str] = None
     new_coach_name: Optional[str] = None
+    last_verified: Optional[str] = None
 
 
 class DeleteCoach(BaseModel):

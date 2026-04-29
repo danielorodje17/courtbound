@@ -350,7 +350,7 @@ async def admin_fix_coach_email(college_id: str, data: CoachEmailFix, _=Depends(
         update_fields["name"] = data.new_coach_name
     if not update_fields:
         raise HTTPException(status_code=400, detail="No fields to update")
-    update_fields["last_verified"] = datetime.now(timezone.utc).date().isoformat()
+    update_fields["last_verified"] = data.last_verified if data.last_verified else datetime.now(timezone.utc).date().isoformat()
 
     result = await run_in_threadpool(
         lambda: supa.table("coaches")
