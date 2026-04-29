@@ -416,8 +416,8 @@ export default function AdminPage() {
     URL.revokeObjectURL(url);
   };
 
-  const loadContacts = async () => {
-    if (contactsLoaded) return;
+  const loadContacts = async (forceRefresh = false) => {
+    if (contactsLoaded && !forceRefresh) return;
     try {
       const res = await adminReq("get", "/admin/colleges-contacts");
       setContacts(res.data);
@@ -431,21 +431,15 @@ export default function AdminPage() {
     setInlineSaving(true);
     setInlineSaveError("");
     try {
-      await adminReq("patch", `/admin/colleges/${inlineEdit.college_id}/coach-email`, {
+      const result = await adminReq("patch", `/admin/colleges/${inlineEdit.college_id}/coach-email`, {
         old_coach_name: inlineEdit.coach_name,
         new_coach_name: inlineNameValue.trim() || undefined,
         new_coach_email: inlineValue.trim() || undefined,
         last_verified:  inlineLvValue.trim() || undefined,
       });
+      // Always re-fetch contacts from DB after save so UI reflects actual persisted data
+      await loadContacts(true);
       const key = `${inlineEdit.college_id}-${inlineEdit.coach_name}`;
-      const finalName  = inlineNameValue.trim() || inlineEdit.coach_name;
-      const finalEmail = inlineValue.trim() || inlineEdit.current_email;
-      const finalLv    = inlineLvValue.trim() || inlineEdit.last_verified || "";
-      setContacts(prev => prev.map(c =>
-        c.college_id === inlineEdit.college_id && c.coach_name === inlineEdit.coach_name
-          ? { ...c, coach_name: finalName, email: finalEmail, last_verified: finalLv, suspicious: false }
-          : c
-      ));
       setInlineDone(prev => ({ ...prev, [key]: true }));
       setInlineEdit(null);
       setInlineValue("");
