@@ -432,10 +432,11 @@ export default function AdminPage() {
     setInlineSaveError("");
     try {
       const result = await adminReq("patch", `/admin/colleges/${inlineEdit.college_id}/coach-email`, {
-        old_coach_name: inlineEdit.coach_name,
-        new_coach_name: inlineNameValue.trim() || undefined,
+        coach_id:        inlineEdit.coach_id,
+        old_coach_name:  inlineEdit.coach_name,
+        new_coach_name:  inlineNameValue.trim() || undefined,
         new_coach_email: inlineValue.trim() || undefined,
-        last_verified:  inlineLvValue.trim() || undefined,
+        last_verified:   inlineLvValue.trim() || undefined,
       });
       // Always re-fetch contacts from DB after save so UI reflects actual persisted data
       await loadContacts(true);
@@ -1248,7 +1249,7 @@ export default function AdminPage() {
                               <div className="flex items-center gap-2">
                                 <button
                                   data-testid={`edit-contact-${i}`}
-                                  onClick={() => { setInlineEdit({ college_id: c.college_id, coach_name: c.coach_name, current_email: c.email, last_verified: c.last_verified }); setInlineNameValue(c.coach_name); setInlineValue(c.email); setInlineLvValue(c.last_verified || ""); }}
+                                  onClick={() => { setInlineEdit({ college_id: c.college_id, coach_id: c.coach_id, coach_name: c.coach_name, current_email: c.email, last_verified: c.last_verified }); setInlineNameValue(c.coach_name); setInlineValue(c.email); setInlineLvValue(c.last_verified || ""); setInlineSaveError(""); }}
                                   className="text-xs text-orange-600 hover:text-orange-800 font-bold transition-colors"
                                 >
                                   Edit Coach

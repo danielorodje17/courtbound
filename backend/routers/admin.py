@@ -2,6 +2,7 @@ import os
 import io
 import csv
 import uuid
+import logging
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Cookie, Header
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import StreamingResponse
@@ -11,6 +12,7 @@ from collections import defaultdict
 from supabase_db import supa
 from models import AdminLogin, CollegeUpdate, CoachEmailFix, DeleteCoach, BulkImportColleges
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 ADMIN_EMAILS = os.environ.get("ADMIN_EMAILS", "").split(",")
@@ -352,13 +354,22 @@ async def admin_fix_coach_email(college_id: str, data: CoachEmailFix, _=Depends(
         raise HTTPException(status_code=400, detail="No fields to update")
     update_fields["last_verified"] = data.last_verified if data.last_verified else datetime.now(timezone.utc).date().isoformat()
 
-    result = await run_in_threadpool(
-        lambda: supa.table("coaches")
-        .update(update_fields)
-        .eq("college_id", college_id)
-        .eq("name", data.old_coach_name)
-        .execute()
-    )
+    # Prefer matching by coach UUID — unambiguous and immune to name changes.
+    # Fall back to name-match if coach_id not provided (legacy path).
+    query = supa.table("coaches").update(update_fields).eq("college_id", college_id)
+    if data.coach_id:
+        query = query.eq("id", data.coach_id)
+    elif data.old_coach_name:
+        query = query.eq("name", data.old_coach_name)
+    else:
+        raise HTTPException(status_code=400, detail="coach_id or old_coach_name required")
+
+    result = await run_in_threadpool(lambda: query.execute())
+    updated = len(result.data) if result.data else 0
+    logger.info(f"Coach update: college={college_id} coach_id={data.coach_id} name={data.old_coach_name} updated={updated}")
+
+    if updated == 0:
+        raise HTTPException(status_code=404, detail="Coach not found — the record may have changed. Please refresh and try again.")
 
     if data.old_coach_email and data.new_coach_email and data.old_coach_email != data.new_coach_email:
         await run_in_threadpool(
@@ -368,7 +379,7 @@ async def admin_fix_coach_email(college_id: str, data: CoachEmailFix, _=Depends(
             .eq("coach_email", data.old_coach_email)
             .execute()
         )
-    return {"message": "Coach updated", "updated": len(result.data) if result.data else 0}
+    return {"message": "Coach updated", "updated": updated}
 
 
 @router.get("/colleges-contacts")
@@ -407,6 +418,7 @@ async def admin_colleges_contacts(_=Depends(require_admin_token), division: str 
             for coach in coaches:
                 rows.append({
                     "college_id": college["id"],
+                    "coach_id": coach.get("id"),
                     "college_name": college.get("name", ""),
                     "division": college.get("division"),
                     "conference": college.get("conference"),

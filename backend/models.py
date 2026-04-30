@@ -206,7 +206,8 @@ class CollegeUpdate(BaseModel):
 
 
 class CoachEmailFix(BaseModel):
-    old_coach_name: str
+    coach_id: Optional[str] = None          # Preferred: UUID of the coach row (eliminates name-match fragility)
+    old_coach_name: Optional[str] = None    # Fallback if coach_id not available
     old_coach_email: Optional[str] = ""
     new_coach_email: Optional[str] = None
     new_coach_name: Optional[str] = None
