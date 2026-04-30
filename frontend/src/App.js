@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
+import { Toaster } from "./components/ui/sonner";
 import { AuthProvider, useAuth, apiRequest } from "./context/AuthContext";
 import { ThemeProvider, useTheme, DIVISION_THEME } from "./context/ThemeContext";
 import Dashboard from "./pages/Dashboard";
@@ -254,6 +255,7 @@ function App() {
       <AuthProvider>
         <ThemeProvider>
           <AppRouter />
+          <Toaster position="top-right" richColors />
         </ThemeProvider>
       </AuthProvider>
     </BrowserRouter>

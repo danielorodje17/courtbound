@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { toast } from "sonner";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   AreaChart, Area, ResponsiveContainer,
@@ -418,11 +419,10 @@ export default function AdminPage() {
 
   const loadContacts = async (forceRefresh = false) => {
     if (contactsLoaded && !forceRefresh) return;
-    try {
-      const res = await adminReq("get", "/admin/colleges-contacts");
-      setContacts(res.data);
-      setContactsLoaded(true);
-    } catch {}
+    // NOTE: This function intentionally does NOT catch errors — callers must handle them.
+    const res = await adminReq("get", "/admin/colleges-contacts");
+    setContacts(res.data);
+    setContactsLoaded(true);
   };
 
   const saveInlineEmail = async () => {
@@ -431,24 +431,30 @@ export default function AdminPage() {
     setInlineSaving(true);
     setInlineSaveError("");
     try {
-      const result = await adminReq("patch", `/admin/colleges/${inlineEdit.college_id}/coach-email`, {
+      await adminReq("patch", `/admin/colleges/${inlineEdit.college_id}/coach-email`, {
         coach_id:        inlineEdit.coach_id,
         old_coach_name:  inlineEdit.coach_name,
         new_coach_name:  inlineNameValue.trim() || undefined,
         new_coach_email: inlineValue.trim() || undefined,
         last_verified:   inlineLvValue.trim() || undefined,
       });
-      // Always re-fetch contacts from DB after save so UI reflects actual persisted data
-      await loadContacts(true);
-      const key = `${inlineEdit.college_id}-${inlineEdit.coach_name}`;
-      setInlineDone(prev => ({ ...prev, [key]: true }));
+      // Force re-fetch so UI always reflects actual DB state
+      try {
+        await loadContacts(true);
+      } catch {
+        // Re-fetch failed — close form anyway but warn user
+        toast.warning("Saved, but could not refresh the list. Please reload the page.");
+      }
       setInlineEdit(null);
       setInlineValue("");
       setInlineNameValue("");
       setInlineLvValue("");
+      toast.success("Coach details saved.");
     } catch (err) {
-      const msg = err?.response?.data?.detail;
-      setInlineSaveError(typeof msg === "string" ? msg : "Save failed — please try again.");
+      const detail = err?.response?.data?.detail;
+      const msg = typeof detail === "string" ? detail : "Save failed. Please try again.";
+      setInlineSaveError(msg);
+      toast.error(msg);
     }
     setInlineSaving(false);
   };
