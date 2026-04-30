@@ -73,8 +73,13 @@ async def compare_colleges(ids: str, current_user: UserModel = Depends(get_curre
 @router.get("/colleges/{college_id}")
 async def get_college(college_id: str):
     result = await run_in_threadpool(
-        lambda: supa.table("colleges").select("*, coaches(*)").eq("id", college_id).execute()
+        lambda: supa.table("colleges").select("*").eq("id", college_id).execute()
     )
     if not result.data:
         raise HTTPException(status_code=404, detail="College not found")
-    return result.data[0]
+    college = result.data[0]
+    coaches_result = await run_in_threadpool(
+        lambda: supa.table("coaches").select("*").eq("college_id", college_id).order("sort_order").execute()
+    )
+    college["coaches"] = coaches_result.data or []
+    return college
