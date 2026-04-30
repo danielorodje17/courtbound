@@ -365,12 +365,14 @@ export default function AdminPage() {
         ranking: editForm.ranking !== "" ? Number(editForm.ranking) : null,
       };
       await adminReq("patch", `/admin/colleges/${editCollege.id}/details`, payload);
-      // Refresh contacts list
-      setContactsLoaded(false);
-      await loadContacts();
+      await loadContacts(true);
+      toast.success("College saved.");
       setEditSaved(true);
       setTimeout(() => { setEditSaved(false); setEditCollege(null); }, 1500);
-    } catch {}
+    } catch (err) {
+      const detail = err?.response?.data?.detail;
+      toast.error(typeof detail === "string" ? detail : "Save failed. Please try again.");
+    }
     setEditSaving(false);
   };
 
