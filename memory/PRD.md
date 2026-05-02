@@ -123,5 +123,11 @@ Build "CourtBound," a web app to track USA and UK college basketball scholarship
 - Admin Funnel tab: "Acquisition Channels" horizontal bar chart shows breakdown
 - Backend: `/api/admin/funnel` returns `lead_sources` array with count per source
 
+## Landing Page Copy (Updated Feb 2026)
+- Hero tagline: "Built for UK Basketball Players" (was "European Basketball Players")
+- Stats grid: "300+" Colleges in our Database (was 274), "50+" UK-Friendly Programs (was 43)
+- Agency comparison price: "£2,000 – £4,000+" (was £3,000 – £10,000+)
+- Feature body: "over 300 US programmes" (was 274)
+
 ## Pending Migrations (User Must Run in Supabase SQL Editor)
 - `/app/memory/supabase_migration_v5.sql` — adds `lead_source TEXT` to profiles table

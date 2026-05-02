@@ -27,7 +27,7 @@ const FEATURES = [
   {
     icon: TrendingUp,
     title: "Targets the right colleges",
-    body: "Our AI matches your profile against 274 US programmes and shows your best-fit schools, your likelihood of interest, and exactly what to say to each coach.",
+    body: "Our AI matches your profile against over 300 US programmes and shows your best-fit schools, your likelihood of interest, and exactly what to say to each coach.",
   },
   {
     icon: RefreshCw,
@@ -85,7 +85,7 @@ export default function LandingPage() {
 
         <div className="relative z-10 text-center px-6 max-w-4xl mx-auto">
           <p className="text-xs font-bold uppercase tracking-[0.3em] text-orange-400 mb-5">
-            Built for European Basketball Players
+            Built for UK Basketball Players
           </p>
           <h1
             className="text-5xl sm:text-6xl md:text-7xl font-black uppercase leading-tight text-white mb-6"
@@ -202,8 +202,8 @@ export default function LandingPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               {[
-                { n: "274", label: "US Colleges Tracked" },
-                { n: "43",  label: "UK-Friendly Programs" },
+                { n: "300+", label: "Colleges in our Database" },
+                { n: "50+",  label: "UK-Friendly Programs" },
                 { n: "7",   label: "AI Email Types" },
                 { n: "5min", label: "To Your First Match" },
               ].map(({ n, label }) => (
@@ -270,7 +270,7 @@ export default function LandingPage() {
                 className="text-5xl font-black text-red-400 mb-4"
                 style={{ fontFamily: "Barlow Condensed, sans-serif" }}
               >
-                £3,000 – £10,000+
+                £2,000 – £4,000+
               </p>
               <ul className="space-y-2.5">
                 {["You pay upfront, no guarantees", "Generic email templates used for all players", "Limited contact — slow response", "You're one of dozens they manage"].map(s => (
