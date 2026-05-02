@@ -1,5 +1,41 @@
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, Trophy, CheckCircle2, X, TrendingUp, Mail, RefreshCw, BarChart2, Zap, Lock } from "lucide-react";
+
+function CountUp({ value, duration = 1600 }) {
+  const match = value.match(/^(\d+)(.*)$/);
+  const target = match ? parseInt(match[1], 10) : 0;
+  const suffix = match ? match[2] : value;
+  const [count, setCount] = useState(0);
+  const [started, setStarted] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) setStarted(true); },
+      { threshold: 0.6 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!started) return;
+    let startTime = null;
+    const step = (ts) => {
+      if (!startTime) startTime = ts;
+      const progress = Math.min((ts - startTime) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setCount(Math.floor(eased * target));
+      if (progress < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }, [started, target, duration]);
+
+  return <span ref={ref}>{count}{suffix}</span>;
+}
 
 const HERO_IMG = "https://images.unsplash.com/photo-1677617586882-2b494292ebbe?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzR8MHwxfHNlYXJjaHwyfHxlbXB0eSUyMGluZG9vciUyMGJhc2tldGJhbGwlMjBjb3VydCUyMGRhcmt8ZW58MHx8fHwxNzc2MzcwMTc4fDA&ixlib=rb-4.1.0&q=85";
 
@@ -208,7 +244,7 @@ export default function LandingPage() {
                 { n: "5min", label: "To Your First Match" },
               ].map(({ n, label }) => (
                 <div key={label} className="bg-slate-900/60 border border-white/10 rounded-xl p-6 text-center">
-                  <p className="text-4xl font-black text-orange-500 mb-1" style={{ fontFamily: "Barlow Condensed, sans-serif" }}>{n}</p>
+                  <p className="text-4xl font-black text-orange-500 mb-1" style={{ fontFamily: "Barlow Condensed, sans-serif" }}><CountUp value={n} /></p>
                   <p className="text-xs text-slate-400 uppercase tracking-wider font-bold">{label}</p>
                 </div>
               ))}
