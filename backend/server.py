@@ -12,7 +12,7 @@ import os
 # from database import db, client
 # from seed_data import seed_colleges, seed_extended_colleges, _seed_european_colleges_startup
 
-from routers import auth, colleges, tracked, emails, dashboard, goals, ai, profile, admin, reports, subscription
+from routers import auth, colleges, tracked, emails, dashboard, goals, ai, profile, admin, reports, subscription, webhook
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -39,6 +39,7 @@ api_router.include_router(profile.router)
 api_router.include_router(admin.router)
 api_router.include_router(reports.router)
 api_router.include_router(subscription.router)
+api_router.include_router(webhook.router)
 
 app.include_router(api_router)
 

@@ -13,10 +13,11 @@ class UserModel(BaseModel):
     picture: Optional[str] = ""
     subscription_tier: str = "free"
     trial_end_date: Optional[str] = None
+    subscription_expires_at: Optional[str] = None
 
 
-def _compute_effective_tier(tier: str, trial_end_raw) -> str:
-    """Return the tier to use, downgrading 'trial' if it has expired."""
+def _compute_effective_tier(tier: str, trial_end_raw, expires_at_raw=None) -> str:
+    """Return the tier to use, downgrading if trial or paid subscription has expired."""
     if tier == "trial" and trial_end_raw:
         try:
             ted = datetime.fromisoformat(str(trial_end_raw).replace("Z", "+00:00"))
@@ -26,6 +27,15 @@ def _compute_effective_tier(tier: str, trial_end_raw) -> str:
                 return "free"
         except Exception:
             return "free"
+    if tier in ("basic", "premium") and expires_at_raw:
+        try:
+            exp = datetime.fromisoformat(str(expires_at_raw).replace("Z", "+00:00"))
+            if getattr(exp, "tzinfo", None) is None:
+                exp = exp.replace(tzinfo=timezone.utc)
+            if exp < datetime.now(timezone.utc):
+                return "free"
+        except Exception:
+            pass
     return tier
 
 
@@ -60,15 +70,14 @@ async def get_current_user(
     try:
         user_result = await run_in_threadpool(
             lambda: supa.table("users")
-            .select("id,email,name,picture,subscription_tier,trial_end_date")
+            .select("id,email,name,picture,subscription_tier,trial_end_date,subscription_expires_at")
             .eq("id", session["user_id"])
             .execute()
         )
     except Exception:
-        # trial columns not yet created — run supabase_migration_v3.sql
         user_result = await run_in_threadpool(
             lambda: supa.table("users")
-            .select("id,email,name,picture,subscription_tier")
+            .select("id,email,name,picture,subscription_tier,trial_end_date")
             .eq("id", session["user_id"])
             .execute()
         )
@@ -78,7 +87,8 @@ async def get_current_user(
     u = user_result.data[0]
     raw_tier = u.get("subscription_tier", "free") or "free"
     trial_end = u.get("trial_end_date")
-    effective_tier = _compute_effective_tier(raw_tier, trial_end)
+    expires_at = u.get("subscription_expires_at")
+    effective_tier = _compute_effective_tier(raw_tier, trial_end, expires_at)
 
     return UserModel(
         user_id=u["id"],
@@ -87,4 +97,5 @@ async def get_current_user(
         picture=u.get("picture") or "",
         subscription_tier=effective_tier,
         trial_end_date=str(trial_end) if trial_end else None,
+        subscription_expires_at=str(expires_at) if expires_at else None,
     )

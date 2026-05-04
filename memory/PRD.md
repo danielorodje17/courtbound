@@ -123,6 +123,40 @@ Build "CourtBound," a web app to track USA and UK college basketball scholarship
 - Admin Funnel tab: "Acquisition Channels" horizontal bar chart shows breakdown
 - Backend: `/api/admin/funnel` returns `lead_sources` array with count per source
 
+## Stripe Payments (Added May 2026)
+### Plans
+| Plan key | Amount | Tier granted | Access |
+|---|---|---|---|
+| recruit_monthly | £9.99 | basic | 30 days |
+| recruit_annual | £79 | basic | 365 days |
+| scholarship_monthly | £19.99 | premium | 30 days |
+| scholarship_annual | £159 | premium | 365 days |
+| season_pass | £49 | premium | 120 days |
+
+### Backend endpoints
+- `POST /api/subscription/checkout` — creates Stripe checkout session
+- `GET /api/subscription/checkout/status/{session_id}` — polls Stripe, activates tier on success
+- `POST /api/webhook/stripe` — Stripe webhook handler (backup to polling)
+
+### DB changes
+- `users.subscription_expires_at TIMESTAMPTZ` — added by migration v6
+- `payment_transactions` table — added by migration v6
+
+### Env vars added
+- `STRIPE_API_KEY` (sandbox secret key) in backend/.env
+- `STRIPE_PUBLISHABLE_KEY` in backend/.env
+- `REACT_APP_STRIPE_PUBLISHABLE_KEY` in frontend/.env
+
+### Migration required
+- `/app/memory/supabase_migration_v6.sql` — run in Supabase SQL Editor
+
+### Go-live steps (user must do)
+1. Run supabase_migration_v6.sql in Supabase Dashboard → SQL Editor
+2. Swap sandbox keys for live keys in backend/.env once ready to charge real money
+3. In Stripe Dashboard → Developers → Webhooks → Add endpoint:
+   - URL: `https://getcourtbound.com/api/webhook/stripe`
+   - Events: `checkout.session.completed`
+
 ## Landing Page Copy (Updated Feb 2026)
 - Hero tagline: "Built for UK Basketball Players" (was "European Basketball Players")
 - Stats grid: "300+" Colleges in our Database (was 274), "50+" UK-Friendly Programs (was 43)
