@@ -605,12 +605,24 @@ async def bulk_import_colleges(data: BulkImportColleges, _=Depends(require_admin
     return {"inserted": inserted, "updated": updated, "errors": errors}
 
 
+SUSPICIOUS_PREFIXES = ["athletics@","info@","admin@","basketball@","sports@","recruiting@","coaches@","contact@"]
+
+def _is_suspicious(email: str) -> bool:
+    if not email:
+        return True
+    email_lower = email.lower()
+    return any(email_lower.startswith(p) for p in SUSPICIOUS_PREFIXES)
+
 @router.get("/colleges-contacts/export")
-async def export_contacts(_=Depends(require_admin_token)):
+async def export_contacts(filter: str = "all", _=Depends(require_admin_token)):
     result = await run_in_threadpool(
         lambda: supa.table("coaches").select("*, colleges(name,division,conference,state)").order("last_verified", desc=True).execute()
     )
     coaches = result.data or []
+    if filter == "suspicious":
+        coaches = [c for c in coaches if _is_suspicious(c.get("email", ""))]
+    elif filter == "ok":
+        coaches = [c for c in coaches if not _is_suspicious(c.get("email", ""))]
     rows = []
     for c in coaches:
         college = c.get("colleges") or {}
