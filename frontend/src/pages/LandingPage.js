@@ -390,13 +390,20 @@ export default function LandingPage() {
 
       {/* ── FOOTER ────────────────────────────────────────────────── */}
       <footer className="border-t border-white/10 px-6 py-8 text-center">
-        <div className="flex items-center justify-center gap-2 mb-2">
+        <div className="flex items-center justify-center gap-2 mb-3">
           <div className="w-5 h-5 bg-orange-500 rounded flex items-center justify-center">
             <Trophy className="w-3 h-3 text-white" />
           </div>
           <span className="font-black text-white text-xs uppercase tracking-widest" style={{ fontFamily: "Barlow Condensed, sans-serif" }}>CourtBound</span>
         </div>
-        <p className="text-xs text-slate-600">Built to get you recruited.</p>
+        <p className="text-xs text-slate-600 mb-3">Built to get you recruited.</p>
+        <div className="flex items-center justify-center gap-4 text-xs text-slate-500">
+          <a href="/privacy" className="hover:text-slate-300 transition-colors">Privacy Policy</a>
+          <span>·</span>
+          <a href="/terms" className="hover:text-slate-300 transition-colors">Terms of Use</a>
+          <span>·</span>
+          <span>© {new Date().getFullYear()} CourtBound Limited</span>
+        </div>
       </footer>
 
       <style>{`

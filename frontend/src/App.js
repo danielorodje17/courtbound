@@ -23,6 +23,7 @@ import AdminLoginPage from "./pages/AdminLoginPage";
 import AdminUserDetailPage from "./pages/AdminUserDetailPage";
 import PricingPage from "./pages/PricingPage";
 import SupabaseAuthCallback from "./pages/SupabaseAuthCallback";
+import LegalPage from "./pages/LegalPage";
 import HelpWidget from "./components/HelpWidget";
 import { Trophy, Home, BookOpen, Mail, Wand2, Lightbulb, Menu, X, ShieldCheck, UserCircle, MessageSquare, LogOut, ChevronDown, Sparkles, Bell, CreditCard } from "lucide-react";
 
@@ -312,6 +313,8 @@ function AppRouter() {
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/admin/users/:userId" element={<AdminUserDetailPage />} />
         <Route path="/pricing" element={<PricingPage />} />
+        <Route path="/privacy" element={<LegalPage type="privacy" />} />
+        <Route path="/terms" element={<LegalPage type="terms" />} />
         <Route path="/auth/callback" element={<SupabaseAuthCallback />} />
       </Routes>
       <HelpWidget />

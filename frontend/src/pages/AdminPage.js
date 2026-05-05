@@ -101,6 +101,103 @@ const relTime = (iso) => {
   return d < 30 ? `${d}d ago` : fmtDate(iso);
 };
 
+
+function AdminLegalEditor() {
+  const API = process.env.REACT_APP_BACKEND_URL;
+  const adminToken = localStorage.getItem("admin_token");
+
+  const [activeDoc, setActiveDoc] = useState("privacy");
+  const [contents, setContents]   = useState({ privacy: "", terms: "" });
+  const [loading, setLoading]     = useState(true);
+  const [saving, setSaving]       = useState(false);
+  const [saved, setSaved]         = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [p, t] = await Promise.all([
+          axios.get(`${API}/api/legal/privacy`),
+          axios.get(`${API}/api/legal/terms`),
+        ]);
+        setContents({ privacy: p.data.content || "", terms: t.data.content || "" });
+      } catch {}
+      setLoading(false);
+    };
+    load();
+  }, [API]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await axios.patch(
+        `${API}/api/legal/${activeDoc}`,
+        { content: contents[activeDoc] },
+        { headers: { Authorization: `Bearer ${adminToken}` } }
+      );
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch { alert("Save failed"); }
+    setSaving(false);
+  };
+
+  return (
+    <div className="max-w-4xl">
+      <div className="bg-white border border-slate-200 rounded-xl p-6">
+        <h2 className="text-xl font-black text-slate-900 mb-5" style={{ fontFamily: "Barlow Condensed, sans-serif", textTransform: "uppercase" }}>
+          Legal Documents
+        </h2>
+
+        {/* Doc selector */}
+        <div className="flex gap-2 mb-5">
+          {[{ id: "privacy", label: "Privacy Policy" }, { id: "terms", label: "Terms of Use" }].map(d => (
+            <button
+              key={d.id}
+              onClick={() => { setActiveDoc(d.id); setSaved(false); }}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeDoc === d.id ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-500 hover:text-slate-700"}`}
+            >
+              {d.label}
+            </button>
+          ))}
+          <a
+            href={`/${activeDoc}`}
+            target="_blank"
+            rel="noreferrer"
+            className="ml-auto px-4 py-2 rounded-lg text-xs font-bold bg-orange-50 text-orange-600 hover:bg-orange-100 transition-all"
+          >
+            Preview live page →
+          </a>
+        </div>
+
+        {loading ? (
+          <div className="h-64 bg-slate-100 rounded-xl animate-pulse" />
+        ) : (
+          <textarea
+            value={contents[activeDoc]}
+            onChange={e => setContents(c => ({ ...c, [activeDoc]: e.target.value }))}
+            className="w-full h-[520px] border-2 border-slate-200 rounded-xl p-4 text-sm text-slate-800 font-mono leading-relaxed resize-none focus:outline-none focus:border-orange-400 transition-colors"
+            spellCheck={false}
+          />
+        )}
+
+        <div className="flex items-center gap-4 mt-4">
+          <button
+            onClick={handleSave}
+            disabled={saving || loading}
+            className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-6 py-2.5 rounded-xl text-sm transition-colors disabled:opacity-60 flex items-center gap-2"
+          >
+            {saving ? "Saving…" : "Save Changes"}
+          </button>
+          {saved && <span className="text-xs text-green-600 font-bold">✓ Saved successfully</span>}
+          <span className="text-xs text-slate-400 ml-auto">
+            Use **text** for bold, * items for bullet lists. Full-line **Heading** becomes a section header.
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 export default function AdminPage() {
   const navigate  = useNavigate();
   const [stats, setStats]     = useState(null);
@@ -559,6 +656,7 @@ export default function AdminPage() {
           { id: "reports",   label: `Reports${reports.filter(r => r.status === "pending").length > 0 ? ` (${reports.filter(r => r.status === "pending").length})` : ""}` },
           { id: "colleges",  label: "Colleges" },
           { id: "pricing",   label: "Pricing" },
+          { id: "legal",     label: "Legal" },
           { id: "settings",  label: "Settings" },
         ].map(t => (
           <button key={t.id} onClick={() => {
@@ -1453,6 +1551,9 @@ export default function AdminPage() {
           </div>
         </div>
       )}
+
+      {/* ── LEGAL TAB ─────────────────────────────────────────── */}
+      {activeTab === "legal" && <AdminLegalEditor />}
 
       {/* ── FUNNEL TAB ─────────────────────────────────────────── */}
       {activeTab === "funnel" && (
