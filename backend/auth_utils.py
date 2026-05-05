@@ -67,21 +67,25 @@ async def get_current_user(
     if expires_at < datetime.now(timezone.utc):
         raise HTTPException(status_code=401, detail="Session expired")
 
-    try:
-        user_result = await run_in_threadpool(
-            lambda: supa.table("users")
-            .select("id,email,name,picture,subscription_tier,trial_end_date,subscription_expires_at")
-            .eq("id", session["user_id"])
-            .execute()
-        )
-    except Exception:
-        user_result = await run_in_threadpool(
-            lambda: supa.table("users")
-            .select("id,email,name,picture,subscription_tier,trial_end_date")
-            .eq("id", session["user_id"])
-            .execute()
-        )
-    if not user_result.data:
+    # Try with all optional columns first, fall back to progressively fewer
+    user_result = None
+    for cols in [
+        "id,email,name,picture,subscription_tier,trial_end_date,subscription_expires_at",
+        "id,email,name,picture,subscription_tier,trial_end_date",
+        "id,email,name,picture,subscription_tier",
+    ]:
+        try:
+            user_result = await run_in_threadpool(
+                lambda c=cols: supa.table("users")
+                .select(c)
+                .eq("id", session["user_id"])
+                .execute()
+            )
+            break
+        except Exception:
+            continue
+
+    if user_result is None or not user_result.data:
         raise HTTPException(status_code=401, detail="User not found")
 
     u = user_result.data[0]
