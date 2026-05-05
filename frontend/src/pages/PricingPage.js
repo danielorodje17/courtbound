@@ -423,7 +423,7 @@ export default function PricingPage() {
             Every new account gets a <strong>14-day free trial</strong> with full Scholarship access — no credit card required.
           </p>
           <p className="text-xs text-slate-400">
-            After your trial, you'll move to the Free plan unless you subscribe. Test card: <code className="bg-slate-100 px-1.5 py-0.5 rounded text-xs">4242 4242 4242 4242</code>
+            After your trial, you'll move to the Free plan unless you subscribe.
           </p>
         </div>
       </div>
