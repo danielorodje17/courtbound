@@ -103,7 +103,6 @@ const relTime = (iso) => {
 
 
 function AdminPromoCodes() {
-  const API = process.env.REACT_APP_BACKEND_URL;
   const adminToken = localStorage.getItem("admin_token");
   const adminReq = (method, path, data) =>
     axios({ method, url: `${API}/api${path}`, data, headers: { Authorization: `Bearer ${adminToken}` } });
@@ -320,10 +319,8 @@ function AdminPromoCodes() {
 }
 
 
-  const API = process.env.REACT_APP_BACKEND_URL;
+function AdminLegalEditor() {
   const adminToken = localStorage.getItem("admin_token");
-
-  const [activeDoc, setActiveDoc] = useState("privacy");
   const [contents, setContents]   = useState({ privacy: "", terms: "" });
   const [loading, setLoading]     = useState(true);
   const [saving, setSaving]       = useState(false);
