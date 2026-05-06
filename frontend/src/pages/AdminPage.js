@@ -102,7 +102,224 @@ const relTime = (iso) => {
 };
 
 
-function AdminLegalEditor() {
+function AdminPromoCodes() {
+  const API = process.env.REACT_APP_BACKEND_URL;
+  const adminToken = localStorage.getItem("admin_token");
+  const adminReq = (method, path, data) =>
+    axios({ method, url: `${API}/api${path}`, data, headers: { Authorization: `Bearer ${adminToken}` } });
+
+  const [codes, setCodes]         = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [showForm, setShowForm]   = useState(false);
+  const [deleting, setDeleting]   = useState(null);
+  const [toggling, setToggling]   = useState(null);
+  const [form, setForm]           = useState({ code: "", extension_days: "14", max_uses: "", description: "", expires_at: "" });
+  const [formError, setFormError] = useState("");
+  const [creating, setCreating]   = useState(false);
+
+  const load = async () => {
+    try {
+      const r = await adminReq("get", "/promo/admin/codes");
+      setCodes(r.data || []);
+    } catch {}
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    setFormError("");
+    setCreating(true);
+    try {
+      await adminReq("post", "/promo/admin/codes", {
+        ...form,
+        extension_days: parseInt(form.extension_days),
+        max_uses: form.max_uses ? parseInt(form.max_uses) : null,
+        expires_at: form.expires_at || null,
+      });
+      setForm({ code: "", extension_days: "14", max_uses: "", description: "", expires_at: "" });
+      setShowForm(false);
+      await load();
+    } catch (err) {
+      setFormError(err?.response?.data?.detail || "Failed to create code");
+    }
+    setCreating(false);
+  };
+
+  const toggleActive = async (code, current) => {
+    setToggling(code);
+    try {
+      await adminReq("patch", `/promo/admin/codes/${code}`, { is_active: !current });
+      setCodes(prev => prev.map(c => c.code === code ? { ...c, is_active: !current } : c));
+    } catch {}
+    setToggling(null);
+  };
+
+  const deleteCode = async (code) => {
+    if (!window.confirm(`Delete code "${code}"? This cannot be undone.`)) return;
+    setDeleting(code);
+    try {
+      await adminReq("delete", `/promo/admin/codes/${code}`);
+      setCodes(prev => prev.filter(c => c.code !== code));
+    } catch {}
+    setDeleting(null);
+  };
+
+  const DAYS_OPTIONS = [
+    { value: "7",  label: "+7 days" },
+    { value: "14", label: "+14 days" },
+    { value: "30", label: "+30 days" },
+    { value: "60", label: "+60 days" },
+    { value: "90", label: "+90 days" },
+  ];
+
+  return (
+    <div className="max-w-4xl space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-black text-slate-900" style={{ fontFamily: "Barlow Condensed, sans-serif", textTransform: "uppercase" }}>
+            Promo Codes
+          </h2>
+          <p className="text-xs text-slate-400 mt-0.5">Codes extend trial or subscription access. Toggle off to disable without deleting.</p>
+        </div>
+        <button
+          onClick={() => { setShowForm(s => !s); setFormError(""); }}
+          className="bg-orange-500 hover:bg-orange-600 text-white font-bold px-5 py-2.5 rounded-xl text-sm transition-colors"
+        >
+          {showForm ? "Cancel" : "+ New Code"}
+        </button>
+      </div>
+
+      {/* Create form */}
+      {showForm && (
+        <form onSubmit={handleCreate} className="bg-white border-2 border-orange-200 rounded-xl p-6 space-y-4">
+          <h3 className="text-sm font-black text-slate-800 mb-2">New Promo Code</h3>
+          {formError && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{formError}</p>}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-1">Code *</label>
+              <input
+                data-testid="promo-code-input"
+                value={form.code}
+                onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase() }))}
+                placeholder="e.g. EXTEND14"
+                required
+                className="w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-sm font-mono uppercase focus:outline-none focus:border-orange-400"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-1">Extension *</label>
+              <select
+                data-testid="promo-days-select"
+                value={form.extension_days}
+                onChange={e => setForm(f => ({ ...f, extension_days: e.target.value }))}
+                className="w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-orange-400"
+              >
+                {DAYS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-1">Max uses (blank = unlimited)</label>
+              <input
+                type="number"
+                min="1"
+                value={form.max_uses}
+                onChange={e => setForm(f => ({ ...f, max_uses: e.target.value }))}
+                placeholder="Unlimited"
+                className="w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-orange-400"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-1">Expires on (optional)</label>
+              <input
+                type="date"
+                value={form.expires_at}
+                onChange={e => setForm(f => ({ ...f, expires_at: e.target.value }))}
+                className="w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-orange-400"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1">Description (internal note)</label>
+            <input
+              value={form.description}
+              onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+              placeholder="e.g. Sent to athletes at London tournament"
+              className="w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-orange-400"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={creating}
+            data-testid="promo-create-btn"
+            className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-6 py-2.5 rounded-xl text-sm transition-colors disabled:opacity-60"
+          >
+            {creating ? "Creating…" : "Create Code"}
+          </button>
+        </form>
+      )}
+
+      {/* Codes table */}
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        {loading ? (
+          <div className="p-8 text-center text-sm text-slate-400">Loading…</div>
+        ) : codes.length === 0 ? (
+          <div className="p-8 text-center text-sm text-slate-400">No promo codes yet. Create your first one above.</div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 border-b border-slate-200">
+              <tr>
+                {["Code", "Extension", "Uses", "Expires", "Description", "Status", "Actions"].map(h => (
+                  <th key={h} className="text-left text-xs font-bold text-slate-500 px-4 py-3">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {codes.map(c => (
+                <tr key={c.code} className="hover:bg-slate-50">
+                  <td className="px-4 py-3 font-mono font-bold text-slate-900 text-xs">{c.code}</td>
+                  <td className="px-4 py-3">
+                    <span className="bg-orange-100 text-orange-700 text-xs font-bold px-2 py-0.5 rounded-full">+{c.extension_days} days</span>
+                  </td>
+                  <td className="px-4 py-3 text-slate-600 text-xs">
+                    {c.use_count}{c.max_uses ? ` / ${c.max_uses}` : " / ∞"}
+                  </td>
+                  <td className="px-4 py-3 text-slate-500 text-xs">
+                    {c.expires_at ? new Date(c.expires_at).toLocaleDateString("en-GB") : "Never"}
+                  </td>
+                  <td className="px-4 py-3 text-slate-500 text-xs max-w-[160px] truncate">{c.description || "—"}</td>
+                  <td className="px-4 py-3">
+                    <button
+                      data-testid={`toggle-${c.code}`}
+                      onClick={() => toggleActive(c.code, c.is_active)}
+                      disabled={toggling === c.code}
+                      className={`relative w-10 h-5 rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-50 ${c.is_active ? "bg-emerald-500" : "bg-slate-300"}`}
+                    >
+                      <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${c.is_active ? "translate-x-5" : "translate-x-0.5"}`} />
+                    </button>
+                  </td>
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={() => deleteCode(c.code)}
+                      disabled={deleting === c.code}
+                      className="text-xs text-red-500 hover:text-red-700 font-bold transition-colors disabled:opacity-50"
+                    >
+                      {deleting === c.code ? "Deleting…" : "Delete"}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
   const API = process.env.REACT_APP_BACKEND_URL;
   const adminToken = localStorage.getItem("admin_token");
 
@@ -656,6 +873,7 @@ export default function AdminPage() {
           { id: "reports",   label: `Reports${reports.filter(r => r.status === "pending").length > 0 ? ` (${reports.filter(r => r.status === "pending").length})` : ""}` },
           { id: "colleges",  label: "Colleges" },
           { id: "pricing",   label: "Pricing" },
+          { id: "promos",    label: "Promo Codes" },
           { id: "legal",     label: "Legal" },
           { id: "settings",  label: "Settings" },
         ].map(t => (
@@ -1551,6 +1769,9 @@ export default function AdminPage() {
           </div>
         </div>
       )}
+
+      {/* ── PROMO CODES TAB ───────────────────────────────────────── */}
+      {activeTab === "promos" && <AdminPromoCodes />}
 
       {/* ── LEGAL TAB ─────────────────────────────────────────── */}
       {activeTab === "legal" && <AdminLegalEditor />}

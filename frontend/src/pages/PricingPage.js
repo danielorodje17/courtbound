@@ -94,6 +94,63 @@ function PlanCard({ col, children, highlight, badge }) {
   );
 }
 
+function PromoCodeInput({ onSuccess }) {
+  const [open, setOpen]       = useState(false);
+  const [code, setCode]       = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState("");
+  const [success, setSuccess] = useState("");
+
+  const handleRedeem = async (e) => {
+    e.preventDefault();
+    setError(""); setSuccess("");
+    setLoading(true);
+    try {
+      const res = await apiRequest("post", "/promo/redeem", { code: code.trim().toUpperCase() });
+      setSuccess(res.data.message);
+      setCode("");
+      if (onSuccess) onSuccess();
+    } catch (err) {
+      setError(err?.response?.data?.detail || "Invalid code. Please try again.");
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-2xl px-8 py-5 mb-6">
+      <button
+        onClick={() => { setOpen(o => !o); setError(""); setSuccess(""); }}
+        className="flex items-center justify-between w-full text-sm font-bold text-slate-600 hover:text-slate-900 transition-colors"
+      >
+        <span>Have a promo code?</span>
+        <span className="text-slate-400 text-lg leading-none">{open ? "−" : "+"}</span>
+      </button>
+      {open && (
+        <form onSubmit={handleRedeem} className="mt-4 flex gap-3">
+          <input
+            data-testid="promo-code-user-input"
+            value={code}
+            onChange={e => { setCode(e.target.value.toUpperCase()); setError(""); setSuccess(""); }}
+            placeholder="Enter code"
+            className="flex-1 border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm font-mono uppercase focus:outline-none focus:border-orange-400 transition-colors"
+          />
+          <button
+            data-testid="promo-code-apply-btn"
+            type="submit"
+            disabled={loading || !code.trim()}
+            className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-5 py-2.5 rounded-xl text-sm transition-colors disabled:opacity-60 flex items-center gap-2"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+            Apply
+          </button>
+        </form>
+      )}
+      {error   && <p className="mt-3 text-xs text-red-600 font-semibold">{error}</p>}
+      {success && <p className="mt-3 text-xs text-emerald-600 font-semibold">{success}</p>}
+    </div>
+  );
+}
+
 export default function PricingPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -416,6 +473,12 @@ export default function PricingPage() {
             </button>
           </div>
         </div>
+
+        {/* ── Promo Code ──────────────────────────────────────────────── */}
+        <PromoCodeInput onSuccess={async () => {
+          const r = await apiRequest("get", "/subscription/status");
+          setStatus(r.data);
+        }} />
 
         {/* Trial note */}
         <div className="text-center bg-white border border-slate-200 rounded-2xl px-8 py-6">
