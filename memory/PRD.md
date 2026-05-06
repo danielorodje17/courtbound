@@ -110,7 +110,37 @@ Build "CourtBound," a web app to track USA and UK college basketball scholarship
 4. **Set SENDER_EMAIL** in backend/.env for email from address
 5. **Set FRONTEND_URL** in backend/.env (e.g., https://your-app.vercel.app)
 
-## Women's Basketball Division (Added Feb 2026)
+## Coach Portal (Phase 1 — added May 2026)
+### Routes
+- `/coach` — public landing page
+- `/coach/login` — coach login
+- `/coach/register` — 3-step registration (email, programme, sport)
+- `/coach/dashboard` — main dashboard (protected)
+- `/coach/players` — player search with filters (protected, verified only)
+- `/coach/players/:userId` — full player profile with AI summary (protected, verified only)
+- `/coach/board` — recruiting board / saved players in 4 lists (protected)
+- `/coach/settings` — profile + recruiting preferences editor (protected)
+
+### Key Rules
+- Coaches only see players matching their `primary_sport` (Men's vs Women's Basketball)
+- Unverified coaches get dashboard access but player search/profile is locked
+- Match score (0–100) calculated from coach's recruiting preferences vs player stats
+- AI summary (Claude) generated per player on profile view
+
+### DB Tables (v10 migration — user must run)
+- `coach_accounts` — coach user records with session token auth
+- `ncaa_institutions` — known email domains for auto-verification
+- `coach_saved_players` — saved players with list assignment
+- `coach_notifications` — in-app notification feed
+- `coach_player_views` — view tracking
+
+### Phase 2 (upcoming)
+- Kanban-style recruiting board
+- Messaging with NCAA compliance warnings
+- Admin verification queue
+- Coach analytics
+
+
 - Gender selector on onboarding step 0 (Men's / Women's)
 - Women's theme: rose accent (#e11d48), indigo sidebar (#1e1b4b), Outfit/DM Sans fonts, pill-shaped buttons
 - Men's theme: orange accent (#f97316), slate sidebar, Barlow Condensed font, sharp buttons

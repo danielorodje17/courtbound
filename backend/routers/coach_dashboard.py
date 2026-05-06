@@ -1,3 +1,4 @@
+import os
 import logging
 from fastapi import APIRouter, Depends, Path
 from fastapi.concurrency import run_in_threadpool
@@ -233,8 +234,6 @@ async def admin_coach_queue(authorization: str = None):
     )
     return res.data or []
 
-
-import os
 
 @router.patch("/admin/verify/{coach_id}")
 async def admin_verify_coach(

@@ -3,6 +3,15 @@ import { useState, useEffect } from "react";
 import { Toaster } from "./components/ui/sonner";
 import { AuthProvider, useAuth, apiRequest } from "./context/AuthContext";
 import { ThemeProvider, useTheme, DIVISION_THEME } from "./context/ThemeContext";
+import { CoachAuthProvider, useCoachAuth } from "./context/CoachAuthContext";
+import CoachLandingPage from "./pages/coach/CoachLandingPage";
+import CoachLoginPage from "./pages/coach/CoachLoginPage";
+import CoachRegisterPage from "./pages/coach/CoachRegisterPage";
+import CoachDashboard from "./pages/coach/CoachDashboard";
+import CoachPlayersPage from "./pages/coach/CoachPlayersPage";
+import CoachPlayerProfile from "./pages/coach/CoachPlayerProfile";
+import CoachBoardPage from "./pages/coach/CoachBoardPage";
+import CoachSettingsPage from "./pages/coach/CoachSettingsPage";
 import Dashboard from "./pages/Dashboard";
 import CollegesPage from "./pages/CollegesPage";
 import CollegeDetailPage from "./pages/CollegeDetailPage";
@@ -255,12 +264,27 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <ThemeProvider>
-          <AppRouter />
-          <Toaster position="top-right" richColors />
+          <CoachAuthProvider>
+            <AppRouter />
+            <Toaster position="top-right" richColors />
+          </CoachAuthProvider>
         </ThemeProvider>
       </AuthProvider>
     </BrowserRouter>
   );
+}
+
+function CoachProtectedRoute({ children }) {
+  const { coach, loading } = useCoachAuth();
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-10 w-10 border-4 border-blue-600 border-t-transparent" />
+      </div>
+    );
+  }
+  if (!coach) return <Navigate to="/coach/login" replace />;
+  return children;
 }
 
 function AppRouter() {
@@ -316,6 +340,16 @@ function AppRouter() {
         <Route path="/privacy" element={<LegalPage type="privacy" />} />
         <Route path="/terms" element={<LegalPage type="terms" />} />
         <Route path="/auth/callback" element={<SupabaseAuthCallback />} />
+        {/* Coach Portal */}
+        <Route path="/coach" element={<CoachLandingPage />} />
+        <Route path="/coach/login" element={<CoachLoginPage />} />
+        <Route path="/coach/register" element={<CoachRegisterPage />} />
+        <Route path="/coach/dashboard" element={<CoachProtectedRoute><CoachDashboard /></CoachProtectedRoute>} />
+        <Route path="/coach/players" element={<CoachProtectedRoute><CoachPlayersPage /></CoachProtectedRoute>} />
+        <Route path="/coach/players/:userId" element={<CoachProtectedRoute><CoachPlayerProfile /></CoachProtectedRoute>} />
+        <Route path="/coach/board" element={<CoachProtectedRoute><CoachBoardPage /></CoachProtectedRoute>} />
+        <Route path="/coach/settings" element={<CoachProtectedRoute><CoachSettingsPage /></CoachProtectedRoute>} />
+        <Route path="/coach/notifications" element={<CoachProtectedRoute><CoachDashboard /></CoachProtectedRoute>} />
       </Routes>
       <HelpWidget />
     </>
