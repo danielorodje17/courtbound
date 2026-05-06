@@ -424,7 +424,6 @@ export default function AdminPage() {
   const [refreshedAt, setRefreshedAt] = useState(null);
   const [resolvingId, setResolvingId] = useState(null);
   const [resolveForm, setResolveForm] = useState({ status: "fixed", message: "" });
-  const [appSettings, setAppSettings] = useState({ show_european: true });
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsSaved, setSettingsSaved] = useState(false);
   // Pricing management
@@ -474,17 +473,15 @@ export default function AdminPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [sRes, uRes, rRes, setRes, pRes] = await Promise.all([
+      const [sRes, uRes, rRes, pRes] = await Promise.all([
         adminReq("get", "/admin/stats"),
         adminReq("get", "/admin/users"),
         adminReq("get", "/admin/reports"),
-        adminReq("get", "/admin/settings"),
         adminReq("get", "/admin/pricing"),
       ]);
       setStats(sRes.data);
       setUsers(uRes.data);
       setReports(rRes.data);
-      setAppSettings(setRes.data);
       setPricingPlans(pRes.data || []);
       setRefreshedAt(new Date());
     } catch (e) {
@@ -527,17 +524,6 @@ export default function AdminPage() {
 
   const updateTier = (userId, tier) =>
     setUsers(prev => prev.map(u => u.user_id === userId ? { ...u, subscription_tier: tier } : u));
-
-  const saveSettings = async (newVal) => {
-    setSavingSettings(true);
-    try {
-      await adminReq("patch", "/admin/settings", { show_european: newVal });
-      setAppSettings(prev => ({ ...prev, show_european: newVal }));
-      setSettingsSaved(true);
-      setTimeout(() => setSettingsSaved(false), 3000);
-    } catch {}
-    setSavingSettings(false);
-  };
 
   const savePricing = async (tier) => {
     setPricingSaving(true);
@@ -1724,39 +1710,6 @@ export default function AdminPage() {
               Feature Flags
             </h2>
 
-            {/* European Colleges Toggle */}
-            <div className="flex items-start justify-between gap-4 p-4 rounded-xl border border-slate-200 bg-slate-50">
-              <div className="flex items-start gap-3">
-                <div className="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
-                  <Globe className="w-4 h-4 text-blue-600" />
-                </div>
-                <div>
-                  <p className="font-bold text-slate-800 text-sm">European Colleges</p>
-                  <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
-                    Show or hide the 43 European basketball programme listings for all users.
-                    Toggle off to keep the trial focused on US colleges only. All data is preserved — toggle back on to reinstate them instantly.
-                  </p>
-                  {!appSettings.show_european && (
-                    <p className="text-xs font-semibold text-amber-600 mt-2">
-                      Currently hidden from all users
-                    </p>
-                  )}
-                </div>
-              </div>
-              <button
-                data-testid="toggle-european-btn"
-                onClick={() => saveSettings(!appSettings.show_european)}
-                disabled={savingSettings}
-                className={`relative flex-shrink-0 w-12 h-6 rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-60 ${
-                  appSettings.show_european ? "bg-green-500" : "bg-slate-300"
-                }`}
-              >
-                <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${
-                  appSettings.show_european ? "translate-x-6" : "translate-x-0"
-                }`} />
-              </button>
-            </div>
-
             {settingsSaved && (
               <div data-testid="settings-saved-banner" className="mt-4 flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 text-sm font-semibold px-4 py-3 rounded-lg">
                 <CheckCircle2 className="w-4 h-4" />
@@ -2088,7 +2041,7 @@ export default function AdminPage() {
                   { key: "state", label: "State" },
                   { key: "division", label: "Division" },
                   { key: "conference", label: "Conference" },
-                  { key: "region", label: "Region (USA / Europe)" },
+                  { key: "region", label: "Region" },
                   { key: "acceptance_rate", label: "Acceptance Rate" },
                   { key: "ranking", label: "Ranking #" },
                   { key: "website", label: "Website URL" },

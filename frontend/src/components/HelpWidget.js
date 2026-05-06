@@ -33,15 +33,11 @@ const SECTIONS = [
     items: [
       {
         q: "How do I find colleges?",
-        a: "Go to the Colleges page. You can:\n• Search by college name\n• Filter by Division (D1, D2, NAIA, JUCO)\n• Toggle the USA / Europe tab to switch regions\n• Turn on 'UK Friendly Only' to show colleges that actively recruit UK players"
+        a: "Go to the Colleges page. You can:\n• Search by college name or city\n• Filter by Division (D1, D2, NAIA, JUCO)\n• Turn on 'UK Friendly Only' to show colleges that actively recruit UK players\n• Filter by state to narrow your search"
       },
       {
         q: "What does 'UK Friendly' mean?",
         a: "'UK Friendly' means the college actively recruits UK and international players. They are experienced with the visa process (F-1), NCAA Eligibility Center registration, and supporting international student-athletes. These are your best-fit targets."
-      },
-      {
-        q: "What are the European university programmes?",
-        a: "CourtBound includes 31 European basketball scholarship programmes across Spain, France, Germany, Netherlands, Italy, Czech Republic, Denmark, Norway, Sweden, and Finland. Switch to the 'Europe' tab on the Colleges page to browse them. Each listing shows the scholarship type, language of instruction, and country."
       },
       {
         q: "How do I compare colleges side by side?",
@@ -326,7 +322,7 @@ export default function HelpWidget() {
               {/* Footer */}
               <div className="px-5 py-5 border-t border-slate-100 bg-slate-50">
                 <p className="text-xs text-slate-500 text-center leading-relaxed">
-                  CourtBound helps European basketball players find and secure college scholarships in the USA and Europe.
+                  CourtBound helps UK basketball players find and secure college scholarships in the USA.
                 </p>
               </div>
             </div>

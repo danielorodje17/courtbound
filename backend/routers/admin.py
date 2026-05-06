@@ -698,14 +698,14 @@ async def admin_get_settings(_=Depends(require_admin_token)):
     )
     if result.data:
         return result.data[0]
-    return {"key": "global", "show_european": True}
+    return {"key": "global"}
 
 
 @router.patch("/settings")
 async def admin_update_settings(body: dict, _=Depends(require_admin_token)):
     await run_in_threadpool(
         lambda: supa.table("app_settings").upsert(
-            {"key": "global", "show_european": body.get("show_european", True), "updated_at": _now()},
+            {"key": "global", "updated_at": _now()},
             on_conflict="key",
         ).execute()
     )

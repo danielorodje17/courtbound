@@ -15,19 +15,11 @@ async def get_colleges(
     foreign_friendly: Optional[bool] = None,
     state: Optional[str] = None,
 ):
-    # Check global show_european setting
-    settings_result = await run_in_threadpool(
-        lambda: supa.table("app_settings").select("show_european").eq("key", "global").execute()
-    )
-    show_european = True
-    if settings_result.data:
-        show_european = settings_result.data[0].get("show_european", True)
-
     query = supa.table("colleges").select(
         "id,name,location,state,division,conference,foreign_friendly,ranking,"
         "acceptance_rate,image_url,scholarship_info,notable_alumni,website,"
         "region,country,language_of_study,scholarship_type,coaches(*)"
-    )
+    ).neq("region", "Europe")
     if search:
         query = query.ilike("name", f"%{search}%")
     if division:
@@ -36,8 +28,6 @@ async def get_colleges(
         query = query.eq("foreign_friendly", foreign_friendly)
     if state:
         query = query.ilike("state", f"%{state}%")
-    if not show_european:
-        query = query.neq("region", "Europe")
 
     result = await run_in_threadpool(lambda: query.order("ranking").limit(500).execute())
     return result.data

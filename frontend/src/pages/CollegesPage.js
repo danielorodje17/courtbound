@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { apiRequest } from "../context/AuthContext";
 import { useTheme, DIVISION_THEME } from "../context/ThemeContext";
 import { getCollegeImage } from "../utils/collegeImages";
-import { Search, MapPin, Users, Globe, Plus, Check, Flag, BarChart2, ArrowLeft, ShieldCheck } from "lucide-react";
+import { Search, MapPin, Users, Plus, Check, Flag, BarChart2, ArrowLeft, ShieldCheck } from "lucide-react";
 
 export default function CollegesPage() {
   const navigate = useNavigate();
@@ -19,7 +19,6 @@ export default function CollegesPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [ncaaDivision, setNcaaDivision] = useState("");
-  const [region, setRegion] = useState("");
   const [foreignOnly, setForeignOnly] = useState(false);
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [state, setState] = useState("");
@@ -31,7 +30,7 @@ export default function CollegesPage() {
 
   useEffect(() => {
     applyFilters();
-  }, [search, ncaaDivision, region, foreignOnly, verifiedOnly, state, allColleges, trackedOnly, trackedData, tracked, basketballDivision]);
+  }, [search, ncaaDivision, foreignOnly, verifiedOnly, state, allColleges, trackedOnly, trackedData, tracked, basketballDivision]);
 
   const fetchAllColleges = async () => {
     try {
@@ -54,7 +53,6 @@ export default function CollegesPage() {
       if (basketballDivision === "womens") return c.program_gender === "womens" || c.program_gender === "both";
       return c.program_gender === "mens" || c.program_gender === "both";
     });
-    if (region) filtered = filtered.filter(c => (c.region || "USA") === region);
     if (search) filtered = filtered.filter(c => c.name.toLowerCase().includes(search.toLowerCase()) || c.location.toLowerCase().includes(search.toLowerCase()) || c.country?.toLowerCase().includes(search.toLowerCase()));
     if (ncaaDivision) filtered = filtered.filter(c => c.division === ncaaDivision);
     if (foreignOnly) filtered = filtered.filter(c => c.foreign_friendly);
@@ -100,7 +98,6 @@ export default function CollegesPage() {
     if (compareSet.size >= 2) navigate(`/compare?ids=${[...compareSet].join(",")}`);
   };
 
-  const euroFriendlyCount = allColleges.filter(c => c.foreign_friendly).length;
   const divisions = ["Division I", "Division II", "NAIA", "JUCO"];
 
   const scoreColor = (s) => s >= 75 ? "#10b981" : s >= 50 ? "#f97316" : s >= 25 ? "#3b82f6" : "#94a3b8";
@@ -141,42 +138,6 @@ export default function CollegesPage() {
 
       {/* Filters */}
       <div className="bg-white border border-slate-200 rounded-lg p-4 mb-6 space-y-3">
-        {/* Region Toggle */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mr-1">Region:</span>
-          {[["", "All"], ["USA", "USA"], ["Europe", "Europe"]].map(([val, label]) => (
-            <button
-              key={val}
-              data-testid={`region-filter-${label.toLowerCase()}`}
-              onClick={() => setRegion(val)}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-wider transition-all ${
-                region === val ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-            >
-              {label === "USA" ? "🇺🇸 USA" : label === "Europe" ? "🇪🇺 Europe" : label}
-            </button>
-          ))}
-          <span className="text-slate-200 mx-1">|</span>
-          <button
-            data-testid="euro-friendly-filter-btn"
-            onClick={() => setForeignOnly(!foreignOnly)}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1 ${
-              foreignOnly ? "bg-green-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-            }`}
-          >
-            <Flag className="w-3 h-3" /> UK Friendly Only
-          </button>
-          <button
-            data-testid="verified-email-filter-btn"
-            onClick={() => setVerifiedOnly(!verifiedOnly)}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1 ${
-              verifiedOnly ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-            }`}
-          >
-            <ShieldCheck className="w-3 h-3" /> Email Verified
-          </button>
-        </div>
-
         {/* Search + Division filter row */}
         <div className="flex flex-wrap gap-3 items-center">
           <div className="relative flex-1 min-w-48">
@@ -324,9 +285,7 @@ export default function CollegesPage() {
                   <h3 className="font-bold text-slate-900 text-sm truncate">{college.name}</h3>
                   <div className="flex items-center gap-1 mt-1">
                     <MapPin className="w-3 h-3 text-slate-400" />
-                    <span className="text-xs text-slate-500">
-                      {college.region === "Europe" ? `${college.location}, ${college.country}` : college.location}
-                    </span>
+                    <span className="text-xs text-slate-500">{college.location}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-slate-500 mb-2 flex-wrap">
@@ -334,25 +293,12 @@ export default function CollegesPage() {
                     <Users className="w-3 h-3" />
                     <span>{college.coaches?.length || 0} coaches</span>
                   </div>
-                  {college.region === "Europe" && (
-                    <div className="flex items-center gap-1 font-semibold text-blue-600">
-                      <Globe className="w-3 h-3" />
-                      <span>{college.language_of_study || "—"}</span>
-                    </div>
-                  )}
                   {college.foreign_friendly && (
                     <span className="text-green-600 font-semibold flex items-center gap-0.5">
                       <Flag className="w-3 h-3" /> UK
                     </span>
                   )}
                 </div>
-                {college.region === "Europe" && college.scholarship_type && (
-                  <div className="mb-2">
-                    <span className="text-xs bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded-full border border-blue-200">
-                      {college.scholarship_type}
-                    </span>
-                  </div>
-                )}
                 {/* Full-width Track button */}
                 <button
                   data-testid={`track-college-${college.name}`}

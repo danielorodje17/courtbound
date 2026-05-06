@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { apiRequest } from "../context/AuthContext";
 import { getCollegeImage } from "../utils/collegeImages";
-import { MapPin, Globe, Mail, Phone, Plus, Check, ArrowLeft, Pen, Clock, Calendar, AlertTriangle, ListChecks, MessageSquare, Trash2, Film, Info, Flag, X, ShieldCheck } from "lucide-react";
+import { MapPin, Globe, Mail, Phone, Plus, Check, ArrowLeft, Pen, Clock, Calendar, AlertTriangle, ListChecks, MessageSquare, Trash2, Film, Flag, X, ShieldCheck } from "lucide-react";
 
 const ISSUE_TYPES = [
   "Wrong email address",
@@ -271,8 +271,8 @@ export default function CollegeDetailPage() {
           <div className="flex items-end justify-between">
             <div>
               <div className="flex gap-2 mb-2">
-                <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${college.region === "Europe" ? "bg-blue-500 text-white" : college.division === "Division I" ? "bg-orange-500 text-white" : "bg-slate-500 text-white"}`}>
-                  {college.region === "Europe" ? "Europe" : college.division}
+                <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${college.division === "Division I" ? "bg-orange-500 text-white" : "bg-slate-500 text-white"}`}>
+                  {college.division}
                 </span>
                 {college.foreign_friendly && (
                   <span className="px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide bg-green-500 text-white">
@@ -285,7 +285,7 @@ export default function CollegeDetailPage() {
               </h1>
               <div className="flex items-center gap-1 mt-1">
                 <MapPin className="w-3.5 h-3.5 text-white/70" />
-                <span className="text-white/70 text-sm">{college.region === "Europe" ? `${college.location}, ${college.country}` : college.location} · {college.region === "Europe" ? college.division : college.conference}</span>
+                <span className="text-white/70 text-sm">{college.location} · {college.conference}</span>
               </div>
             </div>
             <button
@@ -310,24 +310,12 @@ export default function CollegeDetailPage() {
           <div className="bg-white border border-slate-200 rounded-lg p-5">
             <h2 className="font-bold text-slate-900 mb-4" style={{ fontFamily: "Barlow Condensed, sans-serif", textTransform: "uppercase", letterSpacing: "0.05em" }}>College Details</h2>
             <div className="grid grid-cols-2 gap-4 text-sm">
-              {college.region === "Europe" ? (
-                <>
-                  <div><span className="text-slate-400 text-xs uppercase tracking-wide">Country</span><p className="font-semibold text-slate-800 mt-0.5">{college.country}</p></div>
-                  <div><span className="text-slate-400 text-xs uppercase tracking-wide">League / Division</span><p className="font-semibold text-slate-800 mt-0.5">{college.division}</p></div>
-                  <div><span className="text-slate-400 text-xs uppercase tracking-wide">Language of Study</span><p className="font-semibold text-blue-700 mt-0.5">{college.language_of_study || "—"}</p></div>
-                  <div><span className="text-slate-400 text-xs uppercase tracking-wide">Scholarship Type</span><p className="font-semibold text-slate-800 mt-0.5">{college.scholarship_type || "—"}</p></div>
-                  <div><span className="text-slate-400 text-xs uppercase tracking-wide">Domestic Conference</span><p className="font-semibold text-slate-800 mt-0.5">{college.conference}</p></div>
-                  <div><span className="text-slate-400 text-xs uppercase tracking-wide">Entry Requirements</span><p className="font-semibold text-slate-800 mt-0.5">{college.acceptance_rate || "—"}</p></div>
-                  <div className="col-span-2"><span className="text-slate-400 text-xs uppercase tracking-wide">Scholarship Info</span><p className="font-medium text-slate-700 mt-0.5">{college.scholarship_info}</p></div>
-                </>
-              ) : (
-                <>
-                  <div><span className="text-slate-400 text-xs uppercase tracking-wide">Acceptance Rate</span><p className="font-semibold text-slate-800 mt-0.5">{college.acceptance_rate}</p></div>
-                  <div><span className="text-slate-400 text-xs uppercase tracking-wide">Conference</span><p className="font-semibold text-slate-800 mt-0.5">{college.conference}</p></div>
-                  <div className="col-span-2"><span className="text-slate-400 text-xs uppercase tracking-wide">Scholarship Info</span><p className="font-medium text-slate-700 mt-0.5">{college.scholarship_info}</p></div>
-                  <div className="col-span-2"><span className="text-slate-400 text-xs uppercase tracking-wide">Notable Alumni</span><p className="font-medium text-slate-700 mt-0.5">{college.notable_alumni}</p></div>
-                </>
-              )}
+              <>
+                <div><span className="text-slate-400 text-xs uppercase tracking-wide">Acceptance Rate</span><p className="font-semibold text-slate-800 mt-0.5">{college.acceptance_rate}</p></div>
+                <div><span className="text-slate-400 text-xs uppercase tracking-wide">Conference</span><p className="font-semibold text-slate-800 mt-0.5">{college.conference}</p></div>
+                <div className="col-span-2"><span className="text-slate-400 text-xs uppercase tracking-wide">Scholarship Info</span><p className="font-medium text-slate-700 mt-0.5">{college.scholarship_info}</p></div>
+                <div className="col-span-2"><span className="text-slate-400 text-xs uppercase tracking-wide">Notable Alumni</span><p className="font-medium text-slate-700 mt-0.5">{college.notable_alumni}</p></div>
+              </>
             </div>
             {college.website && (
               <a href={college.website} target="_blank" rel="noreferrer" className="mt-4 flex items-center gap-1.5 text-orange-500 hover:text-orange-600 text-sm font-medium">
@@ -418,47 +406,6 @@ export default function CollegeDetailPage() {
               ))}
             </div>
           </div>
-
-          {/* European Contact Tips */}
-          {college.region === "Europe" && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-5" data-testid="euro-contact-tips">
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <Info className="w-4 h-4 text-blue-600" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-blue-900 text-sm mb-2" style={{ fontFamily: "Barlow Condensed, sans-serif", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                    Tips for Contacting European Clubs
-                  </h3>
-                  <ul className="space-y-1.5 text-sm text-blue-800">
-                    <li className="flex items-start gap-2">
-                      <span className="font-bold text-blue-500 flex-shrink-0">1.</span>
-                      <span><strong>These are admin/general inboxes</strong> — European clubs don't have dedicated recruitment portals like US coaches. Your email will be forwarded to the right person, so be patient.</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="font-bold text-blue-500 flex-shrink-0">2.</span>
-                      <span><strong>Keep it short & professional</strong> — 3–4 sentences max. State your position, age, nationality, current club, and one stand-out stat. Attach your highlight tape link.</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="font-bold text-blue-500 flex-shrink-0">3.</span>
-                      <span><strong>Reference your Player Profile</strong> — Use the AI Compose feature to auto-fill your stats, highlight tape URL, and academic info into a tailored draft.</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="font-bold text-blue-500 flex-shrink-0">4.</span>
-                      <span><strong>Follow up after 2–3 weeks</strong> — European clubs are slower to respond than US coaches. A polite follow-up email significantly increases reply rates.</span>
-                    </li>
-                  </ul>
-                  <button
-                    onClick={() => navigate("/compose", { state: { college } })}
-                    className="mt-3 text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold uppercase tracking-wider hover:bg-blue-700 transition-colors flex items-center gap-1.5 w-fit"
-                    data-testid="euro-compose-btn"
-                  >
-                    <Mail className="w-3.5 h-3.5" /> Draft AI Email for This Club
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Email History */}
           <div className="bg-white border border-slate-200 rounded-lg p-5">

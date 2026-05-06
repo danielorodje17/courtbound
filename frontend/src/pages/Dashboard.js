@@ -128,7 +128,7 @@ export default function Dashboard() {
           <h1 className="text-3xl font-bold text-white mt-1" style={{ fontFamily: theme.fontHeading, textTransform: "uppercase" }}>
             Your Scholarship Tracker
           </h1>
-          <p className="text-white/60 mt-1">{division === "womens" ? "Women's" : "European"} | Basketball Scholarship Tracker</p>
+          <p className="text-white/60 mt-1">{division === "womens" ? "Women's" : "Men's"} | Basketball Scholarship Tracker</p>
           <div className="flex gap-3 mt-5">
             <button
               data-testid="dashboard-find-colleges-btn"
