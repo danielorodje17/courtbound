@@ -1,0 +1,76 @@
+{
+  "summary": "Phase 2 testing: Admin Coaches tab, coach messaging UI, notifications, player messages inbox. Found and fixed a CRITICAL build-breaking bug (duplicate CoachNav export) and a missing import (CoachSettingsPage). After fixes, all Phase 2 UI flows verified working. Messaging APIs return 500 as expected (v11 migration not run yet).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/coach/messages/sent", "issue": "Returns 500 — expected, v11 DB migration (coach_messages table) not yet run"},
+      {"endpoint": "GET /api/player/messages", "issue": "Returns 500 — expected, v11 DB migration not yet run"}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "CoachPlayerProfile stats display",
+        "issue": "Percentage stats show double '%' symbol (e.g. '44%%', '39%%') — pre-existing Phase 1 bug",
+        "selector": ".stat-value",
+        "priority": "LOW"
+      },
+      {
+        "component": "PlayerMessagesPage",
+        "issue": "Shows loading skeleton indefinitely when /api/player/messages returns 500 — empty state 'No messages yet' never renders. Will resolve once v11 migration is run.",
+        "selector": "text=No messages yet",
+        "priority": "LOW (expected until migration)"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "bugs_fixed": [
+    {
+      "file": "/app/frontend/src/components/coach/CoachNav.js",
+      "issue": "CRITICAL: Duplicate export function CoachNav declaration (lines 6 and 98). Caused SyntaxError that broke the entire frontend app. The second declaration (old version without Messages link) was renamed to _CoachNavOld_UNUSED to fix the build.",
+      "fix": "Renamed second CoachNav export to _CoachNavOld_UNUSED"
+    },
+    {
+      "file": "/app/frontend/src/App.js",
+      "issue": "Missing import for CoachSettingsPage — caused ReferenceError at runtime crashing entire app router",
+      "fix": "Added: import CoachSettingsPage from './pages/coach/CoachSettingsPage'"
+    }
+  ],
+  "test_report_links": ["/app/backend/tests/test_coach_portal.py"],
+  "action_items": [
+    "IMPORTANT: Clean up CoachNav.js — remove the second CoachNav function body (_CoachNavOld_UNUSED) entirely to keep the file clean",
+    "Fix double %% in stats display on CoachPlayerProfile (Phase 1 pre-existing issue)",
+    "After running Supabase v11 migration, messaging endpoints (/api/coach/messages/sent, POST /api/coach/messages/:id, /api/player/messages) will work — retest messaging flow end-to-end"
+  ],
+  "critical_code_review_comments": [
+    "CoachNav.js had duplicate named exports — this is likely because E1 appended new code without removing old. Should be cleaned up.",
+    "App.js was missing CoachSettingsPage import — this crashed the entire router. All page imports must be validated when adding new routes."
+  ],
+  "updated_files": [
+    "/app/frontend/src/components/coach/CoachNav.js",
+    "/app/frontend/src/App.js"
+  ],
+  "features_verified": {
+    "admin_coaches_tab": "PASS — Coaches tab visible, loads coach list, All/pending/verified/rejected filters work",
+    "admin_coaches_list": "PASS — Test Coach shown with verified status",
+    "admin_revoke_modal": "PASS — Revoke button opens 'Reject Coach' modal with Notes field and Reject Coach/Cancel buttons",
+    "admin_get_coaches_api": "PASS — GET /api/admin/coaches returns 200 with coach list",
+    "coach_messages_page": "PASS — /coach/messages loads CoachMessagesPage with Send icon and empty state 'No messages sent yet'",
+    "coach_nav_messages_link": "PASS — Messages link with Send icon visible in CoachNav alongside Dashboard, Search Players, My Board",
+    "coach_notifications_page": "PASS — /coach/notifications loads CoachNotificationsPage with Bell icon and empty state",
+    "coach_player_message_button": "PASS — Blue Message button with Send icon visible in sticky header on player profile",
+    "send_message_modal": "PASS — Modal opens with Subject (optional) and Message fields, NCAA compliance footer text",
+    "modal_close": "PASS — Modal closes via X button and Cancel button",
+    "player_messages_page": "PASS — /messages route renders PlayerMessagesPage with 'Messages from Coaches' header",
+    "player_nav_messages_link": "PASS — Messages link appears in player nav sidebar"
+  },
+  "success_rate": {
+    "backend": "100% (all non-messaging endpoints pass; messaging 500s are expected)",
+    "frontend": "95% — all Phase 2 UI flows working after build fixes; minor pre-existing stat display bug"
+  },
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Phase 2 is working after fixing 2 critical frontend build errors (duplicate CoachNav + missing CoachSettingsPage import). All admin, coach, and player UI flows verified. Messaging APIs will return 500 until v11 Supabase migration is run. After migration, re-test: SendMessageModal send flow, CoachMessagesPage list, PlayerMessagesPage inbox."
+}

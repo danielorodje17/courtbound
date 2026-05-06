@@ -426,6 +426,12 @@ export default function AdminPage() {
   const [resolveForm, setResolveForm] = useState({ status: "fixed", message: "" });
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsSaved, setSettingsSaved] = useState(false);
+  // Coach portal
+  const [coaches, setCoaches] = useState([]);
+  const [coachesLoaded, setCoachesLoaded] = useState(false);
+  const [coachFilter, setCoachFilter] = useState("all");
+  const [verifyingCoach, setVerifyingCoach] = useState(null);
+  const [verifyForm, setVerifyForm] = useState({ notes: "" });
   // Pricing management
   const [pricingPlans, setPricingPlans] = useState([]);
   const [editingPlan, setEditingPlan] = useState(null);
@@ -496,6 +502,7 @@ export default function AdminPage() {
   const loadFunnel   = useCallback(async () => { try { const r = await adminReq("get", "/admin/funnel");   setFunnel(r.data);   } catch {} }, []);
   const loadOutreach = useCallback(async () => { try { const r = await adminReq("get", "/admin/outreach"); setOutreach(r.data); } catch {} }, []);
   const loadActivity = useCallback(async () => { try { const r = await adminReq("get", "/admin/activity"); setActivity(r.data); } catch {} }, []);
+  const loadCoaches  = useCallback(async () => { try { const r = await adminReq("get", "/admin/coaches"); setCoaches(r.data || []); setCoachesLoaded(true); } catch {} }, []);
 
   const sendNudge = async (userIds) => {
     setNudging(true); setNudgeResult(null);
@@ -857,10 +864,11 @@ export default function AdminPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 bg-white border border-slate-200 rounded-xl p-1 w-fit">
+      <div className="flex gap-1 mb-6 bg-white border border-slate-200 rounded-xl p-1 w-fit flex-wrap">
         {[
           { id: "overview",  label: "Overview" },
           { id: "users",     label: `Users (${users.length})` },
+          { id: "coaches",   label: "Coaches" },
           { id: "funnel",    label: "Funnel" },
           { id: "outreach",  label: "Outreach" },
           { id: "activity",  label: "Activity" },
@@ -877,6 +885,7 @@ export default function AdminPage() {
             if (t.id === "funnel"   && !funnel)   loadFunnel();
             if (t.id === "outreach" && !outreach) loadOutreach();
             if (t.id === "activity" && !activity) loadActivity();
+            if (t.id === "coaches") loadCoaches();
           }}
             className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${activeTab === t.id ? "bg-slate-900 text-white" : "text-slate-500 hover:text-slate-700"}`}>
             {t.label}
@@ -1111,6 +1120,148 @@ export default function AdminPage() {
         </div>
       </div>
       </>)}
+
+      {/* ── COACHES TAB ──────────────────────────────────────────── */}
+      {activeTab === "coaches" && (
+        <div>
+          {/* Header + Filter */}
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+            <div>
+              <h2 className="font-black text-slate-900 text-lg">Coach Accounts</h2>
+              <p className="text-slate-500 text-sm">{coaches.length} coach{coaches.length !== 1 ? "es" : ""} registered</p>
+            </div>
+            <div className="flex gap-2">
+              {["all", "pending", "verified", "rejected"].map(f => (
+                <button key={f} onClick={() => setCoachFilter(f)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all ${coachFilter === f ? "bg-slate-900 text-white" : "text-slate-500 hover:text-slate-700 bg-white border border-slate-200"}`}>
+                  {f === "all" ? `All (${coaches.length})` : `${f} (${coaches.filter(c => c.verification_status === f).length})`}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {!coachesLoaded ? (
+            <div className="flex justify-center py-20 text-slate-400">Loading coaches...</div>
+          ) : coaches.length === 0 ? (
+            <div className="bg-white border border-slate-200 rounded-xl py-20 text-center text-slate-400">No coach accounts yet</div>
+          ) : (
+            <div className="space-y-3">
+              {coaches
+                .filter(c => coachFilter === "all" || c.verification_status === coachFilter)
+                .map(c => (
+                  <div key={c.id} data-testid={`coach-row-${c.id}`}
+                    className="bg-white border border-slate-200 rounded-xl p-5">
+                    <div className="flex items-start justify-between gap-4 flex-wrap">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <h3 className="font-black text-slate-900">{c.full_name}</h3>
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                            c.verification_status === "verified" ? "bg-green-100 text-green-700" :
+                            c.verification_status === "rejected" ? "bg-red-100 text-red-700" :
+                            "bg-amber-100 text-amber-700"
+                          }`}>{c.verification_status}</span>
+                          <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{c.primary_sport}</span>
+                        </div>
+                        <p className="text-slate-600 text-sm">{c.job_title} — {c.institution_name}</p>
+                        <div className="flex flex-wrap gap-3 mt-1 text-xs text-slate-400">
+                          <span>{c.email}</span>
+                          <span>·</span>
+                          <span>{c.division}</span>
+                          {c.conference && <><span>·</span><span>{c.conference}</span></>}
+                          <span>·</span>
+                          <span>Applied {c.created_at ? new Date(c.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—"}</span>
+                        </div>
+                        {c.verification_notes && (
+                          <p className="text-slate-500 text-xs mt-2 italic">{c.verification_notes}</p>
+                        )}
+                      </div>
+                      {/* Action buttons */}
+                      {c.verification_status !== "verified" && (
+                        <div className="flex gap-2 flex-shrink-0">
+                          <button
+                            data-testid={`approve-coach-${c.id}`}
+                            onClick={() => setVerifyingCoach({ ...c, action: "approve" })}
+                            className="flex items-center gap-1.5 bg-green-600 hover:bg-green-500 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Approve
+                          </button>
+                          <button
+                            data-testid={`reject-coach-${c.id}`}
+                            onClick={() => setVerifyingCoach({ ...c, action: "reject" })}
+                            className="flex items-center gap-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors">
+                            <XCircle className="w-3.5 h-3.5" /> Reject
+                          </button>
+                        </div>
+                      )}
+                      {c.verification_status === "verified" && (
+                        <div className="flex gap-2 flex-shrink-0">
+                          <button
+                            data-testid={`revoke-coach-${c.id}`}
+                            onClick={() => setVerifyingCoach({ ...c, action: "reject" })}
+                            className="text-xs font-bold text-slate-400 hover:text-red-500 border border-slate-200 px-3 py-1.5 rounded-lg transition-colors">
+                            Revoke
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+            </div>
+          )}
+
+          {/* Verify/Reject Confirm Modal */}
+          {verifyingCoach && (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-md p-6">
+                <h3 className="font-black text-slate-900 text-lg mb-1">
+                  {verifyingCoach.action === "approve" ? "Approve" : "Reject"} Coach
+                </h3>
+                <p className="text-slate-600 text-sm mb-4">
+                  {verifyingCoach.action === "approve"
+                    ? `This will grant ${verifyingCoach.full_name} full access to search and message players.`
+                    : `This will block ${verifyingCoach.full_name} from accessing the coach portal.`}
+                </p>
+                <div className="mb-4">
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Notes (optional)</label>
+                  <input
+                    value={verifyForm.notes}
+                    onChange={e => setVerifyForm({ notes: e.target.value })}
+                    placeholder="Internal notes about this decision..."
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    data-testid="verify-coach-notes"
+                  />
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    data-testid="confirm-verify-coach-btn"
+                    onClick={async () => {
+                      try {
+                        await adminReq("patch", `/admin/coaches/${verifyingCoach.id}/verify`, {
+                          action: verifyingCoach.action,
+                          notes: verifyForm.notes,
+                        });
+                        toast.success(`Coach ${verifyingCoach.action === "approve" ? "approved" : "rejected"}`);
+                        setCoaches(prev => prev.map(c =>
+                          c.id === verifyingCoach.id
+                            ? { ...c, verification_status: verifyingCoach.action === "approve" ? "verified" : "rejected", verification_notes: verifyForm.notes }
+                            : c
+                        ));
+                        setVerifyingCoach(null);
+                        setVerifyForm({ notes: "" });
+                      } catch { toast.error("Failed to update coach status"); }
+                    }}
+                    className={`flex-1 text-white font-black py-3 rounded-xl transition-colors ${verifyingCoach.action === "approve" ? "bg-green-600 hover:bg-green-500" : "bg-red-600 hover:bg-red-500"}`}>
+                    {verifyingCoach.action === "approve" ? "Approve Coach" : "Reject Coach"}
+                  </button>
+                  <button onClick={() => { setVerifyingCoach(null); setVerifyForm({ notes: "" }); }}
+                    className="px-5 py-3 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors font-semibold text-sm">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── USERS TAB ──────────────────────────────────────────── */}
       {activeTab === "users" && (

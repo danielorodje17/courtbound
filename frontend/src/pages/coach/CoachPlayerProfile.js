@@ -2,7 +2,93 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useCoachAuth } from "../../context/CoachAuthContext";
 import { CoachNav } from "../../components/coach/CoachNav";
-import { ArrowLeft, BookmarkPlus, Film, Shield, Star, MapPin, GraduationCap, BarChart2, User, ExternalLink, Bookmark } from "lucide-react";
+import { toast } from "sonner";
+import { ArrowLeft, Film, Shield, Star, MapPin, GraduationCap, BarChart2, User, ExternalLink, Bookmark, Send, X, AlertCircle } from "lucide-react";
+
+const PERIOD_WARNINGS = {
+  dead: "You are in a NCAA Dead Period. In-person contact is not permitted. Ensure any written communication complies with your division rules.",
+  quiet: "You are in a Quiet Period. Off-campus recruiting and evaluations are restricted.",
+  evaluation: "You are in an Evaluation Period. Only on-campus contact is permitted.",
+};
+
+function SendMessageModal({ player, coach, onClose, onSent }) {
+  const { coachReq } = useCoachAuth();
+  const [form, setForm] = useState({ subject: "", body: "" });
+  const [sending, setSending] = useState(false);
+  const [periodWarning] = useState(PERIOD_WARNINGS[coach?.current_period_type] || null);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!form.body.trim()) { toast.error("Message body is required"); return; }
+    setSending(true);
+    try {
+      await coachReq("post", `/messages/${player.user_id}`, form);
+      toast.success("Message sent!");
+      onSent();
+      onClose();
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Failed to send message");
+    }
+    setSending(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+      <div className="w-full max-w-lg bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl">
+        <div className="flex items-center justify-between p-5 border-b border-slate-800">
+          <div>
+            <h3 className="font-black text-white">Message {player?.full_name}</h3>
+            <p className="text-slate-400 text-xs mt-0.5">{player?.position} · {player?.club_team || player?.hometown || "UK"}</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-slate-800">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        {periodWarning && (
+          <div className="mx-5 mt-4 flex items-start gap-2 bg-amber-900/30 border border-amber-700/50 rounded-xl p-3">
+            <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+            <p className="text-amber-300 text-xs leading-relaxed">{periodWarning}</p>
+          </div>
+        )}
+        <form onSubmit={submit} className="p-5 space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Subject (optional)</label>
+            <input
+              value={form.subject}
+              onChange={e => setForm(p => ({ ...p, subject: e.target.value }))}
+              placeholder="e.g. Recruiting Interest — Fort Hays State"
+              className="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Message *</label>
+            <textarea
+              value={form.body}
+              onChange={e => setForm(p => ({ ...p, body: e.target.value }))}
+              rows={6}
+              maxLength={2000}
+              placeholder="Introduce yourself and your programme..."
+              className="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 resize-none"
+              required
+              data-testid="message-body-input"
+            />
+            <p className="text-slate-600 text-xs mt-1 text-right">{form.body.length}/2000</p>
+          </div>
+          <div className="flex gap-3 pt-1">
+            <button type="submit" disabled={sending || !form.body.trim()} data-testid="send-message-btn"
+              className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white font-black py-3 rounded-xl transition-colors flex items-center justify-center gap-2">
+              <Send className="w-4 h-4" /> {sending ? "Sending..." : "Send Message"}
+            </button>
+            <button type="button" onClick={onClose} className="px-5 py-3 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors font-semibold text-sm">
+              Cancel
+            </button>
+          </div>
+          <p className="text-slate-600 text-xs text-center">By sending, you confirm this communication complies with your division's recruiting rules.</p>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 function StatPill({ label, value }) {
   if (!value && value !== 0) return null;
@@ -38,7 +124,7 @@ function InfoRow({ label, value }) {
 
 export default function CoachPlayerProfile() {
   const { userId } = useParams();
-  const { coachReq } = useCoachAuth();
+  const { coachReq, coach } = useCoachAuth();
   const navigate = useNavigate();
   const [player, setPlayer] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -46,6 +132,7 @@ export default function CoachPlayerProfile() {
   const [notFound, setNotFound] = useState(false);
   const [saveList, setSaveList] = useState("Watch List");
   const [showSaveMenu, setShowSaveMenu] = useState(false);
+  const [showMessageModal, setShowMessageModal] = useState(false);
 
   const LISTS = ["Watch List", "Priority Targets", "Contacted", "Offer Extended"];
 
@@ -113,27 +200,38 @@ export default function CoachPlayerProfile() {
             <h1 className="text-white font-black text-sm truncate">{player?.full_name}</h1>
             <p className="text-slate-400 text-xs">{player?.position} · {player?.height_ft}</p>
           </div>
-          {/* Save button */}
-          <div className="relative">
-            <div className="flex gap-1">
-              <button onClick={() => handleSave()} disabled={saving} data-testid="save-player-profile-btn"
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-colors ${
-                  player?.is_saved ? "bg-blue-600/20 border border-blue-600 text-blue-300" : "bg-slate-800 border border-slate-700 text-slate-300 hover:border-blue-600"
-                }`}>
-                <Bookmark className="w-3.5 h-3.5" /> {player?.is_saved ? `Saved: ${player.saved_list}` : "Save to Board"}
-              </button>
-              {!player?.is_saved && (
-                <button onClick={() => setShowSaveMenu(!showSaveMenu)} className="bg-slate-800 border border-slate-700 text-slate-300 px-2 py-2 rounded-lg hover:border-blue-600 transition-colors text-xs">▾</button>
+          {/* Action buttons */}
+          <div className="flex gap-2 items-center">
+            {/* Send Message */}
+            <button
+              onClick={() => setShowMessageModal(true)}
+              data-testid="open-message-modal-btn"
+              className="flex items-center gap-1.5 px-3 py-2 bg-blue-700 hover:bg-blue-600 text-white rounded-lg text-xs font-bold transition-colors border border-blue-600"
+            >
+              <Send className="w-3.5 h-3.5" /> Message
+            </button>
+            {/* Save button */}
+            <div className="relative">
+              <div className="flex gap-1">
+                <button onClick={() => handleSave()} disabled={saving} data-testid="save-player-profile-btn"
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-colors ${
+                    player?.is_saved ? "bg-blue-600/20 border border-blue-600 text-blue-300" : "bg-slate-800 border border-slate-700 text-slate-300 hover:border-blue-600"
+                  }`}>
+                  <Bookmark className="w-3.5 h-3.5" /> {player?.is_saved ? `Saved: ${player.saved_list}` : "Save to Board"}
+                </button>
+                {!player?.is_saved && (
+                  <button onClick={() => setShowSaveMenu(!showSaveMenu)} className="bg-slate-800 border border-slate-700 text-slate-300 px-2 py-2 rounded-lg hover:border-blue-600 transition-colors text-xs">▾</button>
+                )}
+              </div>
+              {showSaveMenu && (
+                <div className="absolute right-0 top-10 bg-slate-800 border border-slate-700 rounded-xl shadow-xl w-48 py-1 z-50">
+                  <p className="px-3 py-1.5 text-xs text-slate-500 font-bold uppercase">Save to list</p>
+                  {LISTS.map(l => (
+                    <button key={l} onClick={() => handleSave(l)} className="w-full text-left px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 transition-colors">{l}</button>
+                  ))}
+                </div>
               )}
             </div>
-            {showSaveMenu && (
-              <div className="absolute right-0 top-10 bg-slate-800 border border-slate-700 rounded-xl shadow-xl w-48 py-1 z-50">
-                <p className="px-3 py-1.5 text-xs text-slate-500 font-bold uppercase">Save to list</p>
-                {LISTS.map(l => (
-                  <button key={l} onClick={() => handleSave(l)} className="w-full text-left px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 transition-colors">{l}</button>
-                ))}
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -265,6 +363,17 @@ export default function CoachPlayerProfile() {
           </div>
         </div>
       </div>
+
+      {showMessageModal && player && (
+        <SendMessageModal
+          player={player}
+          coach={coach}
+          onClose={() => setShowMessageModal(false)}
+          onSent={() => {
+            setPlayer(prev => ({ ...prev, is_saved: prev.is_saved }));
+          }}
+        />
+      )}
     </div>
   );
 }

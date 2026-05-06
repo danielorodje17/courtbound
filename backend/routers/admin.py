@@ -928,3 +928,52 @@ async def admin_nudge(body: dict, _=Depends(require_admin_token)):
             logger.warning(f"Nudge failed for {addr}: {e}")
 
     return {"sent": sent_count, "total": len(user_ids)}
+
+
+
+# ── Coach Portal Admin Endpoints ──────────────────────────────────────────────
+
+@router.get("/coaches")
+async def admin_list_coaches(
+    status: Optional[str] = None,
+    _=Depends(require_admin_token),
+):
+    """List all coach accounts, optionally filtered by verification_status."""
+    query = supa.table("coach_accounts").select(
+        "id, email, full_name, job_title, institution_name, division, primary_sport, "
+        "verification_status, verification_notes, verified_at, created_at, last_active, country"
+    ).order("created_at", desc=True)
+    if status:
+        query = query.eq("verification_status", status)
+    result = await run_in_threadpool(lambda: query.execute())
+    return result.data or []
+
+
+@router.patch("/coaches/{coach_id}/verify")
+async def admin_verify_coach(coach_id: str, body: dict, _=Depends(require_admin_token)):
+    """Approve or reject a coach account."""
+    action = body.get("action")
+    if action not in ("approve", "reject"):
+        raise HTTPException(status_code=400, detail="action must be 'approve' or 'reject'")
+    notes = body.get("notes", "")
+    status = "verified" if action == "approve" else "rejected"
+    updates = {
+        "verification_status": status,
+        "verification_notes": notes,
+        "verified_at": _now() if action == "approve" else None,
+    }
+    result = await run_in_threadpool(
+        lambda: supa.table("coach_accounts").update(updates).eq("id", coach_id).execute()
+    )
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Coach not found")
+    return {"message": f"Coach {status}", "coach": result.data[0]}
+
+
+@router.delete("/coaches/{coach_id}")
+async def admin_delete_coach_account(coach_id: str, _=Depends(require_admin_token)):
+    """Delete a coach account entirely."""
+    await run_in_threadpool(
+        lambda: supa.table("coach_accounts").delete().eq("id", coach_id).execute()
+    )
+    return {"message": "Coach account deleted"}

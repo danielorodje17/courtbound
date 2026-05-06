@@ -12,6 +12,9 @@ import CoachPlayersPage from "./pages/coach/CoachPlayersPage";
 import CoachPlayerProfile from "./pages/coach/CoachPlayerProfile";
 import CoachBoardPage from "./pages/coach/CoachBoardPage";
 import CoachSettingsPage from "./pages/coach/CoachSettingsPage";
+import CoachNotificationsPage from "./pages/coach/CoachNotificationsPage";
+import CoachMessagesPage from "./pages/coach/CoachMessagesPage";
+import PlayerMessagesPage from "./pages/PlayerMessagesPage";
 import Dashboard from "./pages/Dashboard";
 import CollegesPage from "./pages/CollegesPage";
 import CollegeDetailPage from "./pages/CollegeDetailPage";
@@ -34,12 +37,13 @@ import PricingPage from "./pages/PricingPage";
 import SupabaseAuthCallback from "./pages/SupabaseAuthCallback";
 import LegalPage from "./pages/LegalPage";
 import HelpWidget from "./components/HelpWidget";
-import { Trophy, Home, BookOpen, Mail, Wand2, Lightbulb, Menu, X, ShieldCheck, UserCircle, MessageSquare, LogOut, ChevronDown, Sparkles, Bell, CreditCard } from "lucide-react";
+import { Trophy, Home, BookOpen, Mail, Wand2, Lightbulb, Menu, X, ShieldCheck, UserCircle, MessageSquare, LogOut, ChevronDown, Sparkles, Bell, CreditCard, Inbox } from "lucide-react";
 
 const NAV_ITEMS = [
   { path: "/dashboard", label: "Dashboard", icon: Home },
   { path: "/profile", label: "Profile", icon: UserCircle },
   { path: "/colleges", label: "Colleges", icon: BookOpen },
+  { path: "/messages", label: "Messages", icon: Inbox },
   { path: "/communications", label: "Emails", icon: Mail },
   { path: "/responses", label: "Responses", icon: MessageSquare },
   { path: "/ai-match", label: "AI Match", icon: Sparkles },
@@ -326,6 +330,7 @@ function AppRouter() {
         <Route path="/colleges" element={<ProtectedAppRoute needsOnboarding={needsOnboarding}><CollegesPage /></ProtectedAppRoute>} />
         <Route path="/colleges/:id" element={<ProtectedAppRoute needsOnboarding={needsOnboarding}><CollegeDetailPage /></ProtectedAppRoute>} />
         <Route path="/communications" element={<ProtectedAppRoute needsOnboarding={needsOnboarding}><CommunicationsPage /></ProtectedAppRoute>} />
+        <Route path="/messages" element={<ProtectedAppRoute needsOnboarding={needsOnboarding}><PlayerMessagesPage /></ProtectedAppRoute>} />
         <Route path="/compose" element={<ProtectedAppRoute needsOnboarding={needsOnboarding}><ComposePage /></ProtectedAppRoute>} />
         <Route path="/strategy" element={<ProtectedAppRoute needsOnboarding={needsOnboarding}><StrategyPage /></ProtectedAppRoute>} />
         <Route path="/ncaa" element={<ProtectedAppRoute needsOnboarding={needsOnboarding}><NCAACHeckerPage /></ProtectedAppRoute>} />
@@ -349,7 +354,8 @@ function AppRouter() {
         <Route path="/coach/players/:userId" element={<CoachProtectedRoute><CoachPlayerProfile /></CoachProtectedRoute>} />
         <Route path="/coach/board" element={<CoachProtectedRoute><CoachBoardPage /></CoachProtectedRoute>} />
         <Route path="/coach/settings" element={<CoachProtectedRoute><CoachSettingsPage /></CoachProtectedRoute>} />
-        <Route path="/coach/notifications" element={<CoachProtectedRoute><CoachDashboard /></CoachProtectedRoute>} />
+        <Route path="/coach/messages" element={<CoachProtectedRoute><CoachMessagesPage /></CoachProtectedRoute>} />
+        <Route path="/coach/notifications" element={<CoachProtectedRoute><CoachNotificationsPage /></CoachProtectedRoute>} />
       </Routes>
       <HelpWidget />
     </>

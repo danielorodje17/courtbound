@@ -13,7 +13,7 @@ import os
 # from seed_data import seed_colleges, seed_extended_colleges, _seed_european_colleges_startup
 
 from routers import auth, colleges, tracked, emails, dashboard, goals, ai, profile, admin, reports, subscription, webhook, legal, promo
-from routers import coach_auth, coach_players, coach_dashboard
+from routers import coach_auth, coach_players, coach_dashboard, coach_messaging
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -46,6 +46,8 @@ api_router.include_router(promo.router)
 api_router.include_router(coach_auth.router)
 api_router.include_router(coach_players.router)
 api_router.include_router(coach_dashboard.router)
+api_router.include_router(coach_messaging.router)
+api_router.include_router(coach_messaging.player_router)
 
 app.include_router(api_router)
 
