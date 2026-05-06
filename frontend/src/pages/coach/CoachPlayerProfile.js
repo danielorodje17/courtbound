@@ -292,9 +292,9 @@ export default function CoachPlayerProfile() {
                   <StatPill label="RPG" value={player.rpg} />
                   <StatPill label="APG" value={player.apg} />
                   <StatPill label="SPG" value={player.spg} />
-                  <StatPill label="FG%" value={player.fg_percent ? `${player.fg_percent}%` : null} />
-                  <StatPill label="3P%" value={player.three_pt_percent ? `${player.three_pt_percent}%` : null} />
-                  <StatPill label="FT%" value={player.ft_percent ? `${player.ft_percent}%` : null} />
+                  <StatPill label="FG%" value={player.fg_percent || null} />
+                  <StatPill label="3P%" value={player.three_pt_percent || null} />
+                  <StatPill label="FT%" value={player.ft_percent || null} />
                   <StatPill label="BPG" value={player.bpg} />
                 </div>
               </Section>

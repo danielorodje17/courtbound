@@ -134,11 +134,20 @@ Build "CourtBound," a web app to track USA and UK college basketball scholarship
 - `coach_notifications` — in-app notification feed
 - `coach_player_views` — view tracking
 
-### Phase 2 (upcoming)
-- Kanban-style recruiting board
-- Messaging with NCAA compliance warnings
-- Admin verification queue
+### Phase 2 (completed)
+- Admin verification queue (Coaches tab in Admin Panel) — approve/reject coaches
+- Messaging system: coach → player one-way messages with NCAA compliance warnings  
+- Coach notifications page (`/coach/notifications`)
+- Coach sent messages page (`/coach/messages`)
+- Player messages inbox (`/messages`) — read-only, mark as read
+- Board upgrade: Move-between-lists and remove actions
+- Double `%%` stat display bug fixed
+
+### Phase 3 (upcoming)
 - Coach analytics
+- Onboarding sequence
+- Programme public page
+- Unread message badges on player nav
 
 
 - Gender selector on onboarding step 0 (Men's / Women's)
