@@ -534,6 +534,7 @@ export default function AdminPage() {
       await adminReq("put", `/admin/pricing/${tier}`, {
         ...pricingForm,
         price_monthly: parseFloat(pricingForm.price_monthly),
+        price_annual: pricingForm.price_annual !== "" ? parseFloat(pricingForm.price_annual) : null,
         features: featuresArr,
       });
       setPricingPlans(prev => prev.map(p => p.tier === tier ? { ...p, ...pricingForm, features: featuresArr } : p));
@@ -1644,6 +1645,7 @@ export default function AdminPage() {
                       setPricingForm({
                         name: plan.name,
                         price_monthly: plan.price_monthly,
+                        price_annual: plan.price_annual ?? "",
                         currency: plan.currency,
                         description: plan.description,
                         features: features.join("\n"),
@@ -1671,15 +1673,20 @@ export default function AdminPage() {
                         <input data-testid={`pricing-name-${plan.tier}`} value={pricingForm.name || ""} onChange={e => setPricingForm(p => ({ ...p, name: e.target.value }))} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none" />
                       </div>
                       <div>
+                        <label className="block text-xs font-semibold text-slate-500 mb-1">Currency</label>
+                        <select data-testid={`pricing-currency-${plan.tier}`} value={pricingForm.currency || "GBP"} onChange={e => setPricingForm(p => ({ ...p, currency: e.target.value }))} className="w-full border border-slate-200 rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none">
+                          <option value="GBP">GBP £</option>
+                          <option value="USD">USD $</option>
+                          <option value="EUR">EUR €</option>
+                        </select>
+                      </div>
+                      <div>
                         <label className="block text-xs font-semibold text-slate-500 mb-1">Monthly Price</label>
-                        <div className="flex gap-2">
-                          <select data-testid={`pricing-currency-${plan.tier}`} value={pricingForm.currency || "GBP"} onChange={e => setPricingForm(p => ({ ...p, currency: e.target.value }))} className="border border-slate-200 rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none">
-                            <option value="GBP">GBP £</option>
-                            <option value="USD">USD $</option>
-                            <option value="EUR">EUR €</option>
-                          </select>
-                          <input data-testid={`pricing-price-${plan.tier}`} type="number" step="0.01" min="0" value={pricingForm.price_monthly || ""} onChange={e => setPricingForm(p => ({ ...p, price_monthly: e.target.value }))} className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none" />
-                        </div>
+                        <input data-testid={`pricing-price-${plan.tier}`} type="number" step="0.01" min="0" value={pricingForm.price_monthly || ""} onChange={e => setPricingForm(p => ({ ...p, price_monthly: e.target.value }))} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-500 mb-1">Annual Price {plan.tier !== "season_pass" && <span className="text-slate-400 font-normal">(one-time yearly)</span>}</label>
+                        <input data-testid={`pricing-annual-${plan.tier}`} type="number" step="0.01" min="0" value={pricingForm.price_annual ?? ""} onChange={e => setPricingForm(p => ({ ...p, price_annual: e.target.value }))} placeholder="e.g. 79.00" className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none" />
                       </div>
                     </div>
                     <div>

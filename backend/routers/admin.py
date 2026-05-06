@@ -259,11 +259,13 @@ async def admin_get_pricing(_=Depends(require_admin_token)):
 
 @router.put("/pricing/{tier}")
 async def admin_update_pricing(tier: str, body: dict, _=Depends(require_admin_token)):
-    if tier not in ("basic", "premium", "recruit", "scholarship"):
+    if tier not in ("basic", "premium", "season_pass", "recruit", "scholarship"):
         raise HTTPException(status_code=400, detail="Invalid tier")
     update_data = {"updated_at": _now()}
     if "price_monthly" in body:
         update_data["price_monthly"] = float(body["price_monthly"])
+    if "price_annual" in body and body["price_annual"] not in (None, ""):
+        update_data["price_annual"] = float(body["price_annual"])
     if "currency" in body:
         update_data["currency"] = body["currency"]
     if "description" in body:
@@ -277,7 +279,7 @@ async def admin_update_pricing(tier: str, body: dict, _=Depends(require_admin_to
             lambda: supa.table("pricing_plans").update(update_data).eq("tier", tier).execute()
         )
     except Exception:
-        raise HTTPException(status_code=503, detail="Run supabase_migration_v3.sql first")
+        raise HTTPException(status_code=503, detail="Run supabase_migration_v9.sql first")
     return {"message": "Pricing updated"}
 
 

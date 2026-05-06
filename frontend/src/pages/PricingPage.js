@@ -157,8 +157,26 @@ export default function PricingPage() {
 
   const [annual, setAnnual] = useState(false);
   const [status, setStatus] = useState(null);
+  const [plans, setPlans] = useState({});
   const [loadingPlan, setLoadingPlan] = useState(null);
   const [polling, setPolling] = useState(false);
+
+  // ── Fetch live pricing from DB ─────────────────────────────────────────────
+  useEffect(() => {
+    apiRequest("get", "/subscription/plans")
+      .then(r => setPlans(r.data || {}))
+      .catch(() => {});
+  }, []);
+
+  // Helper: currency symbol
+  const sym = (tier) => plans[tier]?.currency === "USD" ? "$" : plans[tier]?.currency === "EUR" ? "€" : "£";
+  const mo = (tier, fallback) => plans[tier]?.price_monthly != null ? Number(plans[tier].price_monthly).toFixed(2) : fallback;
+  const yr = (tier, fallback) => plans[tier]?.price_annual != null ? Number(plans[tier].price_annual).toFixed(2) : fallback;
+  const moSavings = (tier, moFallback, yrFallback) => {
+    const monthly = plans[tier]?.price_monthly ?? moFallback;
+    const annual = plans[tier]?.price_annual ?? yrFallback;
+    return (monthly * 12 - annual).toFixed(0);
+  };
 
   // ── Fetch subscription status ──────────────────────────────────────────────
   useEffect(() => {
@@ -281,7 +299,7 @@ export default function PricingPage() {
             Start free. Upgrade when you're ready. Every new account gets a full 14-day Scholarship trial — no card required.
           </p>
           <p className="text-xs text-slate-400 mb-3 italic">
-            Scholarship agencies charge £2,000–£5,000 with no guarantees. Scholarship tier: £159 for a full year.
+            Scholarship agencies charge £2,000–£5,000 with no guarantees. Scholarship tier: {sym("premium")}{yr("premium", "159")} for a full year.
           </p>
 
           {/* Billing toggle */}
@@ -297,7 +315,7 @@ export default function PricingPage() {
             </button>
             <span className={`text-sm font-bold transition-colors ${annual ? "text-slate-900" : "text-slate-400"}`}>
               Annual
-              <span className="ml-2 bg-emerald-100 text-emerald-700 text-xs font-black px-2 py-0.5 rounded-full">Save up to £81</span>
+              <span className="ml-2 bg-emerald-100 text-emerald-700 text-xs font-black px-2 py-0.5 rounded-full">Save up to {sym("premium")}{moSavings("premium", 19.99, 159)}</span>
             </span>
           </div>
         </div>
@@ -340,18 +358,18 @@ export default function PricingPage() {
             {annual ? (
               <div>
                 <div className="mb-1">
-                  <span className="text-4xl font-black text-slate-900">£79</span>
+                  <span className="text-4xl font-black text-slate-900">{sym("basic")}{yr("basic", "79")}</span>
                   <span className="text-sm text-slate-400 ml-1">/year</span>
                 </div>
-                <p className="text-xs text-emerald-600 font-bold mb-6">or £9.99/mo — save £41</p>
+                <p className="text-xs text-emerald-600 font-bold mb-6">or {sym("basic")}{mo("basic", "9.99")}/mo — save {sym("basic")}{moSavings("basic", 9.99, 79)}</p>
               </div>
             ) : (
               <div>
                 <div className="mb-1">
-                  <span className="text-4xl font-black text-slate-900">£9.99</span>
+                  <span className="text-4xl font-black text-slate-900">{sym("basic")}{mo("basic", "9.99")}</span>
                   <span className="text-sm text-slate-400 ml-1">/mo</span>
                 </div>
-                <p className="text-xs text-emerald-600 font-bold mb-6">or £79/year — save £41</p>
+                <p className="text-xs text-emerald-600 font-bold mb-6">or {sym("basic")}{yr("basic", "79")}/year — save {sym("basic")}{moSavings("basic", 9.99, 79)}</p>
               </div>
             )}
             <hr className="border-slate-100 mb-6" />
@@ -390,18 +408,18 @@ export default function PricingPage() {
             {annual ? (
               <div>
                 <div className="mb-1">
-                  <span className="text-4xl font-black text-slate-900">£159</span>
+                  <span className="text-4xl font-black text-slate-900">{sym("premium")}{yr("premium", "159")}</span>
                   <span className="text-sm text-slate-400 ml-1">/year</span>
                 </div>
-                <p className="text-xs text-emerald-600 font-bold mb-6">or £19.99/mo — save £81</p>
+                <p className="text-xs text-emerald-600 font-bold mb-6">or {sym("premium")}{mo("premium", "19.99")}/mo — save {sym("premium")}{moSavings("premium", 19.99, 159)}</p>
               </div>
             ) : (
               <div>
                 <div className="mb-1">
-                  <span className="text-4xl font-black text-slate-900">£19.99</span>
+                  <span className="text-4xl font-black text-slate-900">{sym("premium")}{mo("premium", "19.99")}</span>
                   <span className="text-sm text-slate-400 ml-1">/mo</span>
                 </div>
-                <p className="text-xs text-emerald-600 font-bold mb-6">or £159/year — save £81</p>
+                <p className="text-xs text-emerald-600 font-bold mb-6">or {sym("premium")}{yr("premium", "159")}/year — save {sym("premium")}{moSavings("premium", 19.99, 159)}</p>
               </div>
             )}
             <hr className="border-slate-100 mb-6" />
@@ -459,7 +477,7 @@ export default function PricingPage() {
           </div>
           <div className="flex flex-col items-end gap-3 flex-shrink-0">
             <div className="text-right">
-              <span className="text-4xl font-black text-orange-600">£49</span>
+              <span className="text-4xl font-black text-orange-600">{sym("season_pass") || "£"}{mo("season_pass", "49")}</span>
               <p className="text-xs text-slate-400">one-time payment</p>
             </div>
             <button
