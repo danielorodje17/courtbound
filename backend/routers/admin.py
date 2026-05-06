@@ -470,32 +470,40 @@ async def upload_college_image(college_id: str, file: UploadFile = File(...), _=
 async def admin_update_college(college_id: str, data: CollegeUpdate, _=Depends(require_admin_token)):
     # Split coaches out — they live in the coaches table, not the colleges table
     coaches_payload = data.coaches
-    college_fields = {k: v for k, v in data.dict(exclude_none=True).items() if k != "coaches"}
+    college_fields = {k: v for k, v in data.model_dump(exclude_none=True).items() if k != "coaches"}
 
     if college_fields:
-        await run_in_threadpool(lambda: supa.table("colleges").update(college_fields).eq("id", college_id).execute())
+        try:
+            await run_in_threadpool(lambda: supa.table("colleges").update(college_fields).eq("id", college_id).execute())
+        except Exception as e:
+            logger.error(f"College update failed for {college_id}: {e}")
+            raise HTTPException(status_code=500, detail=f"College update failed: {str(e)}")
 
     if coaches_payload is not None:
         # Replace all coaches for this college atomically:
         # delete existing rows, then re-insert the full list from the payload.
-        await run_in_threadpool(lambda: supa.table("coaches").delete().eq("college_id", college_id).execute())
-        if coaches_payload:
-            rows = []
-            for coach in coaches_payload:
-                row = {
-                    "college_id": college_id,
-                    "name":         coach.get("name", ""),
-                    "title":        coach.get("title", "Head Coach"),
-                    "email":        coach.get("email", ""),
-                    "phone":        coach.get("phone", ""),
-                    "last_verified": coach.get("last_verified") or None,
-                    "sort_order":   coach.get("sort_order", 0),
-                }
-                if coach.get("id"):        # preserve UUID for existing rows
-                    row["id"] = coach["id"]
-                rows.append(row)
-            await run_in_threadpool(lambda: supa.table("coaches").insert(rows).execute())
-        logger.info(f"College {college_id}: coaches upserted ({len(coaches_payload)} rows)")
+        try:
+            await run_in_threadpool(lambda: supa.table("coaches").delete().eq("college_id", college_id).execute())
+            if coaches_payload:
+                rows = []
+                for coach in coaches_payload:
+                    row = {
+                        "college_id": college_id,
+                        "name":         coach.get("name", ""),
+                        "title":        coach.get("title", "Head Coach"),
+                        "email":        coach.get("email", ""),
+                        "phone":        coach.get("phone", ""),
+                        "last_verified": coach.get("last_verified") or None,
+                        "sort_order":   coach.get("sort_order", 0),
+                    }
+                    if coach.get("id"):        # preserve UUID for existing rows
+                        row["id"] = coach["id"]
+                    rows.append(row)
+                await run_in_threadpool(lambda: supa.table("coaches").insert(rows).execute())
+            logger.info(f"College {college_id}: coaches upserted ({len(coaches_payload)} rows)")
+        except Exception as e:
+            logger.error(f"Coach update failed for college {college_id}: {e}")
+            raise HTTPException(status_code=500, detail=f"Coach update failed: {str(e)}")
 
     return {"message": "Updated"}
 

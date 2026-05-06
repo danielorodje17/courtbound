@@ -203,6 +203,7 @@ class CollegeUpdate(BaseModel):
     scholarship_type: Optional[str] = None
     notable_alumni: Optional[str] = None
     image_url: Optional[str] = None
+    program_gender: Optional[str] = None
     coaches: Optional[List[dict]] = None   # Upserted separately into coaches table
 
 
