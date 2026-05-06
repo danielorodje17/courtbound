@@ -18,7 +18,7 @@ Build "CourtBound," a web app to track USA and UK college basketball scholarship
 - **Admin**: CourtBound admin managing users, colleges, and settings
 
 ## Core Features Implemented
-- [x] College browsing with search/filter (USA + optional UK/European)
+- [x] College browsing with search/filter (USA only — European colleges permanently removed)
 - [x] College tracking (bookmark colleges)
 - [x] Coach contact directory with verified badges
 - [x] Email logging & response tracking
@@ -27,14 +27,17 @@ Build "CourtBound," a web app to track USA and UK college basketball scholarship
 - [x] Profile management
 - [x] College comparison tool
 - [x] Admin panel: user management, reports, settings, college management
-- [x] Google OAuth login via Supabase Auth (PKCE flow) — replaces Emergent Auth
+- [x] Email/Password auth + Emergent-managed Google Auth
 - [x] Email address reporting (wrong email clears verification badge)
-- [x] Subscription/Trial system (14-day free trial)
-- [x] Pricing page (/pricing) with 3-tier comparison
+- [x] Subscription/Trial system (14-day free trial, Stripe live keys)
+- [x] Pricing page (/pricing) with Monthly/Annual/Season Pass tiers
 - [x] Trial countdown banner on dashboard
-- [x] Admin pricing management (requires migration v3)
-- [x] Background scheduler for trial email reminders (day 7 + day 11)
-- [x] Admin college image upload → Supabase Storage (bucket: college-images, public)
+- [x] Admin pricing management
+- [x] Background scheduler for trial email reminders
+- [x] Admin college image upload → Supabase Storage
+- [x] Legal Documents (Privacy Policy / Terms of Use) — admin editor + public pages
+- [x] Promo Code system — admin generation, user redemption to extend trial/sub
+- [x] **European universities permanently removed** (43 DB entries deleted, all UI/backend code cleaned)
 
 ## Database Schema (Supabase/PostgreSQL)
 ### users
