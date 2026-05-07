@@ -1,0 +1,44 @@
+{
+  "summary": "Tested promo code discount feature end-to-end. Backend APIs working correctly. Admin Promo Codes tab had a critical bug (wrong localStorage key) that was fixed. All features verified after fix.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "bugs_fixed": [
+    {
+      "file": "/app/frontend/src/pages/AdminPage.js",
+      "issue": "CRITICAL: AdminPromoCodes and AdminLegalEditor components used localStorage.getItem('admin_token') but admin login stores token as 'cb_admin_token'. Caused 401 errors on all promo admin API calls, showing empty codes list.",
+      "fix": "Changed both occurrences from 'admin_token' to 'cb_admin_token' at lines 106 and 370"
+    }
+  ],
+  "features_verified": {
+    "backend_validate_annual50": "PASS — GET /api/promo/validate?code=ANNUAL50 returns type=discount, discount_percent=50.0, applicable_plan_type=annual",
+    "backend_validate_extend30": "PASS — GET /api/promo/validate?code=EXTEND30 returns type=extension, extension_days=30",
+    "backend_validate_fakecode": "PASS — GET /api/promo/validate?code=FAKECODE returns 400 with error detail",
+    "admin_promo_tab_loads": "PASS — ANNUAL50 (green '50% off'), EXTEND30 (+30 days orange), EXTEND14 (+14 days orange) all visible",
+    "admin_code_type_toggle": "PASS — 'Time Extension' and '% Discount at Checkout' buttons visible in form",
+    "admin_discount_fields": "PASS — Selecting '% Discount at Checkout' shows 'Discount %' input and 'Applies To' field",
+    "admin_create_discount_code": "PASS — Created LAUNCH50 discount code, appears in table with green badge",
+    "pricing_promo_section": "PASS — 'Have a promo code?' collapsible visible on /pricing",
+    "pricing_annual50_applied": "PASS — ANNUAL50 shows green banner '50% off annual plans' with ANNUAL50 badge",
+    "pricing_strikethrough_annual": "PASS — Annual plan shows discounted price with strikethrough original",
+    "pricing_monthly_not_discounted": "PASS — Monthly plans NOT discounted when ANNUAL50 applied (annual-only code)",
+    "pricing_remove_discount": "PASS — Remove button clears discount banner and prices return to normal"
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "AdminPage.js has inconsistent localStorage key usage — multiple sub-components use 'admin_token' while the login flow stores 'cb_admin_token'. Only 2 found and fixed; recommend auditing the full file for any remaining 'admin_token' references."
+  ],
+  "updated_files": ["/app/frontend/src/pages/AdminPage.js"],
+  "success_rate": {"backend": "100%", "frontend": "100% (after fix)"},
+  "seed_data_creation": "Created test code LAUNCH50 (50% discount) via admin panel during testing",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Discount promo codes fully working. Admin panel shows codes with correct badges. Pricing page applies discount with strikethrough prices. Bug fixed: AdminPromoCodes was reading 'admin_token' instead of 'cb_admin_token' from localStorage causing 401s."
+}
