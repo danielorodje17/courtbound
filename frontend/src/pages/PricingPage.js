@@ -94,22 +94,36 @@ function PlanCard({ col, children, highlight, badge }) {
   );
 }
 
-function PromoCodeInput({ onSuccess }) {
+function PromoCodeInput({ onExtensionSuccess, onDiscountApplied, appliedDiscount, onClearDiscount }) {
   const [open, setOpen]       = useState(false);
   const [code, setCode]       = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
   const [success, setSuccess] = useState("");
 
-  const handleRedeem = async (e) => {
+  const handleApply = async (e) => {
     e.preventDefault();
     setError(""); setSuccess("");
+    if (!code.trim()) return;
     setLoading(true);
     try {
-      const res = await apiRequest("post", "/promo/redeem", { code: code.trim().toUpperCase() });
-      setSuccess(res.data.message);
-      setCode("");
-      if (onSuccess) onSuccess();
+      // First validate without redeeming
+      const validateRes = await apiRequest("get", `/promo/validate?code=${code.trim().toUpperCase()}`);
+      const promo = validateRes.data;
+
+      if (promo.type === "discount") {
+        const planLabel = promo.applicable_plan_type === "annual" ? "annual plans"
+          : promo.applicable_plan_type === "monthly" ? "monthly plans" : "all plans";
+        onDiscountApplied({ code: code.trim().toUpperCase(), ...promo });
+        setSuccess(`${promo.discount_percent}% discount applied to ${planLabel}!`);
+        setCode("");
+      } else {
+        // Extension code — redeem immediately
+        const redeemRes = await apiRequest("post", "/promo/redeem", { code: code.trim().toUpperCase() });
+        setSuccess(redeemRes.data.message);
+        setCode("");
+        if (onExtensionSuccess) onExtensionSuccess();
+      }
     } catch (err) {
       setError(err?.response?.data?.detail || "Invalid code. Please try again.");
     }
@@ -119,14 +133,27 @@ function PromoCodeInput({ onSuccess }) {
   return (
     <div className="bg-white border border-slate-200 rounded-2xl px-8 py-5 mb-6">
       <button
-        onClick={() => { setOpen(o => !o); setError(""); setSuccess(""); }}
+        onClick={() => { setOpen(o => !o); setError(""); }}
         className="flex items-center justify-between w-full text-sm font-bold text-slate-600 hover:text-slate-900 transition-colors"
       >
         <span>Have a promo code?</span>
         <span className="text-slate-400 text-lg leading-none">{open ? "−" : "+"}</span>
       </button>
-      {open && (
-        <form onSubmit={handleRedeem} className="mt-4 flex gap-3">
+
+      {/* Applied discount banner */}
+      {appliedDiscount && (
+        <div className="mt-3 flex items-center justify-between bg-green-50 border border-green-200 rounded-xl px-4 py-2.5">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-green-500" />
+            <span className="text-green-700 text-sm font-bold">{appliedDiscount.discount_percent}% off {appliedDiscount.applicable_plan_type === "all" ? "all plans" : appliedDiscount.applicable_plan_type + " plans"}</span>
+            <span className="text-green-600 text-xs font-mono bg-green-100 px-2 py-0.5 rounded">{appliedDiscount.code}</span>
+          </div>
+          <button onClick={onClearDiscount} className="text-slate-400 hover:text-red-500 text-xs font-bold transition-colors">Remove</button>
+        </div>
+      )}
+
+      {open && !appliedDiscount && (
+        <form onSubmit={handleApply} className="mt-4 flex gap-3">
           <input
             data-testid="promo-code-user-input"
             value={code}
@@ -146,7 +173,7 @@ function PromoCodeInput({ onSuccess }) {
         </form>
       )}
       {error   && <p className="mt-3 text-xs text-red-600 font-semibold">{error}</p>}
-      {success && <p className="mt-3 text-xs text-emerald-600 font-semibold">{success}</p>}
+      {success && !appliedDiscount && <p className="mt-3 text-xs text-emerald-600 font-semibold">{success}</p>}
     </div>
   );
 }
@@ -160,6 +187,7 @@ export default function PricingPage() {
   const [plans, setPlans] = useState({});
   const [loadingPlan, setLoadingPlan] = useState(null);
   const [polling, setPolling] = useState(false);
+  const [appliedDiscount, setAppliedDiscount] = useState(null); // {code, discount_percent, applicable_plan_type}
 
   // ── Fetch live pricing from DB ─────────────────────────────────────────────
   useEffect(() => {
@@ -228,14 +256,32 @@ export default function PricingPage() {
     setLoadingPlan(planKey);
     try {
       const origin = window.location.origin;
-      const res = await apiRequest("post", "/subscription/checkout", { plan_key: planKey, origin });
-      if (res.data?.url) {
-        window.location.href = res.data.url;
+      const body = { plan_key: planKey, origin };
+      // Apply discount code if valid for this plan type
+      if (appliedDiscount) {
+        const pt = appliedDiscount.applicable_plan_type;
+        const isApplicable = pt === "all"
+          || (pt === "annual" && planKey.endsWith("_annual"))
+          || (pt === "monthly" && planKey.endsWith("_monthly"));
+        if (isApplicable) body.promo_code = appliedDiscount.code;
       }
+      const res = await apiRequest("post", "/subscription/checkout", body);
+      if (res.data?.url) window.location.href = res.data.url;
     } catch (err) {
       toast.error(err?.response?.data?.detail || "Could not start checkout. Please try again.");
     }
     setLoadingPlan(null);
+  };
+
+  // ── Discount price helper ──────────────────────────────────────────────────
+  const discountedPrice = (planKey, originalPrice) => {
+    if (!appliedDiscount || !originalPrice) return null;
+    const pt = appliedDiscount.applicable_plan_type;
+    const isApplicable = pt === "all"
+      || (pt === "annual" && planKey.endsWith("_annual"))
+      || (pt === "monthly" && planKey.endsWith("_monthly"));
+    if (!isApplicable) return null;
+    return (Number(originalPrice) * (1 - appliedDiscount.discount_percent / 100)).toFixed(2);
   };
 
   const currentTier = status?.subscription_tier;
@@ -357,18 +403,38 @@ export default function PricingPage() {
             <p className="text-slate-400 text-sm mb-5">Structure your search</p>
             {annual ? (
               <div>
-                <div className="mb-1">
-                  <span className="text-4xl font-black text-slate-900">{sym("basic")}{yr("basic", "79")}</span>
-                  <span className="text-sm text-slate-400 ml-1">/year</span>
+                <div className="mb-1 flex items-baseline gap-2 flex-wrap">
+                  {discountedPrice("recruit_annual", yr("basic", "79")) ? (
+                    <>
+                      <span className="text-4xl font-black text-slate-900">{sym("basic")}{discountedPrice("recruit_annual", yr("basic", "79"))}</span>
+                      <span className="text-sm text-slate-400 line-through">{sym("basic")}{yr("basic", "79")}</span>
+                    </>
+                  ) : (
+                    <span className="text-4xl font-black text-slate-900">{sym("basic")}{yr("basic", "79")}</span>
+                  )}
+                  <span className="text-sm text-slate-400">/year</span>
                 </div>
+                {discountedPrice("recruit_annual", yr("basic", "79")) && (
+                  <p className="text-xs text-green-600 font-bold mb-2">{appliedDiscount?.discount_percent}% discount applied</p>
+                )}
                 <p className="text-xs text-emerald-600 font-bold mb-6">or {sym("basic")}{mo("basic", "9.99")}/mo — save {sym("basic")}{moSavings("basic", 9.99, 79)}</p>
               </div>
             ) : (
               <div>
-                <div className="mb-1">
-                  <span className="text-4xl font-black text-slate-900">{sym("basic")}{mo("basic", "9.99")}</span>
-                  <span className="text-sm text-slate-400 ml-1">/mo</span>
+                <div className="mb-1 flex items-baseline gap-2 flex-wrap">
+                  {discountedPrice("recruit_monthly", mo("basic", "9.99")) ? (
+                    <>
+                      <span className="text-4xl font-black text-slate-900">{sym("basic")}{discountedPrice("recruit_monthly", mo("basic", "9.99"))}</span>
+                      <span className="text-sm text-slate-400 line-through">{sym("basic")}{mo("basic", "9.99")}</span>
+                    </>
+                  ) : (
+                    <span className="text-4xl font-black text-slate-900">{sym("basic")}{mo("basic", "9.99")}</span>
+                  )}
+                  <span className="text-sm text-slate-400">/mo</span>
                 </div>
+                {discountedPrice("recruit_monthly", mo("basic", "9.99")) && (
+                  <p className="text-xs text-green-600 font-bold mb-2">{appliedDiscount?.discount_percent}% discount applied</p>
+                )}
                 <p className="text-xs text-emerald-600 font-bold mb-6">or {sym("basic")}{yr("basic", "79")}/year — save {sym("basic")}{moSavings("basic", 9.99, 79)}</p>
               </div>
             )}
@@ -407,18 +473,38 @@ export default function PricingPage() {
             <p className="text-slate-400 text-sm mb-5">Everything you need to land an offer</p>
             {annual ? (
               <div>
-                <div className="mb-1">
-                  <span className="text-4xl font-black text-slate-900">{sym("premium")}{yr("premium", "159")}</span>
-                  <span className="text-sm text-slate-400 ml-1">/year</span>
+                <div className="mb-1 flex items-baseline gap-2 flex-wrap">
+                  {discountedPrice("scholarship_annual", yr("premium", "159")) ? (
+                    <>
+                      <span className="text-4xl font-black text-slate-900">{sym("premium")}{discountedPrice("scholarship_annual", yr("premium", "159"))}</span>
+                      <span className="text-sm text-slate-400 line-through">{sym("premium")}{yr("premium", "159")}</span>
+                    </>
+                  ) : (
+                    <span className="text-4xl font-black text-slate-900">{sym("premium")}{yr("premium", "159")}</span>
+                  )}
+                  <span className="text-sm text-slate-400">/year</span>
                 </div>
+                {discountedPrice("scholarship_annual", yr("premium", "159")) && (
+                  <p className="text-xs text-green-600 font-bold mb-2">{appliedDiscount?.discount_percent}% discount applied</p>
+                )}
                 <p className="text-xs text-emerald-600 font-bold mb-6">or {sym("premium")}{mo("premium", "19.99")}/mo — save {sym("premium")}{moSavings("premium", 19.99, 159)}</p>
               </div>
             ) : (
               <div>
-                <div className="mb-1">
-                  <span className="text-4xl font-black text-slate-900">{sym("premium")}{mo("premium", "19.99")}</span>
-                  <span className="text-sm text-slate-400 ml-1">/mo</span>
+                <div className="mb-1 flex items-baseline gap-2 flex-wrap">
+                  {discountedPrice("scholarship_monthly", mo("premium", "19.99")) ? (
+                    <>
+                      <span className="text-4xl font-black text-slate-900">{sym("premium")}{discountedPrice("scholarship_monthly", mo("premium", "19.99"))}</span>
+                      <span className="text-sm text-slate-400 line-through">{sym("premium")}{mo("premium", "19.99")}</span>
+                    </>
+                  ) : (
+                    <span className="text-4xl font-black text-slate-900">{sym("premium")}{mo("premium", "19.99")}</span>
+                  )}
+                  <span className="text-sm text-slate-400">/mo</span>
                 </div>
+                {discountedPrice("scholarship_monthly", mo("premium", "19.99")) && (
+                  <p className="text-xs text-green-600 font-bold mb-2">{appliedDiscount?.discount_percent}% discount applied</p>
+                )}
                 <p className="text-xs text-emerald-600 font-bold mb-6">or {sym("premium")}{yr("premium", "159")}/year — save {sym("premium")}{moSavings("premium", 19.99, 159)}</p>
               </div>
             )}
@@ -493,10 +579,15 @@ export default function PricingPage() {
         </div>
 
         {/* ── Promo Code ──────────────────────────────────────────────── */}
-        <PromoCodeInput onSuccess={async () => {
-          const r = await apiRequest("get", "/subscription/status");
-          setStatus(r.data);
-        }} />
+        <PromoCodeInput
+          onExtensionSuccess={async () => {
+            const r = await apiRequest("get", "/subscription/status");
+            setStatus(r.data);
+          }}
+          onDiscountApplied={setAppliedDiscount}
+          appliedDiscount={appliedDiscount}
+          onClearDiscount={() => setAppliedDiscount(null)}
+        />
 
         {/* Trial note */}
         <div className="text-center bg-white border border-slate-200 rounded-2xl px-8 py-6">

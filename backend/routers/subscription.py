@@ -101,12 +101,40 @@ async def create_checkout(
 ):
     plan_key = body.get("plan_key")
     origin = body.get("origin", "").rstrip("/")
+    promo_code = (body.get("promo_code") or "").strip().upper() or None
 
     if plan_key not in PLANS:
         raise HTTPException(status_code=400, detail="Invalid plan")
 
     plan = PLANS[plan_key]
     live_amount = await _get_plan_amount(plan_key)
+
+    # Apply percentage discount if a valid discount promo code is supplied
+    discount_percent = 0.0
+    if promo_code:
+        try:
+            promo_res = await run_in_threadpool(
+                lambda: supa.table("promo_codes").select("*").eq("code", promo_code).execute()
+            )
+            if promo_res.data:
+                promo = promo_res.data[0]
+                dp = promo.get("discount_percent")
+                plan_type = promo.get("applicable_plan_type", "all")
+                is_valid = (
+                    promo.get("is_active")
+                    and dp is not None
+                    and (
+                        plan_type == "all"
+                        or (plan_type == "annual" and plan_key.endswith("_annual"))
+                        or (plan_type == "monthly" and plan_key.endswith("_monthly"))
+                    )
+                )
+                if is_valid:
+                    discount_percent = float(dp)
+                    live_amount = round(live_amount * (1 - discount_percent / 100), 2)
+        except Exception:
+            pass  # Don't block checkout if promo validation fails
+
     host_url = str(request.base_url)
     webhook_url = f"{host_url}api/webhook/stripe"
 
@@ -121,6 +149,8 @@ async def create_checkout(
         "plan_key": plan_key,
         "tier": plan["tier"],
         "days": str(plan["days"]),
+        "promo_code": promo_code or "",
+        "discount_percent": str(discount_percent),
     }
 
     checkout_req = CheckoutSessionRequest(
@@ -132,13 +162,12 @@ async def create_checkout(
     )
     session = await stripe.create_checkout_session(checkout_req)
 
-    # Store pending transaction (best-effort — requires migration v6)
     try:
         await run_in_threadpool(
             lambda: supa.table("payment_transactions").insert({
                 "session_id": session.session_id,
                 "user_id": str(current_user.user_id),
-                "amount": float(plan["amount"]),
+                "amount": float(live_amount),
                 "currency": plan["currency"],
                 "plan_key": plan_key,
                 "tier": plan["tier"],
@@ -149,7 +178,7 @@ async def create_checkout(
             }).execute()
         )
     except Exception:
-        pass  # Table not yet created — run supabase_migration_v6.sql
+        pass
 
     return {"url": session.url, "session_id": session.session_id}
 
@@ -201,6 +230,12 @@ async def get_checkout_status(
                 "subscription_expires_at": expires_at,
             }).eq("id", user_id).execute()
         )
+
+        # Record discount promo code redemption
+        promo_code = meta.get("promo_code", "").strip().upper()
+        if promo_code:
+            from routers.promo import record_discount_redemption
+            await record_discount_redemption(promo_code, user_id)
 
         try:
             await run_in_threadpool(

@@ -112,7 +112,8 @@ function AdminPromoCodes() {
   const [showForm, setShowForm]   = useState(false);
   const [deleting, setDeleting]   = useState(null);
   const [toggling, setToggling]   = useState(null);
-  const [form, setForm]           = useState({ code: "", extension_days: "14", max_uses: "", description: "", expires_at: "" });
+  const BLANK_FORM = { code: "", code_type: "extension", extension_days: "30", discount_percent: "50", applicable_plan_type: "annual", max_uses: "", description: "", expires_at: "" };
+  const [form, setForm]           = useState(BLANK_FORM);
   const [formError, setFormError] = useState("");
   const [creating, setCreating]   = useState(false);
 
@@ -131,13 +132,21 @@ function AdminPromoCodes() {
     setFormError("");
     setCreating(true);
     try {
-      await adminReq("post", "/promo/admin/codes", {
-        ...form,
-        extension_days: parseInt(form.extension_days),
+      const payload = {
+        code: form.code,
+        code_type: form.code_type,
         max_uses: form.max_uses ? parseInt(form.max_uses) : null,
         expires_at: form.expires_at || null,
-      });
-      setForm({ code: "", extension_days: "14", max_uses: "", description: "", expires_at: "" });
+        description: form.description,
+      };
+      if (form.code_type === "discount") {
+        payload.discount_percent = parseFloat(form.discount_percent);
+        payload.applicable_plan_type = form.applicable_plan_type;
+      } else {
+        payload.extension_days = parseInt(form.extension_days);
+      }
+      await adminReq("post", "/promo/admin/codes", payload);
+      setForm(BLANK_FORM);
       setShowForm(false);
       await load();
     } catch (err) {
@@ -181,7 +190,7 @@ function AdminPromoCodes() {
           <h2 className="text-xl font-black text-slate-900" style={{ fontFamily: "Barlow Condensed, sans-serif", textTransform: "uppercase" }}>
             Promo Codes
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">Codes extend trial or subscription access. Toggle off to disable without deleting.</p>
+          <p className="text-xs text-slate-400 mt-0.5">Create time-extension codes or percentage discount codes for checkout.</p>
         </div>
         <button
           onClick={() => { setShowForm(s => !s); setFormError(""); }}
@@ -196,6 +205,21 @@ function AdminPromoCodes() {
         <form onSubmit={handleCreate} className="bg-white border-2 border-orange-200 rounded-xl p-6 space-y-4">
           <h3 className="text-sm font-black text-slate-800 mb-2">New Promo Code</h3>
           {formError && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{formError}</p>}
+
+          {/* Code type toggle */}
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-2">Code Type *</label>
+            <div className="flex gap-2">
+              {[{ v: "extension", label: "Time Extension" }, { v: "discount", label: "% Discount at Checkout" }].map(t => (
+                <button key={t.v} type="button"
+                  onClick={() => setForm(f => ({ ...f, code_type: t.v }))}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold border transition-all ${form.code_type === t.v ? "bg-slate-900 text-white border-slate-900" : "border-slate-200 text-slate-500 hover:border-slate-400"}`}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-slate-500 mb-1">Code *</label>
@@ -203,28 +227,59 @@ function AdminPromoCodes() {
                 data-testid="promo-code-input"
                 value={form.code}
                 onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase() }))}
-                placeholder="e.g. EXTEND14"
+                placeholder={form.code_type === "discount" ? "e.g. ANNUAL50" : "e.g. EXTEND30"}
                 required
                 className="w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-sm font-mono uppercase focus:outline-none focus:border-orange-400"
               />
             </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1">Extension *</label>
-              <select
-                data-testid="promo-days-select"
-                value={form.extension_days}
-                onChange={e => setForm(f => ({ ...f, extension_days: e.target.value }))}
-                className="w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-orange-400"
-              >
-                {DAYS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-            </div>
+
+            {form.code_type === "extension" ? (
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">Extension *</label>
+                <select
+                  data-testid="promo-days-select"
+                  value={form.extension_days}
+                  onChange={e => setForm(f => ({ ...f, extension_days: e.target.value }))}
+                  className="w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-orange-400"
+                >
+                  {DAYS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">Discount % *</label>
+                  <div className="relative">
+                    <input type="number" min="1" max="100" step="1"
+                      data-testid="promo-discount-input"
+                      value={form.discount_percent}
+                      onChange={e => setForm(f => ({ ...f, discount_percent: e.target.value }))}
+                      placeholder="50"
+                      required
+                      className="w-full border-2 border-slate-200 rounded-xl px-3 py-2 pr-8 text-sm focus:outline-none focus:border-orange-400"
+                    />
+                    <span className="absolute right-3 top-2.5 text-slate-400 text-sm font-bold">%</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">Applies To *</label>
+                  <select
+                    data-testid="promo-plan-type-select"
+                    value={form.applicable_plan_type}
+                    onChange={e => setForm(f => ({ ...f, applicable_plan_type: e.target.value }))}
+                    className="w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-orange-400"
+                  >
+                    <option value="all">All plans</option>
+                    <option value="annual">Annual plans only</option>
+                    <option value="monthly">Monthly plans only</option>
+                  </select>
+                </div>
+              </>
+            )}
+
             <div>
               <label className="block text-xs font-bold text-slate-500 mb-1">Max uses (blank = unlimited)</label>
-              <input
-                type="number"
-                min="1"
-                value={form.max_uses}
+              <input type="number" min="1" value={form.max_uses}
                 onChange={e => setForm(f => ({ ...f, max_uses: e.target.value }))}
                 placeholder="Unlimited"
                 className="w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-orange-400"
@@ -232,9 +287,7 @@ function AdminPromoCodes() {
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-500 mb-1">Expires on (optional)</label>
-              <input
-                type="date"
-                value={form.expires_at}
+              <input type="date" value={form.expires_at}
                 onChange={e => setForm(f => ({ ...f, expires_at: e.target.value }))}
                 className="w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-orange-400"
               />
@@ -242,19 +295,14 @@ function AdminPromoCodes() {
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-500 mb-1">Description (internal note)</label>
-            <input
-              value={form.description}
+            <input value={form.description}
               onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-              placeholder="e.g. Sent to athletes at London tournament"
+              placeholder={form.code_type === "discount" ? "e.g. 50% off annual — summer campaign" : "e.g. Sent to athletes at London tournament"}
               className="w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-orange-400"
             />
           </div>
-          <button
-            type="submit"
-            disabled={creating}
-            data-testid="promo-create-btn"
-            className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-6 py-2.5 rounded-xl text-sm transition-colors disabled:opacity-60"
-          >
+          <button type="submit" disabled={creating} data-testid="promo-create-btn"
+            className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-6 py-2.5 rounded-xl text-sm transition-colors disabled:opacity-60">
             {creating ? "Creating…" : "Create Code"}
           </button>
         </form>
@@ -270,7 +318,7 @@ function AdminPromoCodes() {
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                {["Code", "Extension", "Uses", "Expires", "Description", "Status", "Actions"].map(h => (
+                {["Code", "Type / Benefit", "Uses", "Expires", "Description", "Status", "Actions"].map(h => (
                   <th key={h} className="text-left text-xs font-bold text-slate-500 px-4 py-3">{h}</th>
                 ))}
               </tr>
@@ -280,31 +328,30 @@ function AdminPromoCodes() {
                 <tr key={c.code} className="hover:bg-slate-50">
                   <td className="px-4 py-3 font-mono font-bold text-slate-900 text-xs">{c.code}</td>
                   <td className="px-4 py-3">
-                    <span className="bg-orange-100 text-orange-700 text-xs font-bold px-2 py-0.5 rounded-full">+{c.extension_days} days</span>
+                    {c.discount_percent != null ? (
+                      <div className="flex flex-col gap-0.5">
+                        <span className="bg-green-100 text-green-700 text-xs font-bold px-2 py-0.5 rounded-full w-fit">
+                          {c.discount_percent}% off
+                        </span>
+                        <span className="text-slate-400 text-xs capitalize">{c.applicable_plan_type || "all"} plans</span>
+                      </div>
+                    ) : (
+                      <span className="bg-orange-100 text-orange-700 text-xs font-bold px-2 py-0.5 rounded-full">+{c.extension_days} days</span>
+                    )}
                   </td>
-                  <td className="px-4 py-3 text-slate-600 text-xs">
-                    {c.use_count}{c.max_uses ? ` / ${c.max_uses}` : " / ∞"}
-                  </td>
-                  <td className="px-4 py-3 text-slate-500 text-xs">
-                    {c.expires_at ? new Date(c.expires_at).toLocaleDateString("en-GB") : "Never"}
-                  </td>
+                  <td className="px-4 py-3 text-slate-600 text-xs">{c.use_count}{c.max_uses ? ` / ${c.max_uses}` : " / ∞"}</td>
+                  <td className="px-4 py-3 text-slate-500 text-xs">{c.expires_at ? new Date(c.expires_at).toLocaleDateString("en-GB") : "Never"}</td>
                   <td className="px-4 py-3 text-slate-500 text-xs max-w-[160px] truncate">{c.description || "—"}</td>
                   <td className="px-4 py-3">
-                    <button
-                      data-testid={`toggle-${c.code}`}
-                      onClick={() => toggleActive(c.code, c.is_active)}
-                      disabled={toggling === c.code}
-                      className={`relative w-10 h-5 rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-50 ${c.is_active ? "bg-emerald-500" : "bg-slate-300"}`}
-                    >
+                    <button data-testid={`toggle-${c.code}`}
+                      onClick={() => toggleActive(c.code, c.is_active)} disabled={toggling === c.code}
+                      className={`relative w-10 h-5 rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-50 ${c.is_active ? "bg-emerald-500" : "bg-slate-300"}`}>
                       <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${c.is_active ? "translate-x-5" : "translate-x-0.5"}`} />
                     </button>
                   </td>
                   <td className="px-4 py-3">
-                    <button
-                      onClick={() => deleteCode(c.code)}
-                      disabled={deleting === c.code}
-                      className="text-xs text-red-500 hover:text-red-700 font-bold transition-colors disabled:opacity-50"
-                    >
+                    <button onClick={() => deleteCode(c.code)} disabled={deleting === c.code}
+                      className="text-xs text-red-500 hover:text-red-700 font-bold transition-colors disabled:opacity-50">
                       {deleting === c.code ? "Deleting…" : "Delete"}
                     </button>
                   </td>
