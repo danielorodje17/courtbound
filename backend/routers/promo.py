@@ -224,19 +224,24 @@ async def create_promo_code(body: dict, _=Depends(require_admin_token)):
         max_uses = int(max_uses) if max_uses else None
     expires_at = body.get("expires_at") or None
 
+    row = {
+        "code": code,
+        "is_active": True,
+        "max_uses": max_uses,
+        "use_count": 0,
+        "description": (body.get("description") or "").strip(),
+        "expires_at": expires_at,
+    }
+    if extension_days is not None:
+        row["extension_days"] = extension_days
+    if discount_percent is not None:
+        row["discount_percent"] = discount_percent
+    if applicable_plan_type is not None:
+        row["applicable_plan_type"] = applicable_plan_type
+
     try:
         res = await run_in_threadpool(
-            lambda: supa.table("promo_codes").insert({
-                "code": code,
-                "extension_days": extension_days,
-                "discount_percent": discount_percent,
-                "applicable_plan_type": applicable_plan_type,
-                "is_active": True,
-                "max_uses": max_uses,
-                "use_count": 0,
-                "description": (body.get("description") or "").strip(),
-                "expires_at": expires_at,
-            }).execute()
+            lambda: supa.table("promo_codes").insert(row).execute()
         )
         return res.data[0] if res.data else {"code": code}
     except Exception as e:
