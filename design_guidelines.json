@@ -1,101 +1,69 @@
 {
-  "project_context": {
-    "domain": "College Basketball Scholarship Tracker (Women's Division)",
-    "target_audience": "Female high school athletes, their parents, and college coaches",
-    "theme_archetype": "Archetype 2 (Performance Pro) + Archetype 5 (Jewel & Luxury)",
-    "visual_mood": "Premium, highly athletic, empowering, focused, and distinct from the Men's division. Emphasis on speed, agility, and elite collegiate aesthetics."
-  },
+  "theme": "Dark",
+  "archetype": "Performance Pro (Elite Athleticism & Precision)",
   "colors": {
-    "strategy": "Contrasting with the Men's Dark Slate & Orange, the Women's division uses a richer, deeper Navy (Midnight) paired with a high-energy Electric Rose/Coral to evoke a powerful, modern, and elite WNBA/NCAA aesthetic.",
-    "css_variables": {
-      "light": {
-        "--background": "0 0% 98%",
-        "--foreground": "226 70% 10%",
-        "--sidebar-bg": "227 60% 10%",
-        "--sidebar-foreground": "0 0% 100%",
-        "--card": "0 0% 100%",
-        "--card-foreground": "226 70% 10%",
-        "--border": "60 5% 90%",
-        "--primary": "348 83% 47%",
-        "--primary-foreground": "0 0% 100%",
-        "--primary-hover": "348 83% 37%",
-        "--secondary": "227 20% 94%",
-        "--secondary-foreground": "226 70% 10%",
-        "--muted": "227 20% 94%",
-        "--muted-foreground": "227 15% 45%",
-        "--accent": "348 83% 47%",
-        "--accent-foreground": "0 0% 100%"
-      }
-    },
-    "tailwind_palette_mapping": {
-      "background": "bg-stone-50",
-      "sidebar": "bg-indigo-950 (Midnight Navy)",
-      "primary": "bg-rose-600 (Electric Rose)",
-      "primary_hover": "hover:bg-rose-700",
-      "card_border": "border-stone-200"
-    }
+    "background_base": "bg-slate-950",
+    "background_surface": "bg-slate-900/50",
+    "background_elevated": "bg-slate-800/40",
+    "primary_accent": "text-blue-500",
+    "secondary_accent": "text-orange-500",
+    "gradient_primary": "bg-gradient-to-r from-blue-600 to-blue-400",
+    "gradient_text": "bg-clip-text text-transparent bg-gradient-to-br from-white via-blue-100 to-slate-400",
+    "gradient_text_accent": "bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-blue-600",
+    "text_main": "text-slate-50",
+    "text_muted": "text-slate-400"
   },
   "typography": {
-    "strategy": "Avoid the Men's condensed, industrial look (Barlow Condensed). Use a geometric, wide, and highly legible modern sans-serif that breathes and feels premium. No Inter for headings.",
-    "fonts": {
-      "headings": {
-        "family": "Outfit",
-        "weights": ["600", "700", "800"],
-        "description": "Modern, clean, slight geometric curve. Gives a high-end tech/athletic feel."
-      },
-      "body": {
-        "family": "DM Sans",
-        "weights": ["400", "500"],
-        "description": "Excellent readability for data-heavy dashboards, tracks well at small sizes."
-      }
-    },
-    "scale": {
-      "h1": "text-4xl sm:text-5xl tracking-tight leading-none",
-      "h2": "text-3xl sm:text-4xl tracking-tight",
-      "h3": "text-xl sm:text-2xl font-semibold",
-      "body": "text-base leading-relaxed text-slate-700",
-      "labels": "text-xs tracking-[0.15em] uppercase font-bold text-slate-500"
+    "headings": "font-black uppercase tracking-tighter",
+    "body": "font-sans tracking-wide leading-relaxed",
+    "sizes": {
+      "h1": "text-5xl md:text-7xl lg:text-8xl",
+      "h2": "text-4xl md:text-5xl lg:text-6xl",
+      "h3": "text-xl md:text-2xl",
+      "body": "text-base md:text-lg",
+      "massive_bg_text": "text-8xl md:text-9xl"
     }
   },
   "layout_and_spacing": {
-    "strategy": "Move away from the Men's tightly packed, grid-locked 'stats only' vibe to a slightly more editorial, spacious layout. It must still function perfectly as a SaaS dashboard, but with better breathing room.",
-    "dashboard_grid": "Bento-style Control Room Grid (grid-cols-1 md:grid-cols-3 lg:grid-cols-4) with generous gap-6 or gap-8.",
-    "card_treatment": "Softer, premium feel. Use rounded-2xl (vs Men's sharper edges). Use a delicate 1px border (border-stone-200) and a very subtle soft shadow (shadow-[0_8px_30px_rgba(0,0,0,0.04)]).",
-    "button_treatment": "Pill-shaped (rounded-full) for primary actions to distinctively separate from the Men's section. Include a subtle inner glow on hover."
+    "section_padding": "py-24 md:py-32",
+    "container": "max-w-7xl mx-auto px-6 md:px-12",
+    "grid_features": "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8"
   },
-  "motion_and_interactions": {
-    "hover_states": "Buttons must elevate slightly (-translate-y-[1px]) and increase shadow intensity. Explicitly set hover text colors (e.g., hover:bg-rose-700 hover:text-white).",
-    "glassmorphism": "Use the 'Crystal Glass' effect (backdrop-blur-xl bg-white/70 with a 1px border-white/40) for sticky headers and modal overlays to feel elevated and clean."
+  "surfaces_and_shapes": {
+    "cards": "bg-slate-900/40 border border-slate-800 rounded-xl hover:border-blue-500/50 hover:bg-slate-800/60 transition-all duration-300 relative overflow-hidden group",
+    "buttons": {
+      "primary": "bg-blue-600 hover:bg-blue-500 text-white font-black py-4 px-8 rounded-md transform hover:-translate-y-1 transition-all duration-200 shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:shadow-[0_0_30px_rgba(59,130,246,0.6)] flex items-center justify-center gap-2 uppercase tracking-widest",
+      "secondary": "bg-transparent border-2 border-slate-700 hover:border-slate-400 text-white font-bold py-4 px-8 rounded-md transform hover:-translate-y-1 transition-all duration-200 flex items-center justify-center gap-2 uppercase tracking-wider",
+      "outline_accent": "border border-blue-500/30 hover:border-blue-400 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 font-bold py-3 px-6 rounded-md uppercase tracking-wider transition-all"
+    },
+    "dividers": "Use CSS clip-path arbitrary values in Tailwind for angular sections (e.g., `[clip-path:polygon(0_0,100%_0,100%_90%,0_100%)]` or skewing `skew-y-[-2deg]`)"
   },
-  "components": {
-    "sidebar": "Full height, Midnight Navy background (bg-[#0a1128]). Use Electric Rose text/indicator lines for the active navigation state, contrasting against the dark background.",
-    "charts": "Use Recharts or Shadcn charts. Use smooth curving lines (monotone) instead of jagged linear lines. Incorporate gradients under the chart lines dropping from Electric Rose to transparent.",
-    "data_testid_requirements": "ALL interactive elements (buttons, links, form inputs, toggles, sport switchers) MUST have a data-testid attribute formatted in kebab-case based on their role (e.g., data-testid='womens-dashboard-cta', data-testid='theme-switcher')."
+  "animations": {
+    "hover_card": "hover:-translate-y-2",
+    "icons": "group-hover:scale-110 group-hover:text-blue-400 transition-all duration-300",
+    "glow_pulse": "animate-pulse (subtle opacity changes for background glowing orbs)"
   },
-  "theme_switching_strategy": {
-    "mechanism": "Use a data attribute on the root html or body tag: <html data-sports-division=\"womens\">. In your CSS, scope the Women's variables to this attribute.",
-    "css_implementation": "[data-sports-division='womens'] { --primary: 348 83% 47%; --sidebar-bg: 227 60% 10%; --background: 60 9% 98%; }",
-    "ui_toggle": "Provide a premium segmented control or toggle switch in the main navigation or profile dropdown to switch between 'Men\\'s Basketball' and 'Women\\'s Basketball', instantly updating the data attribute without a page reload."
+  "media": {
+    "instructions": "STRICT RULE: NO EXTERNAL IMAGES OR STOCK PHOTOS. Use pure CSS aesthetics: radial gradients for glowing ambient lights (e.g., absolute positioning, bg-blue-600/20, blur-3xl, rounded-full), typographic scale, and lucide-react icons."
   },
-  "media_and_images": {
-    "strategy": "Focus on high-quality women's athletic action shots and premium university campus visuals. Tint hero images slightly with a Navy-to-Rose gradient overlay if text is placed on top.",
-    "image_urls": [
-      {
-        "category": "hero_action_shot_1",
-        "url": "https://images.unsplash.com/photo-1548813019-ff52accb7a8e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzZ8MHwxfHNlYXJjaHwyfHx3b21lbnMlMjBiYXNrZXRiYWxsJTIwZ2FtZSUyMGFjdGlvbnxlbnwwfHx8fDE3NzcwNjUyMDB8MA&ixlib=rb-4.1.0&q=85",
-        "description": "High-intensity women's basketball action. Use as a background or feature card for the profile/onboarding."
-      },
-      {
-        "category": "hero_action_shot_2",
-        "url": "https://images.unsplash.com/photo-1548813302-4cf7be0fa638?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzZ8MHwxfHNlYXJjaHwzfHx3b21lbnMlMjBiYXNrZXRiYWxsJTIwZ2FtZSUyMGFjdGlvbnxlbnwwfHx8fDE3NzcwNjUyMDB8MA&ixlib=rb-4.1.0&q=85",
-        "description": "Secondary women's basketball action shot, ideal for the coach contact directory or college browsing headers."
-      },
-      {
-        "category": "campus_court",
-        "url": "https://images.pexels.com/photos/6863847/pexels-photo-6863847.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
-        "description": "Urban university basketball court, good for college program visual representation or placeholder imagery for universities."
-      }
-    ]
+  "component_structure": {
+    "nav": "Sticky header (backdrop-blur-xl bg-slate-950/80 border-b border-slate-800/50), featuring Logo text, Sign In link, and Start Recruiting CTA.",
+    "hero": "High-impact command center. Left-aligned heavy typography. H1 uses gradient_text. Sub-headline in text-muted. Two buttons. Trust signal line (e.g. 'Trusted by 50+ NCAA Programs'). Ambient blue & orange CSS glows in the background.",
+    "stats_ribbon": "Angular banner (using skew or clip-path) cutting across the page. Background bg-blue-900/20 with border-y border-blue-800/50. 3 stats blocks: '200+ Players', '15 Divisions', 'Free Forever'. Numbers in primary or secondary accent.",
+    "how_it_works": "3 steps displayed in large cards. Incorporate massive, low-opacity absolute-positioned step numbers (e.g., '1', '2', '3') in the background of each card using `text-slate-800/50`.",
+    "features_grid": "6 features (Search UK Prospects, Verified Players, Recruiting Board, Match Scoring, Free for Coaches, NCAA Compliant) in a 3x2 grid. Use Lucide icons: Search, Target, Users, Zap, Award, Shield. Interactive hover states with blue glow.",
+    "bottom_cta": "High energy final conversion section. Strong angular container, dense typography, massive primary CTA.",
+    "footer": "Minimalist dark footer. Links to Privacy (/privacy), Terms (/terms), and Player App (/). Text in slate-500, hover to slate-300."
   },
-  "instructions_to_main_agent": "Ensure you inject the DM Sans and Outfit fonts into the project. Set up the CSS variables scoping using `data-sports-division='womens'`. Implement the bento-grid layouts with generous padding. Apply `rounded-2xl` to cards and `rounded-full` to buttons. Add `data-testid` to all interactive components. Use the provided Unsplash/Pexels images directly—DO NOT use placeholder text or dummy image services."
+  "testing": {
+    "data_testid_rules": "All interactive elements MUST have data-testid attributes (e.g., data-testid='nav-login-link', data-testid='hero-register-button', data-testid='feature-card')."
+  },
+  "instructions_to_main_agent": [
+    "Implement the landing page at /app/frontend/src/pages/coach/CoachLandingPage.js.",
+    "The page must be a single self-contained React component exported as default.",
+    "Use react-router-dom (Link, useNavigate) for routing: /coach/register and /coach/login.",
+    "Use lucide-react for all visual iconography.",
+    "DO NOT use <img> tags or background-image URLs. Rely 100% on Tailwind CSS, borders, gradients, and box-shadows to create a premium sporty tech aesthetic.",
+    "Ensure the design feels highly angular and dynamic, matching the 'Elite Athleticism' archetype."
+  ]
 }

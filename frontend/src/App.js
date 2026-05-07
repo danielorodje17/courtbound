@@ -14,6 +14,7 @@ import CoachBoardPage from "./pages/coach/CoachBoardPage";
 import CoachSettingsPage from "./pages/coach/CoachSettingsPage";
 import CoachNotificationsPage from "./pages/coach/CoachNotificationsPage";
 import CoachMessagesPage from "./pages/coach/CoachMessagesPage";
+import CoachProgramPage from "./pages/coach/CoachProgramPage";
 import PlayerMessagesPage from "./pages/PlayerMessagesPage";
 import Dashboard from "./pages/Dashboard";
 import CollegesPage from "./pages/CollegesPage";
@@ -383,6 +384,7 @@ function AppRouter() {
         <Route path="/coach/settings" element={<CoachProtectedRoute><CoachSettingsPage /></CoachProtectedRoute>} />
         <Route path="/coach/messages" element={<CoachProtectedRoute><CoachMessagesPage /></CoachProtectedRoute>} />
         <Route path="/coach/notifications" element={<CoachProtectedRoute><CoachNotificationsPage /></CoachProtectedRoute>} />
+        <Route path="/coach/program/:slug" element={<CoachProgramPage />} />
       </Routes>
       <HelpWidget />
     </>

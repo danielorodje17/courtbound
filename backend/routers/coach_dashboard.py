@@ -266,3 +266,79 @@ async def admin_verify_coach(
         lambda: supa.table("coach_accounts").update(updates).eq("id", coach_id).execute()
     )
     return {"message": f"Coach {status}"}
+
+
+
+# ── Coach Analytics ───────────────────────────────────────────────────────────
+
+@router.get("/coach/analytics")
+async def get_coach_analytics(coach=Depends(require_verified_coach)):
+    now = datetime.now(timezone.utc)
+    seven_days_ago = (now - timedelta(days=7)).isoformat()
+    thirty_days_ago = (now - timedelta(days=30)).isoformat()
+    fourteen_days_ago = (now - timedelta(days=14)).isoformat()
+
+    views_all = await run_in_threadpool(
+        lambda: supa.table("coach_player_views").select("id", count="exact").eq("coach_id", coach["id"]).execute()
+    )
+    views_7d = await run_in_threadpool(
+        lambda: supa.table("coach_player_views").select("id", count="exact").eq("coach_id", coach["id"]).gte("viewed_at", seven_days_ago).execute()
+    )
+    views_30d = await run_in_threadpool(
+        lambda: supa.table("coach_player_views").select("id", count="exact").eq("coach_id", coach["id"]).gte("viewed_at", thirty_days_ago).execute()
+    )
+    saved_res = await run_in_threadpool(
+        lambda: supa.table("coach_saved_players").select("list_name,player_user_id").eq("coach_id", coach["id"]).execute()
+    )
+    msgs_res = await run_in_threadpool(
+        lambda: supa.table("coach_messages").select("id", count="exact").eq("coach_id", coach["id"]).execute()
+    )
+    views_14d_res = await run_in_threadpool(
+        lambda: supa.table("coach_player_views").select("viewed_at").eq("coach_id", coach["id"]).gte("viewed_at", fourteen_days_ago).execute()
+    )
+
+    saved = saved_res.data or []
+    saves_by_list = {}
+    for s in saved:
+        lst = s.get("list_name") or "Watch List"
+        saves_by_list[lst] = saves_by_list.get(lst, 0) + 1
+
+    top_positions, top_grad_years = [], []
+    if saved:
+        user_ids = [s["player_user_id"] for s in saved]
+        profiles_res = await run_in_threadpool(
+            lambda: supa.table("profiles").select("position,expected_graduation").in_("user_id", user_ids).execute()
+        )
+        positions, grad_years = {}, {}
+        for p in (profiles_res.data or []):
+            pos = p.get("position") or ""
+            yr = str(p.get("expected_graduation") or "")
+            if pos:
+                positions[pos] = positions.get(pos, 0) + 1
+            if yr and yr not in ("", "None", "null"):
+                grad_years[yr] = grad_years.get(yr, 0) + 1
+        top_positions = [{"position": k, "count": v} for k, v in sorted(positions.items(), key=lambda x: x[1], reverse=True)[:5]]
+        top_grad_years = [{"year": k, "count": v} for k, v in sorted(grad_years.items(), key=lambda x: x[0])[:6]]
+
+    daily_map = {(now - timedelta(days=13 - i)).strftime("%Y-%m-%d"): 0 for i in range(14)}
+    for v in (views_14d_res.data or []):
+        day = (v.get("viewed_at") or "")[:10]
+        if day in daily_map:
+            daily_map[day] += 1
+    daily_views = [{"date": k[5:], "views": v} for k, v in daily_map.items()]
+
+    return {
+        "views": {
+            "all_time": views_all.count or 0,
+            "last_7d": views_7d.count or 0,
+            "last_30d": views_30d.count or 0,
+        },
+        "saves": {
+            "total": len(saved),
+            "by_list": [{"list": k, "count": v} for k, v in saves_by_list.items()],
+        },
+        "top_positions": top_positions,
+        "top_grad_years": top_grad_years,
+        "messages_sent": msgs_res.count or 0,
+        "daily_views": daily_views,
+    }

@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { useCoachAuth } from "../../context/CoachAuthContext";
 import { CoachNav } from "../../components/coach/CoachNav";
 import CoachOnboardingModal from "../../components/coach/CoachOnboardingModal";
-import { Users, BookmarkPlus, Bell, TrendingUp, ChevronRight, Star, Film, Shield, AlertCircle, CheckCircle, Calendar, Award } from "lucide-react";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { Users, BookmarkPlus, Bell, TrendingUp, ChevronRight, Star, Film, Shield, AlertCircle, CheckCircle, Calendar, Award, BarChart2, Eye, MessageSquare } from "lucide-react";
 
 const PERIOD_COLORS = {
   contact: "bg-green-500",
@@ -98,11 +99,16 @@ export default function CoachDashboard() {
     return true;
   });
 
+  const [analytics, setAnalytics] = useState(null);
+
   useEffect(() => {
     coachReq("get", "/dashboard")
       .then(r => setData(r.data))
       .catch(() => {})
       .finally(() => setLoading(false));
+    coachReq("get", "/analytics")
+      .then(r => setAnalytics(r.data))
+      .catch(() => {});
   }, []);
 
   const handleSave = async (player) => {
@@ -352,6 +358,128 @@ export default function CoachDashboard() {
             </div>
           </div>
         </div>
+
+        {/* ── Recruiting Activity Analytics ── */}
+        <div className="border-t border-slate-800 pt-8 pb-4" data-testid="coach-analytics-section">
+          <h2 className="font-black text-white text-base mb-5 flex items-center gap-2">
+            <BarChart2 className="w-5 h-5 text-blue-400" /> Recruiting Activity
+          </h2>
+
+          {/* KPI cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+            {[
+              { label: "Total Profile Views", value: analytics?.views?.all_time ?? "—", icon: Eye, color: "text-blue-400" },
+              { label: "Views (7 days)", value: analytics?.views?.last_7d ?? "—", icon: TrendingUp, color: "text-purple-400" },
+              { label: "Players Saved", value: analytics?.saves?.total ?? "—", icon: Star, color: "text-yellow-400" },
+              { label: "Messages Sent", value: analytics?.messages_sent ?? "—", icon: MessageSquare, color: "text-green-400" },
+            ].map(({ label, value, icon: Icon, color }) => (
+              <div key={label} className="bg-slate-900 border border-slate-800 rounded-xl p-4" data-testid={`analytics-kpi`}>
+                <Icon className={`w-4 h-4 ${color} mb-2`} />
+                <p className="text-2xl font-black text-white">{value}</p>
+                <p className="text-slate-500 text-xs mt-0.5">{label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Charts row */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-5">
+            {/* 14-day views trend */}
+            <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-5">
+              <h3 className="font-bold text-slate-300 text-sm mb-4">Profile Views — Last 14 Days</h3>
+              {analytics?.daily_views?.length > 0 ? (
+                <ResponsiveContainer width="100%" height={140}>
+                  <AreaChart data={analytics.daily_views} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+                    <defs>
+                      <linearGradient id="coachViewsGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="date" tick={{ fill: "#475569", fontSize: 10 }} axisLine={false} tickLine={false} interval={2} />
+                    <YAxis hide allowDecimals={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                    <Tooltip contentStyle={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#e2e8f0", fontSize: 12 }} />
+                    <Area type="monotone" dataKey="views" stroke="#3b82f6" fill="url(#coachViewsGrad)" strokeWidth={2} name="Views" dot={false} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-[140px] flex items-center justify-center text-slate-600 text-sm">No view data yet</div>
+              )}
+            </div>
+
+            {/* Saves by list */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+              <h3 className="font-bold text-slate-300 text-sm mb-4">Saves by List</h3>
+              {analytics?.saves?.by_list?.length > 0 ? (
+                <div className="space-y-3">
+                  {analytics.saves.by_list.map(l => (
+                    <div key={l.list}>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="text-slate-300 font-medium truncate">{l.list}</span>
+                        <span className="text-slate-400 ml-2 flex-shrink-0">{l.count}</span>
+                      </div>
+                      <div className="h-1.5 bg-slate-800 rounded-full">
+                        <div className="h-full bg-blue-500 rounded-full"
+                          style={{ width: `${analytics.saves.total > 0 ? (l.count / analytics.saves.total) * 100 : 0}%` }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-24 text-slate-600 text-sm">No saves yet</div>
+              )}
+            </div>
+          </div>
+
+          {/* Positions + Grad Years */}
+          {(analytics?.top_positions?.length > 0 || analytics?.top_grad_years?.length > 0) && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              {analytics.top_positions?.length > 0 && (
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+                  <h3 className="font-bold text-slate-300 text-sm mb-4">Top Saved Positions</h3>
+                  <div className="space-y-2.5">
+                    {analytics.top_positions.map(p => {
+                      const max = analytics.top_positions[0]?.count || 1;
+                      return (
+                        <div key={p.position}>
+                          <div className="flex justify-between text-xs mb-1">
+                            <span className="text-slate-300 font-bold">{p.position}</span>
+                            <span className="text-slate-400">{p.count}</span>
+                          </div>
+                          <div className="h-1.5 bg-slate-800 rounded-full">
+                            <div className="h-full bg-purple-500 rounded-full" style={{ width: `${(p.count / max) * 100}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              {analytics.top_grad_years?.length > 0 && (
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+                  <h3 className="font-bold text-slate-300 text-sm mb-4">Top Saved Grad Years</h3>
+                  <div className="space-y-2.5">
+                    {analytics.top_grad_years.map(g => {
+                      const max = Math.max(...analytics.top_grad_years.map(x => x.count), 1);
+                      return (
+                        <div key={g.year}>
+                          <div className="flex justify-between text-xs mb-1">
+                            <span className="text-slate-300 font-bold">{g.year}</span>
+                            <span className="text-slate-400">{g.count}</span>
+                          </div>
+                          <div className="h-1.5 bg-slate-800 rounded-full">
+                            <div className="h-full bg-green-500 rounded-full" style={{ width: `${(g.count / max) * 100}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
       </div>
     </div>
   );
