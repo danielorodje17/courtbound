@@ -151,10 +151,18 @@ Build "CourtBound," a web app to track USA and UK college basketball scholarship
 - Double `%%` stat display bug fixed
 
 ### Phase 3 (upcoming)
+- [x] Unread message badges on player nav (DONE)
+- [x] Coach Onboarding Sequence (DONE — May 2026)
+  - 4-step modal wizard on first login (Welcome → Preferences → Find Player → Complete)
+  - Skippable via "Skip for now" (localStorage dismissal key)
+  - Step 2 requires saving a player before Continue enables
+  - `markOnboardingStep` helper in CoachAuthContext for background step tracking
+  - Checklist widget on dashboard with clickable steps + "Setup Wizard" reopen button
+  - Elite Recruiter badge when all 5 steps done
+  - `search_done` tracked in CoachPlayersPage, `profile_viewed` tracked in CoachPlayerProfile
 - Coach analytics
-- Onboarding sequence
 - Programme public page
-- Unread message badges on player nav
+- Coach marketing/landing page
 
 
 - Gender selector on onboarding step 0 (Men's / Women's)

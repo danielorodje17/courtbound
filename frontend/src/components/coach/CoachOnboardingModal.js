@@ -25,7 +25,7 @@ function StepDots({ current, total }) {
 }
 
 export default function CoachOnboardingModal({ onComplete, onSkip }) {
-  const { coach, coachReq, updateCoach, markOnboardingStep } = useCoachAuth();
+  const { coach, coachReq, updateCoach } = useCoachAuth();
 
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -94,10 +94,7 @@ export default function CoachOnboardingModal({ onComplete, onSkip }) {
     try {
       await coachReq("post", `/players/${player.user_id}/save`, { list_name: "Watch List" });
       setSavedIds(prev => new Set([...prev, player.user_id]));
-      if (!hasSaved) {
-        setHasSaved(true);
-        markOnboardingStep("search_done");
-      }
+      if (!hasSaved) setHasSaved(true);
       toast.success(`${player.full_name} saved to your board!`);
     } catch {
       toast.error("Failed to save player");
@@ -107,13 +104,7 @@ export default function CoachOnboardingModal({ onComplete, onSkip }) {
   const handleComplete = async () => {
     setSaving(true);
     try {
-      const r = await coachReq("patch", "/auth/profile", {
-        onboarding_completed: true,
-        onboarding_steps: {
-          ...(coach?.onboarding_steps || {}),
-          prefs_set: !!(coach?.onboarding_steps?.prefs_set),
-        },
-      });
+      const r = await coachReq("patch", "/auth/profile", { onboarding_completed: true });
       updateCoach(r.data);
     } catch {}
     setSaving(false);
