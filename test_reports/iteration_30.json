@@ -1,0 +1,41 @@
+{
+  "summary": "Tested 3 new CourtBound features: Public Programme Page, Coach Analytics, and Landing Page Redesign. All 13 backend tests pass. All frontend flows verified. One transient 500 on /api/coach/analytics on first load (httpx.RemoteProtocolError from Supabase), auto-resolved on retry — intermittent, not a code bug.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/coach/analytics + /api/coach/dashboard", "issue": "Intermittent httpx.RemoteProtocolError: Server disconnected from Supabase causing 500 on first load. Auto-recovers on retry. Seen once in test run."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "features_verified": {
+    "public_program_page": "PASS - /coach/program/test-university renders without auth. data-testid=coach-program-page, institution-name='Test University', programme-header, programme-about, recruiting-needs (SG, 2027), player-cta-card, player-register-cta all present",
+    "public_page_404": "PASS - /coach/program/nonexistent-school shows 'Programme Not Found' gracefully",
+    "public_api": "PASS - GET /api/coach/public/test-university returns 200, coach_name='Test Coach', institution_name='Test University', recruiting_prefs.positions=['SG']",
+    "analytics_api": "PASS - GET /api/coach/analytics returns 200 with views{all_time,last_7d,last_30d}, saves{total,by_list}, messages_sent, daily_views (14 entries)",
+    "analytics_dashboard": "PASS - coach-analytics-section renders on dashboard, 4 KPI cards show numeric values (12 views, 1 saved, 1 message), chart area present",
+    "landing_page_design": "PASS - /coach shows premium dark slate-950 design with gradient hero, stats ribbon, 6 feature cards, all CTA buttons present",
+    "landing_page_ctas": "PASS - nav-register-btn navigates to /coach/register, nav-login-link present",
+    "existing_routes": "PASS - /coach/login, /coach/register, /coach/dashboard all load correctly"
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_coach_features.py",
+    "/app/test_reports/pytest/pytest_results_30.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "CoachDashboard.js line 109: analytics fetch has no .catch() handler — silent failure leaves analytics null. Low priority since it recovers on page refresh but worth adding error handling.",
+    "coach_public.py fetches ALL verified coaches to find one by slug — O(n) scan. Consider adding a slug column to coach_accounts table for direct indexed lookup at scale."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "100% (13/13)",
+    "frontend": "100% - all features working"
+  },
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "3 new features all working: Public Programme Page (/coach/program/:slug), Coach Analytics inline on dashboard, Landing Page redesign. testcoach@courtbound.edu has slug=test-university, institution='Test University', recruiting_prefs.positions=['SG'], grad_years=['2027']. Analytics shows 12 all-time views and 1 saved player from previous test runs."
+}

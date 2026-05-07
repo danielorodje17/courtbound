@@ -19,10 +19,7 @@ async def get_public_coach_profile(slug: str):
     """Publicly accessible programme page — no auth required."""
     result = await run_in_threadpool(
         lambda: supa.table("coach_accounts")
-        .select(
-            "id,full_name,institution_name,primary_sport,division,conference,"
-            "bio,recruiting_prefs,verification_status,created_at"
-        )
+        .select("*")
         .eq("verification_status", "verified")
         .execute()
     )
