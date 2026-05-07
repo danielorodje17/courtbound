@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCoachAuth } from "../../context/CoachAuthContext";
 import { CoachNav } from "../../components/coach/CoachNav";
-import { Users, BookmarkPlus, Bell, TrendingUp, ChevronRight, Star, Film, Shield, AlertCircle, CheckCircle, Calendar } from "lucide-react";
+import CoachOnboardingModal from "../../components/coach/CoachOnboardingModal";
+import { Users, BookmarkPlus, Bell, TrendingUp, ChevronRight, Star, Film, Shield, AlertCircle, CheckCircle, Calendar, Award } from "lucide-react";
 
 const PERIOD_COLORS = {
   contact: "bg-green-500",
@@ -89,6 +90,14 @@ export default function CoachDashboard() {
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState(null);
 
+  // Show onboarding wizard if not completed and not previously dismissed
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    if (!coach) return false;
+    if (coach.onboarding_completed) return false;
+    if (localStorage.getItem(`cb_coach_onboarding_dismissed_${coach.id}`)) return false;
+    return true;
+  });
+
   useEffect(() => {
     coachReq("get", "/dashboard")
       .then(r => setData(r.data))
@@ -117,11 +126,11 @@ export default function CoachDashboard() {
   const isVerified = coach?.verification_status === "verified";
   const onboarding = data?.onboarding_steps || {};
   const onboardingSteps = [
-    { key: "email_verified", label: "Verify your institutional email", done: isVerified },
-    { key: "prefs_set", label: "Set recruiting preferences", done: !!onboarding.prefs_set },
-    { key: "player_saved", label: "Save your first player", done: (data?.stats?.saved_count || 0) > 0 },
-    { key: "profile_viewed", label: "View a player's full profile", done: !!onboarding.profile_viewed },
-    { key: "search_done", label: "Run a player search", done: !!onboarding.search_done },
+    { key: "email_verified", label: "Verify your institutional email", done: isVerified, action: null },
+    { key: "prefs_set", label: "Set recruiting preferences", done: !!onboarding.prefs_set, action: () => navigate("/coach/settings") },
+    { key: "player_saved", label: "Save your first player", done: (data?.stats?.saved_count || 0) > 0, action: () => navigate("/coach/players") },
+    { key: "profile_viewed", label: "View a player's full profile", done: !!onboarding.profile_viewed, action: () => navigate("/coach/players") },
+    { key: "search_done", label: "Run a player search", done: !!onboarding.search_done, action: () => navigate("/coach/players") },
   ];
   const onboardingDone = onboardingSteps.filter(s => s.done).length;
   const allOnboarded = onboardingDone === onboardingSteps.length;
@@ -131,6 +140,14 @@ export default function CoachDashboard() {
   return (
     <div className="min-h-screen bg-slate-950">
       <CoachNav notifCount={data?.stats?.unread_notifications || 0} />
+
+      {/* Onboarding wizard modal */}
+      {showOnboarding && (
+        <CoachOnboardingModal
+          onComplete={() => setShowOnboarding(false)}
+          onSkip={() => setShowOnboarding(false)}
+        />
+      )}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
 
@@ -147,21 +164,57 @@ export default function CoachDashboard() {
 
         {/* Onboarding checklist */}
         {!allOnboarded && (
-          <div className="mb-6 bg-slate-900 border border-slate-800 rounded-xl p-5">
+          <div className="mb-6 bg-slate-900 border border-slate-800 rounded-xl p-5" data-testid="onboarding-checklist">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-bold text-white text-sm">Getting Started — {onboardingDone}/5 Complete</h3>
-              <span className="text-xs text-blue-400 font-semibold">Complete all 5 for Elite Recruiter badge</span>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-blue-400 font-semibold hidden sm:block">Complete all 5 for Elite Recruiter badge</span>
+                <button
+                  onClick={() => setShowOnboarding(true)}
+                  data-testid="reopen-wizard-btn"
+                  className="text-xs text-blue-400 hover:text-blue-300 font-bold border border-blue-700/50 px-3 py-1 rounded-lg transition-colors hover:bg-blue-900/20"
+                >
+                  Setup Wizard
+                </button>
+              </div>
             </div>
             <div className="h-1.5 bg-slate-800 rounded-full mb-4">
               <div className="h-full bg-blue-600 rounded-full transition-all" style={{ width: `${(onboardingDone / 5) * 100}%` }} />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
               {onboardingSteps.map(s => (
-                <div key={s.key} className={`flex items-center gap-2 text-xs p-2 rounded-lg ${s.done ? "text-green-400" : "text-slate-400"}`}>
-                  {s.done ? <CheckCircle className="w-3.5 h-3.5 flex-shrink-0" /> : <div className="w-3.5 h-3.5 border border-slate-600 rounded-full flex-shrink-0" />}
+                <button
+                  key={s.key}
+                  onClick={s.action || undefined}
+                  disabled={!s.action || s.done}
+                  data-testid={`checklist-${s.key}`}
+                  className={`flex items-center gap-2 text-xs p-2 rounded-lg text-left transition-colors ${
+                    s.done
+                      ? "text-green-400 cursor-default"
+                      : s.action
+                      ? "text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+                      : "text-slate-500 cursor-default"
+                  }`}>
+                  {s.done
+                    ? <CheckCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                    : <div className="w-3.5 h-3.5 border border-slate-600 rounded-full flex-shrink-0" />}
                   <span>{s.label}</span>
-                </div>
+                  {!s.done && s.action && <ChevronRight className="w-3 h-3 ml-auto flex-shrink-0 opacity-50" />}
+                </button>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Elite Recruiter badge — shown when all steps done */}
+        {allOnboarded && (
+          <div className="mb-6 bg-gradient-to-r from-slate-900 to-blue-950/40 border border-blue-800/40 rounded-xl p-4 flex items-center gap-3" data-testid="elite-recruiter-badge">
+            <div className="w-10 h-10 bg-blue-600/20 border border-blue-600/40 rounded-full flex items-center justify-center flex-shrink-0">
+              <Award className="w-5 h-5 text-blue-400" />
+            </div>
+            <div>
+              <p className="text-white font-bold text-sm">Elite Recruiter</p>
+              <p className="text-slate-400 text-xs">You've completed all setup steps. Your portal is fully configured.</p>
             </div>
           </div>
         )}

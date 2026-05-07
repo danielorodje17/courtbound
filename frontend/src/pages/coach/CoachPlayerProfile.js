@@ -124,7 +124,7 @@ function InfoRow({ label, value }) {
 
 export default function CoachPlayerProfile() {
   const { userId } = useParams();
-  const { coachReq, coach } = useCoachAuth();
+  const { coachReq, coach, markOnboardingStep } = useCoachAuth();
   const navigate = useNavigate();
   const [player, setPlayer] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -138,12 +138,15 @@ export default function CoachPlayerProfile() {
 
   useEffect(() => {
     coachReq("get", `/players/${userId}`)
-      .then(r => setPlayer(r.data))
+      .then(r => {
+        setPlayer(r.data);
+        markOnboardingStep("profile_viewed");
+      })
       .catch(err => {
         if (err?.response?.status === 404) setNotFound(true);
       })
       .finally(() => setLoading(false));
-  }, [userId]);
+  }, [userId]); // eslint-disable-line
 
   const handleSave = async (listName = saveList) => {
     if (!player) return;

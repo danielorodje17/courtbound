@@ -49,8 +49,24 @@ export function CoachAuthProvider({ children }) {
 
   const updateCoach = (updates) => setCoach(prev => ({ ...prev, ...updates }));
 
+  const markOnboardingStep = (stepKey) => {
+    setCoach(current => {
+      if (!current) return current;
+      const existing = current.onboarding_steps || {};
+      if (existing[stepKey]) return current;
+      const updated = { ...existing, [stepKey]: true };
+      const token = localStorage.getItem(TOKEN_KEY);
+      axios.patch(
+        `${API}/api/coach/auth/profile`,
+        { onboarding_steps: updated },
+        { headers: { Authorization: `Bearer ${token}` } }
+      ).then(r => setCoach(r.data)).catch(() => {});
+      return { ...current, onboarding_steps: updated };
+    });
+  };
+
   return (
-    <CoachAuthContext.Provider value={{ coach, loading, login, register, logout, coachReq, updateCoach }}>
+    <CoachAuthContext.Provider value={{ coach, loading, login, register, logout, coachReq, updateCoach, markOnboardingStep }}>
       {children}
     </CoachAuthContext.Provider>
   );

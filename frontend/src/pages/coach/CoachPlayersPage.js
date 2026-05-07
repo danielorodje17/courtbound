@@ -19,7 +19,7 @@ function MatchBadge({ score }) {
 }
 
 export default function CoachPlayersPage() {
-  const { coachReq } = useCoachAuth();
+  const { coachReq, markOnboardingStep } = useCoachAuth();
   const navigate = useNavigate();
   const [players, setPlayers] = useState([]);
   const [total, setTotal] = useState(0);
@@ -57,9 +57,11 @@ export default function CoachPlayersPage() {
       setTotal(r.data.total || 0);
       setPages(r.data.pages || 1);
       setPage(p);
+      // Mark search_done onboarding step on first successful search
+      markOnboardingStep("search_done");
     } catch {}
     setLoading(false);
-  }, [applied, coachReq]);
+  }, [applied, coachReq, markOnboardingStep]);
 
   useEffect(() => {
     fetchPlayers(applied, 1);
