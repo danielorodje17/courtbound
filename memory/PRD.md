@@ -167,9 +167,23 @@ Build "CourtBound," a web app to track USA and UK college basketball scholarship
   - Premium sporty dark aesthetic: gradient hero, stats ribbon (skew), numbered steps with background giant numbers, feature cards with hover glow, angular CTAs
 - [x] Player Division Switcher on Profile page (DONE — May 2026)
   - Two dropdowns: "1st Choice Division" + "2nd Choice Division" (options: D1, D2, D3, NAIA, JUCO)
-  - Replaces free-text input in Recruitment Targets section
   - `target_division` already in DB; `target_division_2` requires migration v14
-  - Backend: models.py + profile.py fallback updated
+- [x] Admin Coach Verification Panel at /admin/coach-verification (DONE — May 2026)
+  - Full pending queue with Overdue (>48h) badges, Approve/Reject/Request Info actions with modals
+  - Stats bar: Total Pending, Overdue, Approved This Week, Rejected This Week
+  - Verified Coaches directory tab (searchable)
+  - Admin panel header button with live red badge (pending count)
+  - Fixed /api/coach/admin/queue + PATCH endpoints to use require_admin_token dependency
+- [x] Social Proof Counters (DONE — May 2026)
+  - /api/coach/public/stats now returns: active_coaches, active_coaches_30d, total_verified, verified_coaches, total_programmes
+  - CoachLandingPage: Live stats ribbon (Verified Coaches + US Programmes) + hero counter line
+  - LandingPage (player): Live "US Coaches Recruiting on CourtBound" counter card
+- [x] Google SSO for Coaches (DONE — May 2026)
+  - "Continue with Google" button on CoachLoginPage + CoachRegisterPage
+  - CoachAuthCallback.js handles PKCE redirect → backend linking
+  - POST /api/coach/auth/google: login existing coach (token) or 404+prefill for new coach
+  - Coach registration supports Google prefill (email read-only, password fields hidden)
+  - Dismissible 2FA nudge banner on CoachDashboard for email/password coaches
 
 
 - Gender selector on onboarding step 0 (Men's / Women's)
