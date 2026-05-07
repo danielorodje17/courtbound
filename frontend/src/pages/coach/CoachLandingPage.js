@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Shield, Search, Users, BarChart2, Trophy, ChevronRight, CheckCircle, Star, Zap, Target, Award, ArrowRight, Globe } from "lucide-react";
 
@@ -16,14 +17,41 @@ const STEPS = [
   { n: "03", title: "Discover UK Recruits",       desc: "Browse your personalised match feed of UK basketball prospects, sorted by fit score." },
 ];
 
-const STATS = [
+const STATIC_STATS = [
   { value: "200+", label: "Verified UK Players" },
   { value: "15",   label: "Divisions Supported" },
   { value: "Free", label: "Forever for Coaches" },
 ];
 
+const API = process.env.REACT_APP_BACKEND_URL;
+
 export default function CoachLandingPage() {
   const navigate = useNavigate();
+  const [liveStats, setLiveStats] = useState(null);
+
+  useEffect(() => {
+    fetch(`${API}/api/coach/public/stats`)
+      .then(r => r.json())
+      .then(d => setLiveStats(d))
+      .catch(() => {});
+  }, []);
+
+  // Build stats ribbon: live values override statics; never show 0
+  const statsRibbon = [
+    {
+      value: liveStats?.verified_coaches > 0 ? `${liveStats.verified_coaches}` : STATIC_STATS[0].value,
+      label: "Verified Coaches",
+    },
+    {
+      value: liveStats?.total_programmes > 0 ? `${liveStats.total_programmes}` : STATIC_STATS[1].value,
+      label: "US Programmes",
+    },
+    STATIC_STATS[2],
+  ];
+
+  const heroCounterText = liveStats?.active_coaches_30d > 0 && liveStats?.total_programmes > 0
+    ? `${liveStats.active_coaches_30d} verified US coaches from ${liveStats.total_programmes} programmes are actively recruiting on CourtBound`
+    : null;
 
   return (
     <div className="min-h-screen bg-slate-950 text-white overflow-x-hidden" style={{ fontFamily: "'Inter', sans-serif" }}>
@@ -79,10 +107,21 @@ export default function CoachLandingPage() {
             </span>
           </h1>
 
-          <p className="text-slate-400 text-lg max-w-2xl mb-10 leading-relaxed">
+          <p className="text-slate-400 text-lg max-w-2xl mb-6 leading-relaxed">
             The only platform built for US college coaches to discover, evaluate, and contact elite UK basketball prospects.
             English-speaking, NCAA-eligible, and actively seeking US programmes.
           </p>
+
+          {/* Live hero counter — fades in when data loads */}
+          {heroCounterText && (
+            <p
+              data-testid="hero-counter-line"
+              className="text-blue-400 text-sm font-semibold mb-8 opacity-0 animate-[fadeIn_0.6s_ease_0.2s_forwards]"
+              style={{ animation: "fadeIn 0.6s ease 0.2s forwards" }}
+            >
+              {heroCounterText}
+            </p>
+          )}
 
           <div className="flex flex-col sm:flex-row gap-4 mb-8">
             <button
@@ -113,7 +152,7 @@ export default function CoachLandingPage() {
       <div className="relative -skew-y-1 bg-blue-950/30 border-y border-blue-800/40 overflow-hidden">
         <div className="skew-y-1 max-w-7xl mx-auto px-6 py-8">
           <div className="grid grid-cols-3 gap-4 divide-x divide-blue-800/30">
-            {STATS.map(s => (
+            {statsRibbon.map(s => (
               <div key={s.label} className="text-center px-4">
                 <p className="text-3xl md:text-4xl font-black text-blue-400 tracking-tight">{s.value}</p>
                 <p className="text-slate-400 text-xs font-semibold uppercase tracking-widest mt-1">{s.label}</p>
@@ -232,6 +271,10 @@ export default function CoachLandingPage() {
           </div>
         </div>
       </footer>
+
+      <style>{`
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+      `}</style>
     </div>
   );
 }

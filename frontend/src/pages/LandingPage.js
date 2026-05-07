@@ -77,9 +77,19 @@ const FEATURES = [
   },
 ];
 
+const API = process.env.REACT_APP_BACKEND_URL;
+
 export default function LandingPage() {
   const navigate = useNavigate();
   const goLogin = () => navigate("/login");
+  const [coachStats, setCoachStats] = useState(null);
+
+  useEffect(() => {
+    fetch(`${API}/api/coach/public/stats`)
+      .then(r => r.json())
+      .then(d => setCoachStats(d))
+      .catch(() => {});
+  }, []);
 
   return (
     <div style={{ fontFamily: "Manrope, sans-serif", background: "#0A0A0A", color: "#fff", overflowX: "hidden" }}>
@@ -248,6 +258,13 @@ export default function LandingPage() {
                   <p className="text-xs text-slate-400 uppercase tracking-wider font-bold">{label}</p>
                 </div>
               ))}
+              {/* Live coach counter — only appears when API returns data */}
+              {coachStats?.verified_coaches > 0 && (
+                <div data-testid="live-coach-counter" className="col-span-2 bg-blue-950/40 border border-blue-800/40 rounded-xl p-4 flex items-center justify-between">
+                  <p className="text-xs text-slate-400 uppercase tracking-wider font-bold">US Coaches Recruiting on CourtBound</p>
+                  <p className="text-3xl font-black text-blue-400" style={{ fontFamily: "Barlow Condensed, sans-serif" }}>{coachStats.verified_coaches}+</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

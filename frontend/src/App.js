@@ -4,6 +4,8 @@ import { Toaster } from "./components/ui/sonner";
 import { AuthProvider, useAuth, apiRequest } from "./context/AuthContext";
 import { ThemeProvider, useTheme, DIVISION_THEME } from "./context/ThemeContext";
 import { CoachAuthProvider, useCoachAuth } from "./context/CoachAuthContext";
+import CoachVerificationPage from "./pages/admin/CoachVerificationPage";
+import CoachAuthCallback from "./pages/coach/CoachAuthCallback";
 import CoachLandingPage from "./pages/coach/CoachLandingPage";
 import CoachLoginPage from "./pages/coach/CoachLoginPage";
 import CoachRegisterPage from "./pages/coach/CoachRegisterPage";
@@ -369,6 +371,7 @@ function AppRouter() {
         <Route path="/admin/login" element={<AdminLoginPage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/admin/users/:userId" element={<AdminUserDetailPage />} />
+        <Route path="/admin/coach-verification" element={<CoachVerificationPage />} />
         <Route path="/pricing" element={<PricingPage />} />
         <Route path="/privacy" element={<LegalPage type="privacy" />} />
         <Route path="/terms" element={<LegalPage type="terms" />} />
@@ -385,6 +388,7 @@ function AppRouter() {
         <Route path="/coach/messages" element={<CoachProtectedRoute><CoachMessagesPage /></CoachProtectedRoute>} />
         <Route path="/coach/notifications" element={<CoachProtectedRoute><CoachNotificationsPage /></CoachProtectedRoute>} />
         <Route path="/coach/program/:slug" element={<CoachProgramPage />} />
+        <Route path="/coach/auth/callback" element={<CoachAuthCallback />} />
       </Routes>
       <HelpWidget />
     </>

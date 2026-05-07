@@ -10,7 +10,7 @@ import {
   Users, Mail, BookMarked, TrendingUp, RefreshCw, LogOut,
   Star, CircleDot, ArrowUpRight, ChevronUp, ChevronDown, ShieldCheck,
   Flag, Clock, CheckCircle2, AlertTriangle, XCircle, ChevronRight, Settings, Globe, Trash2,
-  Download, Upload, Target, Zap, Activity, Send, Bell,
+  Download, Upload, Target, Zap, Activity, Send, Bell, UserCheck,
 } from "lucide-react";
 
 const API = process.env.REACT_APP_BACKEND_URL;
@@ -525,6 +525,7 @@ export default function AdminPage() {
   const [pendingLoading, setPendingLoading] = useState(false);
   const [approvingId, setApprovingId] = useState(null);
   const adminEmail = localStorage.getItem("cb_admin_email") || "Admin";
+  const [pendingCoachCount, setPendingCoachCount] = useState(0);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -546,6 +547,11 @@ export default function AdminPage() {
         navigate("/admin/login", { replace: true });
       }
     }
+    // Fetch pending coach count for badge
+    try {
+      const qRes = await adminReq("get", "/coach/admin/queue");
+      setPendingCoachCount(qRes.data?.stats?.total_pending || 0);
+    } catch {}
     setLoading(false);
   }, [navigate]);
 
@@ -930,6 +936,17 @@ export default function AdminPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <button
+            data-testid="admin-coach-verification-btn"
+            onClick={() => navigate("/admin/coach-verification")}
+            className="relative flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 font-bold text-sm px-4 py-2.5 rounded-xl transition-all">
+            <UserCheck className="w-4 h-4" /> Coach Verification
+            {pendingCoachCount > 0 && (
+              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-black rounded-full min-w-5 h-5 flex items-center justify-center px-1 leading-none">
+                {pendingCoachCount}
+              </span>
+            )}
+          </button>
           <button data-testid="admin-refresh-btn" onClick={load}
             className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-sm px-4 py-2.5 rounded-xl transition-all">
             <RefreshCw className="w-4 h-4" /> Refresh

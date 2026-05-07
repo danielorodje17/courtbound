@@ -2,6 +2,7 @@ import os
 import uuid
 import bcrypt
 import logging
+import json
 from fastapi import APIRouter, HTTPException, Header, Depends
 from fastapi.concurrency import run_in_threadpool
 from datetime import datetime, timezone
@@ -99,10 +100,16 @@ async def coach_register(body: dict):
     primary_sport = body.get("primary_sport", "").strip()
     country = body.get("country", "US").strip()
 
-    if not all([email, password, full_name, job_title, institution_name, division, primary_sport]):
+    if not all([email, full_name, job_title, institution_name, division, primary_sport]):
         raise HTTPException(status_code=400, detail="All required fields must be filled")
-    if len(password) < 8:
-        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+
+    google_id = body.get("google_id", "").strip()
+    # Password required only when not using Google OAuth
+    if not google_id:
+        if not password:
+            raise HTTPException(status_code=400, detail="Password is required")
+        if len(password) < 8:
+            raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
 
     # Check duplicate
     existing = await run_in_threadpool(
@@ -119,7 +126,7 @@ async def coach_register(body: dict):
     session_token = str(uuid.uuid4())
     row = {
         "email": email,
-        "password_hash": _hash_pw(password),
+        "password_hash": _hash_pw(password) if password else None,
         "session_token": session_token,
         "full_name": full_name,
         "job_title": job_title,
@@ -217,3 +224,39 @@ async def coach_logout(coach=Depends(get_current_coach)):
         .execute()
     )
     return {"message": "Logged out"}
+
+
+# ── Google OAuth ──────────────────────────────────────────────────────────────
+
+@router.post("/auth/google")
+async def coach_google_auth(body: dict):
+    """Called after Google OAuth redirect. Links Google identity to coach account."""
+    google_email = body.get("google_email", "").lower().strip()
+    google_name = body.get("google_name", "").strip()
+
+    if not google_email:
+        raise HTTPException(status_code=400, detail="Email required")
+
+    result = await run_in_threadpool(
+        lambda: supa.table("coach_accounts").select("*").eq("email", google_email).limit(1).execute()
+    )
+
+    if not result.data:
+        raise HTTPException(
+            status_code=404,
+            detail=json.dumps({
+                "needs_registration": True,
+                "prefill": {"email": google_email, "full_name": google_name}
+            })
+        )
+
+    coach = result.data[0]
+    session_token = str(uuid.uuid4())
+    await run_in_threadpool(
+        lambda: supa.table("coach_accounts")
+        .update({"session_token": session_token, "last_active": _now()})
+        .eq("id", coach["id"])
+        .execute()
+    )
+    coach["session_token"] = session_token
+    return {"token": session_token, "coach": _clean_coach(coach)}

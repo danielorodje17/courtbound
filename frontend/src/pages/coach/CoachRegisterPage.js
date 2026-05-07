@@ -1,23 +1,45 @@
-import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { useCoachAuth } from "../../context/CoachAuthContext";
+import { supabase } from "../../supabaseClient";
 import { toast } from "sonner";
 import { Trophy, CheckCircle, AlertCircle, Eye, EyeOff, ChevronRight, ChevronLeft } from "lucide-react";
 
 const DIVISIONS = ["NCAA D1", "NCAA D2", "NCAA D3", "NAIA", "JUCO", "Other"];
 const JOB_TITLES = ["Head Coach", "Assistant Coach", "Associate Head Coach", "Director of Basketball Operations", "Graduate Assistant Coach", "Volunteer Coach"];
 
+const GOOGLE_SVG = (
+  <svg width="18" height="18" viewBox="0 0 24 24">
+    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.47 2.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+  </svg>
+);
+
 export default function CoachRegisterPage() {
   const { register } = useCoachAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [showPw, setShowPw] = useState(false);
   const [result, setResult] = useState(null);
 
+  // Check for Google prefill
+  const isGooglePrefill = new URLSearchParams(location.search).get("prefill") === "true";
+  const googlePrefillData = isGooglePrefill
+    ? (() => { try { return JSON.parse(sessionStorage.getItem("coach_google_prefill") || "{}"); } catch { return {}; } })()
+    : {};
+
   const [form, setForm] = useState({
-    email: "", password: "", confirm_password: "",
-    full_name: "", job_title: "", institution_name: "",
+    email: googlePrefillData.email || "",
+    password: "",
+    confirm_password: "",
+    full_name: googlePrefillData.full_name || "",
+    google_id: googlePrefillData.google_id || "",
+    job_title: "", institution_name: "",
     division: "", conference: "", institution_website: "",
     primary_sport: "Men's Basketball", country: "US",
   });
@@ -26,12 +48,28 @@ export default function CoachRegisterPage() {
 
   const stepTitles = ["Account Details", "Programme Info", "Sport & Verification"];
 
+  const handleGoogleRegister = async () => {
+    setGoogleLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: `${window.location.origin}/coach/auth/callback` },
+      });
+      if (error) toast.error("Google sign-in failed. Please try again.");
+    } catch {
+      toast.error("Google sign-in failed. Please try again.");
+      setGoogleLoading(false);
+    }
+  };
+
   const validateStep = () => {
     if (step === 1) {
-      if (!form.email || !form.password || !form.full_name) return "Please fill all required fields";
+      if (!form.email || !form.full_name) return "Please fill all required fields";
       if (!form.email.includes("@")) return "Enter a valid email address";
-      if (form.password.length < 8) return "Password must be at least 8 characters";
-      if (form.password !== form.confirm_password) return "Passwords do not match";
+      if (!isGooglePrefill) {
+        if (form.password.length < 8) return "Password must be at least 8 characters";
+        if (form.password !== form.confirm_password) return "Passwords do not match";
+      }
     }
     if (step === 2) {
       if (!form.institution_name || !form.division) return "Institution name and division are required";
@@ -51,8 +89,11 @@ export default function CoachRegisterPage() {
     if (!form.primary_sport) { toast.error("Select your primary sport"); return; }
     setLoading(true);
     try {
-      const data = await register({ ...form });
+      const payload = { ...form };
+      if (isGooglePrefill) { delete payload.password; delete payload.confirm_password; }
+      const data = await register(payload);
       setResult(data);
+      if (isGooglePrefill) sessionStorage.removeItem("coach_google_prefill");
     } catch (err) {
       toast.error(err?.response?.data?.detail || "Registration failed. Please try again.");
     }
@@ -122,6 +163,33 @@ export default function CoachRegisterPage() {
           ))}
         </div>
 
+        {/* Google SSO — only shown on step 1 and when not already prefilled from Google */}
+        {step === 1 && !isGooglePrefill && (
+          <div className="mb-6">
+            <button
+              data-testid="coach-google-register-btn"
+              onClick={handleGoogleRegister}
+              disabled={googleLoading}
+              className="w-full flex items-center justify-center gap-3 bg-white hover:bg-slate-100 text-slate-800 font-bold py-3 rounded-xl border border-slate-300 transition-all disabled:opacity-60 text-sm"
+            >
+              {GOOGLE_SVG}
+              {googleLoading ? "Redirecting…" : "Continue with Google"}
+            </button>
+            <div className="flex items-center gap-3 mt-4 mb-2">
+              <div className="flex-1 h-px bg-slate-800" />
+              <span className="text-xs text-slate-500 font-semibold">or register with email</span>
+              <div className="flex-1 h-px bg-slate-800" />
+            </div>
+          </div>
+        )}
+
+        {isGooglePrefill && step === 1 && (
+          <div className="mb-4 bg-blue-950/50 border border-blue-800/60 rounded-xl p-3 flex items-center gap-2">
+            <span className="text-blue-400 text-xs font-semibold">{GOOGLE_SVG}</span>
+            <p className="text-blue-300 text-xs font-semibold">Pre-filled from Google. Complete your programme details below.</p>
+          </div>
+        )}
+
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 space-y-5">
 
           {/* Step 1 */}
@@ -135,25 +203,31 @@ export default function CoachRegisterPage() {
               <div>
                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Institutional Email *</label>
                 <input data-testid="reg-email" type="email" value={form.email} onChange={e => set("email", e.target.value)}
-                  placeholder="jsmith@university.edu" className="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600" />
-                <p className="text-xs text-slate-500 mt-1">Use your official .edu email for instant auto-verification</p>
+                  readOnly={isGooglePrefill}
+                  placeholder="jsmith@university.edu"
+                  className={`w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 ${isGooglePrefill ? "opacity-70 cursor-not-allowed" : ""}`} />
+                {!isGooglePrefill && <p className="text-xs text-slate-500 mt-1">Use your official .edu email for instant auto-verification</p>}
               </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Password *</label>
-                <div className="relative">
-                  <input data-testid="reg-password" type={showPw ? "text" : "password"} value={form.password}
-                    onChange={e => set("password", e.target.value)} placeholder="Min 8 characters"
-                    className="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg px-4 py-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600" />
-                  <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-3 text-slate-400">
-                    {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Confirm Password *</label>
-                <input type="password" value={form.confirm_password} onChange={e => set("confirm_password", e.target.value)}
-                  placeholder="Re-enter password" className="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600" />
-              </div>
+              {!isGooglePrefill && (
+                <>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Password *</label>
+                    <div className="relative">
+                      <input data-testid="reg-password" type={showPw ? "text" : "password"} value={form.password}
+                        onChange={e => set("password", e.target.value)} placeholder="Min 8 characters"
+                        className="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg px-4 py-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600" />
+                      <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-3 text-slate-400">
+                        {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Confirm Password *</label>
+                    <input type="password" value={form.confirm_password} onChange={e => set("confirm_password", e.target.value)}
+                      placeholder="Re-enter password" className="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600" />
+                  </div>
+                </>
+              )}
             </>
           )}
 

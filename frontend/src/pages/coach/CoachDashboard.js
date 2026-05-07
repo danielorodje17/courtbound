@@ -4,7 +4,7 @@ import { useCoachAuth } from "../../context/CoachAuthContext";
 import { CoachNav } from "../../components/coach/CoachNav";
 import CoachOnboardingModal from "../../components/coach/CoachOnboardingModal";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { Users, BookmarkPlus, Bell, TrendingUp, ChevronRight, Star, Film, Shield, AlertCircle, CheckCircle, Calendar, Award, BarChart2, Eye, MessageSquare } from "lucide-react";
+import { Users, BookmarkPlus, Bell, TrendingUp, ChevronRight, Star, Film, Shield, AlertCircle, CheckCircle, Calendar, Award, BarChart2, Eye, MessageSquare, X, KeyRound } from "lucide-react";
 
 const PERIOD_COLORS = {
   contact: "bg-green-500",
@@ -91,6 +91,18 @@ export default function CoachDashboard() {
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState(null);
 
+  // 2FA nudge banner — show only for email/password coaches who haven't dismissed it
+  const isGoogleCoach = localStorage.getItem("cb_coach_auth_method") === "google";
+  const [show2FABanner, setShow2FABanner] = useState(() => {
+    if (isGoogleCoach) return false;
+    return !localStorage.getItem("cb_coach_2fa_dismissed");
+  });
+
+  const dismiss2FA = () => {
+    localStorage.setItem("cb_coach_2fa_dismissed", "1");
+    setShow2FABanner(false);
+  };
+
   // Show onboarding wizard if not completed and not previously dismissed
   const [showOnboarding, setShowOnboarding] = useState(() => {
     if (!coach) return false;
@@ -165,6 +177,20 @@ export default function CoachDashboard() {
               <p className="text-amber-200 font-bold text-sm">Account Pending Verification</p>
               <p className="text-amber-300/70 text-xs mt-0.5">Your account is under review. Full player access unlocks within 48 hours. You can browse the platform in the meantime.</p>
             </div>
+          </div>
+        )}
+
+        {/* 2FA nudge banner — email/password coaches only, dismissible */}
+        {show2FABanner && isVerified && (
+          <div data-testid="2fa-nudge-banner" className="mb-6 bg-blue-950/50 border border-blue-800/60 rounded-xl p-4 flex items-start gap-3">
+            <KeyRound className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-blue-200 font-bold text-sm">Secure your account with 2FA</p>
+              <p className="text-blue-300/70 text-xs mt-0.5">Add two-factor authentication to protect your recruiting data. Set it up in your Supabase account settings.</p>
+            </div>
+            <button onClick={dismiss2FA} data-testid="2fa-nudge-dismiss" className="text-blue-500 hover:text-blue-300 transition-colors flex-shrink-0">
+              <X className="w-4 h-4" />
+            </button>
           </div>
         )}
 

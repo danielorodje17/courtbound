@@ -1,12 +1,13 @@
 import os
 import logging
-from fastapi import APIRouter, Depends, Path
+from fastapi import APIRouter, Depends, Path, HTTPException
 from fastapi.concurrency import run_in_threadpool
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 from supabase_db import supa
 from routers.coach_auth import get_current_coach, require_verified_coach
 from routers.coach_players import calculate_match_score, _player_card
+from routers.admin import require_admin_token
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/coach", tags=["coach-dashboard"])
@@ -196,13 +197,13 @@ async def mark_read(notif_id: str, coach=Depends(get_current_coach)):
 
 @router.get("/public/stats")
 async def public_coach_stats():
-    """Used on landing page: verified active coaches count."""
-    week_ago = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
-    res = await run_in_threadpool(
+    """Used on landing pages: live coach counts."""
+    thirty_days_ago = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+    active_res = await run_in_threadpool(
         lambda: supa.table("coach_accounts")
         .select("id", count="exact")
         .eq("verification_status", "verified")
-        .gte("last_active", week_ago)
+        .gte("last_active", thirty_days_ago)
         .execute()
     )
     total_res = await run_in_threadpool(
@@ -211,61 +212,100 @@ async def public_coach_stats():
         .eq("verification_status", "verified")
         .execute()
     )
+    inst_res = await run_in_threadpool(
+        lambda: supa.table("coach_accounts")
+        .select("institution_name")
+        .eq("verification_status", "verified")
+        .execute()
+    )
+    institutions = {r["institution_name"] for r in (inst_res.data or []) if r.get("institution_name")}
     return {
-        "active_coaches": res.count or 0,
+        "active_coaches": active_res.count or 0,
+        "active_coaches_30d": active_res.count or 0,
         "total_verified": total_res.count or 0,
+        "verified_coaches": total_res.count or 0,
+        "total_programmes": len(institutions),
     }
 
 
 # ── Admin: Coach Verification Queue ──────────────────────────────────────────
 
 @router.get("/admin/queue")
-async def admin_coach_queue(authorization: str = None):
-    # Uses admin auth (CB_ADMIN_SECRET env var check)
-    secret = os.environ.get("CB_ADMIN_SECRET", "")
-    if authorization != f"Bearer {secret}":
-        from fastapi import HTTPException
-        raise HTTPException(status_code=401)
-    res = await run_in_threadpool(
+async def admin_coach_queue(_=Depends(require_admin_token)):
+    """Returns pending coach verification queue. Requires admin token."""
+    pending_res = await run_in_threadpool(
         lambda: supa.table("coach_accounts").select("*")
         .eq("verification_status", "pending")
         .order("created_at")
         .execute()
     )
-    return res.data or []
+    verified_res = await run_in_threadpool(
+        lambda: supa.table("coach_accounts").select("*")
+        .eq("verification_status", "verified")
+        .order("verified_at", desc=True)
+        .execute()
+    )
+    now = datetime.now(timezone.utc)
+    week_ago = (now - timedelta(days=7)).isoformat()
+    approved_week = await run_in_threadpool(
+        lambda: supa.table("coach_accounts").select("id", count="exact")
+        .eq("verification_status", "verified")
+        .gte("verified_at", week_ago)
+        .execute()
+    )
+    rejected_week = await run_in_threadpool(
+        lambda: supa.table("coach_accounts").select("id", count="exact")
+        .eq("verification_status", "rejected")
+        .execute()
+    )
+    overdue_cutoff = (now - timedelta(hours=48)).isoformat()
+    overdue = [c for c in (pending_res.data or []) if c.get("created_at", "") < overdue_cutoff]
+    return {
+        "pending": pending_res.data or [],
+        "verified": verified_res.data or [],
+        "stats": {
+            "total_pending": len(pending_res.data or []),
+            "overdue": len(overdue),
+            "approved_week": approved_week.count or 0,
+            "rejected_week": rejected_week.count or 0,
+        }
+    }
 
 
 @router.patch("/admin/verify/{coach_id}")
 async def admin_verify_coach(
     coach_id: str,
     body: dict,
-    authorization: str = None,
+    _=Depends(require_admin_token),
 ):
-    from fastapi import HTTPException, Header
-    from datetime import datetime, timezone
-    # This endpoint is called from the existing admin panel using admin token
-    # We rely on admin_token verification in AdminPage — but here we check it ourselves
-    admin_token = authorization.split(" ")[1] if authorization and " " in authorization else ""
-    # Verify admin token via coach_accounts admin check
-    result = await run_in_threadpool(
-        lambda: supa.table("admin_accounts").select("id").eq("session_token", admin_token).limit(1).execute()
-    )
-    if not result.data:
-        raise HTTPException(status_code=401, detail="Admin auth required")
+    action = body.get("action")  # "approve" | "reject" | "request_info"
+    message = body.get("message", "")
 
-    action = body.get("action")  # "approve" or "reject"
-    notes = body.get("notes", "")
+    if action == "approve":
+        status = "verified"
+        updates = {
+            "verification_status": "verified",
+            "verification_notes": message,
+            "verified_at": datetime.now(timezone.utc).isoformat(),
+        }
+    elif action == "reject":
+        status = "rejected"
+        updates = {
+            "verification_status": "rejected",
+            "verification_notes": message,
+        }
+    elif action == "request_info":
+        updates = {
+            "verification_notes": f"INFO REQUESTED: {message}",
+        }
+        status = "pending"
+    else:
+        raise HTTPException(status_code=400, detail="Invalid action")
 
-    status = "verified" if action == "approve" else "rejected"
-    updates = {
-        "verification_status": status,
-        "verification_notes": notes,
-        "verified_at": datetime.now(timezone.utc).isoformat() if action == "approve" else None,
-    }
     await run_in_threadpool(
         lambda: supa.table("coach_accounts").update(updates).eq("id", coach_id).execute()
     )
-    return {"message": f"Coach {status}"}
+    return {"message": f"Coach {status if action != 'request_info' else 'info requested'}"}
 
 
 
