@@ -161,6 +161,8 @@ async def search_players(
     min_height_cm: Optional[int] = Query(None),
     max_height_cm: Optional[int] = Query(None),
     min_ppg: Optional[float] = Query(None),
+    min_gpa: Optional[float] = Query(None),
+    min_sat: Optional[int] = Query(None),
     ncaa_registered: Optional[bool] = Query(None),
     search: Optional[str] = Query(None),
     sort: Optional[str] = Query("match"),
@@ -198,6 +200,23 @@ async def search_players(
 
     result = await run_in_threadpool(lambda: query.limit(200).execute())
     players = result.data or []
+
+    # Post-query filters for text-stored academic fields
+    if min_gpa is not None:
+        def _gpa_ok(p):
+            try:
+                return float(str(p.get("gpa_equivalent") or "").strip()) >= min_gpa
+            except ValueError:
+                return False
+        players = [p for p in players if _gpa_ok(p)]
+
+    if min_sat is not None:
+        def _sat_ok(p):
+            try:
+                return int(str(p.get("sat_score") or "").strip()) >= min_sat
+            except ValueError:
+                return False
+        players = [p for p in players if _sat_ok(p)]
 
     # Get saved player IDs for this coach
     saved_res = await run_in_threadpool(

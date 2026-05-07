@@ -20,6 +20,8 @@ export default function CoachSettingsPage() {
     divisions: [],
     min_height_cm: "",
     min_ppg: "",
+    min_gpa: "",
+    min_sat: "",
   });
 
   const [profile, setProfile] = useState({
@@ -50,6 +52,8 @@ export default function CoachSettingsPage() {
       divisions: rp.divisions || [],
       min_height_cm: rp.min_height_cm ?? "",
       min_ppg: rp.min_ppg ?? "",
+      min_gpa: rp.min_gpa ?? "",
+      min_sat: rp.min_sat ?? "",
     });
   }, [coach]);
 
@@ -71,6 +75,8 @@ export default function CoachSettingsPage() {
           ...prefs,
           min_height_cm: prefs.min_height_cm !== "" ? Number(prefs.min_height_cm) : null,
           min_ppg: prefs.min_ppg !== "" ? Number(prefs.min_ppg) : null,
+          min_gpa: prefs.min_gpa !== "" ? Number(prefs.min_gpa) : null,
+          min_sat: prefs.min_sat !== "" ? Number(prefs.min_sat) : null,
         },
         onboarding_steps: {
           ...(coach?.onboarding_steps || {}),
@@ -198,6 +204,20 @@ export default function CoachSettingsPage() {
               <input type="number" step="0.1" placeholder="e.g. 10" value={prefs.min_ppg}
                 onChange={e => setPrefs(p => ({ ...p, min_ppg: e.target.value }))}
                 data-testid="pref-min-ppg"
+                className="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Minimum GPA Equivalent</label>
+              <input type="number" step="0.1" min="0" max="4" placeholder="e.g. 3.0" value={prefs.min_gpa}
+                onChange={e => setPrefs(p => ({ ...p, min_gpa: e.target.value }))}
+                data-testid="pref-min-gpa"
+                className="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Minimum SAT Score</label>
+              <input type="number" step="10" min="400" max="1600" placeholder="e.g. 1000" value={prefs.min_sat}
+                onChange={e => setPrefs(p => ({ ...p, min_sat: e.target.value }))}
+                data-testid="pref-min-sat"
                 className="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600" />
             </div>
           </div>

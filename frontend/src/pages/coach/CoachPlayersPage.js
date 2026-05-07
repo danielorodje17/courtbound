@@ -31,6 +31,7 @@ export default function CoachPlayersPage() {
   const [filters, setFilters] = useState({
     search: "", position: "", grad_year: "",
     min_height_cm: "", max_height_cm: "", min_ppg: "",
+    min_gpa: "", min_sat: "",
     ncaa_registered: "", sort: "match",
   });
   const [applied, setApplied] = useState({ ...filters });
@@ -45,6 +46,8 @@ export default function CoachPlayersPage() {
       if (f.min_height_cm) params.append("min_height_cm", f.min_height_cm);
       if (f.max_height_cm) params.append("max_height_cm", f.max_height_cm);
       if (f.min_ppg) params.append("min_ppg", f.min_ppg);
+      if (f.min_gpa) params.append("min_gpa", f.min_gpa);
+      if (f.min_sat) params.append("min_sat", f.min_sat);
       if (f.ncaa_registered !== "") params.append("ncaa_registered", f.ncaa_registered);
       params.append("sort", f.sort);
       params.append("page", p);
@@ -70,7 +73,7 @@ export default function CoachPlayersPage() {
   };
 
   const clearFilters = () => {
-    const cleared = { search: "", position: "", grad_year: "", min_height_cm: "", max_height_cm: "", min_ppg: "", ncaa_registered: "", sort: "match" };
+    const cleared = { search: "", position: "", grad_year: "", min_height_cm: "", max_height_cm: "", min_ppg: "", min_gpa: "", min_sat: "", ncaa_registered: "", sort: "match" };
     setFilters(cleared);
     setApplied(cleared);
     fetchPlayers(cleared, 1);
@@ -126,7 +129,7 @@ export default function CoachPlayersPage() {
 
         {/* Filters panel */}
         {filtersOpen && (
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 mb-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4" data-testid="filters-panel">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 mb-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4" data-testid="filters-panel">
             <div>
               <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Position</label>
               <select value={filters.position} onChange={e => setFilters(p => ({ ...p, position: e.target.value }))}
@@ -162,6 +165,20 @@ export default function CoachPlayersPage() {
                 className="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg px-3 py-2 text-sm" />
             </div>
             <div>
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Min GPA</label>
+              <input type="number" step="0.1" min="0" max="4" placeholder="e.g. 3.0" value={filters.min_gpa}
+                onChange={e => setFilters(p => ({ ...p, min_gpa: e.target.value }))}
+                data-testid="filter-min-gpa"
+                className="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Min SAT</label>
+              <input type="number" step="10" min="400" max="1600" placeholder="e.g. 1000" value={filters.min_sat}
+                onChange={e => setFilters(p => ({ ...p, min_sat: e.target.value }))}
+                data-testid="filter-min-sat"
+                className="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
               <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">NCAA Reg.</label>
               <select value={filters.ncaa_registered} onChange={e => setFilters(p => ({ ...p, ncaa_registered: e.target.value }))}
                 className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm">
@@ -170,7 +187,7 @@ export default function CoachPlayersPage() {
                 <option value="false">Not Yet</option>
               </select>
             </div>
-            <div className="col-span-2 sm:col-span-3 lg:col-span-6 flex gap-3 pt-1">
+            <div className="col-span-2 sm:col-span-3 lg:col-span-4 flex gap-3 pt-1">
               <button onClick={applyFilters} data-testid="apply-filters-btn"
                 className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-6 py-2 rounded-lg text-sm transition-colors">
                 Apply Filters
