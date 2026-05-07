@@ -165,6 +165,11 @@ Build "CourtBound," a web app to track USA and UK college basketball scholarship
   - Frontend: KPI cards + recharts AreaChart + CSS bar charts at bottom of CoachDashboard
 - [x] Coach Marketing/Landing Page redesign (DONE — May 2026)
   - Premium sporty dark aesthetic: gradient hero, stats ribbon (skew), numbered steps with background giant numbers, feature cards with hover glow, angular CTAs
+- [x] Player Division Switcher on Profile page (DONE — May 2026)
+  - Two dropdowns: "1st Choice Division" + "2nd Choice Division" (options: D1, D2, D3, NAIA, JUCO)
+  - Replaces free-text input in Recruitment Targets section
+  - `target_division` already in DB; `target_division_2` requires migration v14
+  - Backend: models.py + profile.py fallback updated
 
 
 - Gender selector on onboarding step 0 (Men's / Women's)
@@ -224,3 +229,4 @@ Build "CourtBound," a web app to track USA and UK college basketball scholarship
 
 ## Pending Migrations (User Must Run in Supabase SQL Editor)
 - `/app/memory/supabase_migration_v5.sql` — adds `lead_source TEXT` to profiles table
+- `/app/memory/supabase_migration_v14_division_second_choice.sql` — adds `target_division_2 TEXT` to profiles table (required for 2nd Choice Division to save)
