@@ -27,6 +27,8 @@ Build "CourtBound," a web app to track USA and UK college basketball scholarship
 - [x] Profile management
 - [x] College comparison tool
 - [x] Admin panel: user management, reports, settings, college management
+- [x] CSV standardized headers with Image URL column (DONE May 2026)
+- [x] Bulk college import: no overwrite, duplicate detection, pending approval status (DONE May 2026 — requires migration v13)
 - [x] Email/Password auth + Emergent-managed Google Auth
 - [x] Email address reporting (wrong email clears verification badge)
 - [x] Subscription/Trial system (14-day free trial, Stripe live keys)

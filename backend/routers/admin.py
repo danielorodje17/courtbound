@@ -522,7 +522,6 @@ async def bulk_export_colleges(_=Depends(require_admin_token)):
     for c in colleges:
         for coach in (c.get("coaches") or [{}]):
             rows.append({
-                "ID": c.get("id", ""),
                 "Name": c.get("name", ""),
                 "Division": c.get("division", ""),
                 "Conference": c.get("conference", ""),
@@ -530,11 +529,12 @@ async def bulk_export_colleges(_=Depends(require_admin_token)):
                 "State": c.get("state", ""),
                 "Region": c.get("region", ""),
                 "Country": c.get("country", ""),
+                "Website": c.get("website", ""),
+                "Image URL": c.get("image_url", ""),
                 "Foreign Friendly": "Yes" if c.get("foreign_friendly") else "No",
                 "Ranking": c.get("ranking", ""),
                 "Acceptance Rate": c.get("acceptance_rate", ""),
                 "Scholarship Info": c.get("scholarship_info", ""),
-                "Website": c.get("website", ""),
                 "Language of Study": c.get("language_of_study", ""),
                 "Scholarship Type": c.get("scholarship_type", ""),
                 "Coach Name": coach.get("name", ""),
@@ -545,8 +545,14 @@ async def bulk_export_colleges(_=Depends(require_admin_token)):
             })
     if not rows:
         rows = [{"Name": "No colleges found"}]
+    STANDARD_FIELDS = [
+        "Name","Division","Conference","Location","State","Region","Country",
+        "Website","Image URL","Foreign Friendly","Ranking","Acceptance Rate",
+        "Scholarship Info","Language of Study","Scholarship Type",
+        "Coach Name","Coach Email","Coach Title","Coach Phone","Coach Last Verified",
+    ]
     output = io.StringIO()
-    writer = csv.DictWriter(output, fieldnames=list(rows[0].keys()))
+    writer = csv.DictWriter(output, fieldnames=STANDARD_FIELDS, extrasaction="ignore")
     writer.writeheader()
     writer.writerows(rows)
     output.seek(0)
@@ -558,28 +564,24 @@ async def bulk_export_colleges(_=Depends(require_admin_token)):
 
 
 @router.post("/colleges/bulk-import")
-async def bulk_import_colleges(data: BulkImportColleges, _=Depends(require_admin_token)):
-    from fastapi.concurrency import run_in_threadpool
-    inserted = updated = errors = 0
-    for row in data.colleges:
+async def bulk_import_colleges(file: UploadFile = File(...), _=Depends(require_admin_token)):
+    content = await file.read()
+    try:
+        text = content.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = content.decode("latin-1")
+    reader = csv.DictReader(io.StringIO(text))
+    rows = list(reader)
+    if not rows:
+        raise HTTPException(status_code=400, detail="CSV is empty or unreadable")
+
+    inserted = 0
+    errors = 0
+    duplicates = []
+
+    for row in rows:
         try:
-            college_doc = {
-                "name": (row.get("name") or row.get("Name", "")).strip(),
-                "division": (row.get("division") or row.get("Division", "")).strip(),
-                "conference": (row.get("conference") or row.get("Conference", "")).strip(),
-                "location": (row.get("location") or row.get("Location", "")).strip(),
-                "state": (row.get("state") or row.get("State", "")).strip(),
-                "region": (row.get("region") or row.get("Region", "")).strip(),
-                "country": (row.get("country") or row.get("Country", "")).strip(),
-                "foreign_friendly": (row.get("foreign_friendly") or row.get("Foreign Friendly", "")).strip().lower() in ("yes", "true", "1"),
-                "ranking": int(row.get("ranking") or row.get("Ranking") or 9999),
-                "acceptance_rate": str(row.get("acceptance_rate") or row.get("Acceptance Rate", "")).strip(),
-                "scholarship_info": (row.get("scholarship_info") or row.get("Scholarship Info", "")).strip(),
-                "website": (row.get("website") or row.get("Website", "")).strip(),
-                "language_of_study": (row.get("language_of_study") or row.get("Language of Study", "")).strip(),
-                "scholarship_type": (row.get("scholarship_type") or row.get("Scholarship Type", "")).strip(),
-            }
-            name = college_doc["name"]
+            name = (row.get("Name") or row.get("name") or "").strip()
             if not name:
                 errors += 1
                 continue
@@ -588,25 +590,52 @@ async def bulk_import_colleges(data: BulkImportColleges, _=Depends(require_admin
                 lambda n=name: supa.table("colleges").select("id").ilike("name", n).execute()
             )
             if existing_r.data:
-                college_id = existing_r.data[0]["id"]
-                await run_in_threadpool(lambda cid=college_id, cd=college_doc: supa.table("colleges").update(cd).eq("id", cid).execute())
-                updated += 1
-            else:
+                duplicates.append({"name": name})
+                continue
+
+            def _ff(val):
+                return (val or "").strip().lower() in ("yes", "true", "1")
+
+            college_doc = {
+                "name": name,
+                "division": (row.get("Division") or row.get("division") or "").strip(),
+                "conference": (row.get("Conference") or row.get("conference") or "").strip(),
+                "location": (row.get("Location") or row.get("location") or "").strip(),
+                "state": (row.get("State") or row.get("state") or "").strip(),
+                "region": (row.get("Region") or row.get("region") or "").strip(),
+                "country": (row.get("Country") or row.get("country") or "").strip(),
+                "foreign_friendly": _ff(row.get("Foreign Friendly") or row.get("foreign_friendly")),
+                "ranking": int(row.get("Ranking") or row.get("ranking") or 9999),
+                "acceptance_rate": str(row.get("Acceptance Rate") or row.get("acceptance_rate") or "").strip(),
+                "scholarship_info": (row.get("Scholarship Info") or row.get("scholarship_info") or "").strip(),
+                "website": (row.get("Website") or row.get("website") or "").strip(),
+                "image_url": (row.get("Image URL") or row.get("image_url") or "").strip() or None,
+                "language_of_study": (row.get("Language of Study") or row.get("language_of_study") or "").strip(),
+                "scholarship_type": (row.get("Scholarship Type") or row.get("scholarship_type") or "").strip(),
+                "status": "pending",
+            }
+
+            try:
                 ins_r = await run_in_threadpool(lambda cd=college_doc: supa.table("colleges").insert(cd).execute())
-                college_id = ins_r.data[0]["id"] if ins_r.data else None
-                inserted += 1
+            except Exception:
+                # Fallback: insert without status if migration v13 not yet applied
+                fallback = {k: v for k, v in college_doc.items() if k != "status"}
+                ins_r = await run_in_threadpool(lambda cd=fallback: supa.table("colleges").insert(cd).execute())
+            college_id = ins_r.data[0]["id"] if ins_r.data else None
+            inserted += 1
 
             if not college_id:
                 continue
 
-            coach_name = (row.get("coach_name") or row.get("Coach Name", "")).strip()
+            coach_name = (row.get("Coach Name") or row.get("coach_name") or "").strip()
             if coach_name:
                 coach_doc = {
-                    "college_id": college_id, "name": coach_name,
-                    "email": (row.get("coach_email") or row.get("Coach Email", "")).strip(),
-                    "title": (row.get("coach_title") or row.get("Coach Title", "Head Coach")).strip(),
-                    "phone": (row.get("coach_phone") or row.get("Coach Phone", "")).strip(),
-                    "last_verified": (row.get("coach_last_verified") or row.get("Coach Last Verified", "")).strip() or None,
+                    "college_id": college_id,
+                    "name": coach_name,
+                    "email": (row.get("Coach Email") or row.get("coach_email") or "").strip(),
+                    "title": (row.get("Coach Title") or row.get("coach_title") or "Head Coach").strip(),
+                    "phone": (row.get("Coach Phone") or row.get("coach_phone") or "").strip(),
+                    "last_verified": (row.get("Coach Last Verified") or row.get("coach_last_verified") or "").strip() or None,
                 }
                 await run_in_threadpool(
                     lambda cid=college_id, cd=coach_doc: supa.table("coaches")
@@ -614,7 +643,8 @@ async def bulk_import_colleges(data: BulkImportColleges, _=Depends(require_admin
                 )
         except Exception:
             errors += 1
-    return {"inserted": inserted, "updated": updated, "errors": errors}
+
+    return {"inserted": inserted, "duplicates": duplicates, "errors": errors}
 
 
 SUSPICIOUS_PREFIXES = ["athletics@","info@","admin@","basketball@","sports@","recruiting@","coaches@","contact@"]
@@ -628,7 +658,10 @@ def _is_suspicious(email: str) -> bool:
 @router.get("/colleges-contacts/export")
 async def export_contacts(filter: str = "all", _=Depends(require_admin_token)):
     result = await run_in_threadpool(
-        lambda: supa.table("coaches").select("*, colleges(name,division,conference,state)").order("last_verified", desc=True).execute()
+        lambda: supa.table("coaches")
+        .select("*, colleges(name,division,conference,location,state,region,country,website,image_url)")
+        .order("last_verified", desc=True)
+        .execute()
     )
     coaches = result.data or []
     if filter == "suspicious":
@@ -637,29 +670,47 @@ async def export_contacts(filter: str = "all", _=Depends(require_admin_token)):
         coaches = [c for c in coaches if not _is_suspicious(c.get("email", ""))]
     rows = []
     for c in coaches:
-        college = c.get("colleges") or {}
+        col = c.get("colleges") or {}
         rows.append({
-            "College": college.get("name", ""),
-            "Division": college.get("division", ""),
-            "Conference": college.get("conference", ""),
-            "State": college.get("state", ""),
+            "Name": col.get("name", ""),
+            "Division": col.get("division", ""),
+            "Conference": col.get("conference", ""),
+            "Location": col.get("location", ""),
+            "State": col.get("state", ""),
+            "Region": col.get("region", ""),
+            "Country": col.get("country", ""),
+            "Website": col.get("website", ""),
+            "Image URL": col.get("image_url", ""),
+            "Foreign Friendly": "",
+            "Ranking": "",
+            "Acceptance Rate": "",
+            "Scholarship Info": "",
+            "Language of Study": "",
+            "Scholarship Type": "",
             "Coach Name": c.get("name", ""),
             "Coach Email": c.get("email", ""),
             "Coach Title": c.get("title", ""),
             "Coach Phone": c.get("phone", ""),
-            "Last Verified": c.get("last_verified", ""),
+            "Coach Last Verified": c.get("last_verified", ""),
         })
+    STANDARD_FIELDS = [
+        "Name","Division","Conference","Location","State","Region","Country",
+        "Website","Image URL","Foreign Friendly","Ranking","Acceptance Rate",
+        "Scholarship Info","Language of Study","Scholarship Type",
+        "Coach Name","Coach Email","Coach Title","Coach Phone","Coach Last Verified",
+    ]
     if not rows:
-        rows = [{"College": "No coaches found"}]
+        rows = [dict.fromkeys(STANDARD_FIELDS, "")]
     output = io.StringIO()
-    writer = csv.DictWriter(output, fieldnames=list(rows[0].keys()))
+    writer = csv.DictWriter(output, fieldnames=STANDARD_FIELDS, extrasaction="ignore")
     writer.writeheader()
     writer.writerows(rows)
     output.seek(0)
+    filename = "suspicious_coaches.csv" if filter == "suspicious" else "all_coaches_export.csv"
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=contacts_export.csv"},
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 
 
@@ -677,7 +728,7 @@ async def import_contacts(file: UploadFile = File(...), _=Depends(require_admin_
     updated = skipped = 0
     for row in rows:
         row = {k.strip(): v.strip() for k, v in row.items()}
-        college_name = row.get("College", "")
+        college_name = row.get("College", "") or row.get("Name", "")
         coach_name = row.get("Coach Name", "")
         coach_email = row.get("Coach Email", "")
         if not college_name or not coach_name:
@@ -722,6 +773,39 @@ async def admin_update_settings(body: dict, _=Depends(require_admin_token)):
         ).execute()
     )
     return {"message": "Settings updated"}
+
+
+# ── Pending College Management ────────────────────────────────────────────────
+
+@router.get("/colleges/pending")
+async def get_pending_colleges(_=Depends(require_admin_token)):
+    try:
+        result = await run_in_threadpool(
+            lambda: supa.table("colleges").select("*, coaches(*)").eq("status", "pending").order("name").execute()
+        )
+        return result.data or []
+    except Exception:
+        return []  # migration v13 not yet applied
+
+
+@router.post("/colleges/{college_id}/approve")
+async def approve_college(college_id: str, _=Depends(require_admin_token)):
+    await run_in_threadpool(
+        lambda: supa.table("colleges").update({"status": "live"}).eq("id", college_id).execute()
+    )
+    return {"message": "College approved and now live"}
+
+
+@router.delete("/colleges/{college_id}")
+async def delete_college(college_id: str, _=Depends(require_admin_token)):
+    # Also delete associated coaches
+    await run_in_threadpool(
+        lambda: supa.table("coaches").delete().eq("college_id", college_id).execute()
+    )
+    await run_in_threadpool(
+        lambda: supa.table("colleges").delete().eq("id", college_id).execute()
+    )
+    return {"message": "College deleted"}
 
 
 # ──────────────────────────────────────────────

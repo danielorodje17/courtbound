@@ -520,7 +520,10 @@ export default function AdminPage() {
   const [editSaved, setEditSaved] = useState(false);
   // Bulk college import
   const [bulkImportResult, setBulkImportResult] = useState(null);
-  const [bulkImporting, setBulkImporting] = useState(false); // {`${college_id}-${coach_name}`: true}
+  const [bulkImporting, setBulkImporting] = useState(false);
+  const [pendingColleges, setPendingColleges] = useState([]);
+  const [pendingLoading, setPendingLoading] = useState(false);
+  const [approvingId, setApprovingId] = useState(null);
   const adminEmail = localStorage.getItem("cb_admin_email") || "Admin";
 
   const load = useCallback(async () => {
@@ -747,7 +750,6 @@ export default function AdminPage() {
     formData.append("file", file);
     try {
       const token = localStorage.getItem("cb_admin_token");
-      const API = process.env.REACT_APP_BACKEND_URL;
       const res = await fetch(`${API}/api/admin/colleges/bulk-import`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
@@ -755,15 +757,44 @@ export default function AdminPage() {
       });
       const data = await res.json();
       setBulkImportResult(data);
-      if (data.created > 0 || data.updated > 0) {
-        setContactsLoaded(false);
-        await loadContacts();
-      }
+      if (data.inserted > 0) loadPendingColleges();
     } catch {
-      setBulkImportResult({ ok: false, error: "Upload failed. Check file format." });
+      setBulkImportResult({ error: "Upload failed. Check file format." });
     }
     setBulkImporting(false);
     e.target.value = "";
+  };
+
+  const loadPendingColleges = async () => {
+    setPendingLoading(true);
+    try {
+      const r = await adminReq("get", "/admin/colleges/pending");
+      setPendingColleges(r.data || []);
+    } catch {}
+    setPendingLoading(false);
+  };
+
+  const approveCollege = async (id) => {
+    setApprovingId(id);
+    try {
+      await adminReq("post", `/admin/colleges/${id}/approve`);
+      setPendingColleges(prev => prev.filter(c => c.id !== id));
+      toast.success("College approved and now live!");
+    } catch {
+      toast.error("Failed to approve college");
+    }
+    setApprovingId(null);
+  };
+
+  const rejectCollege = async (id, name) => {
+    if (!window.confirm(`Delete "${name}"? This cannot be undone.`)) return;
+    try {
+      await adminReq("delete", `/admin/colleges/${id}`);
+      setPendingColleges(prev => prev.filter(c => c.id !== id));
+      toast.success(`${name} removed.`);
+    } catch {
+      toast.error("Failed to delete college");
+    }
   };
 
   const exportBulkColleges = async () => {
@@ -928,6 +959,7 @@ export default function AdminPage() {
         ].map(t => (
           <button key={t.id} onClick={() => {
             setActiveTab(t.id);
+            if (t.id === "colleges") loadPendingColleges();
             if (t.id === "colleges") loadContacts();
             if (t.id === "funnel"   && !funnel)   loadFunnel();
             if (t.id === "outreach" && !outreach) loadOutreach();
@@ -1562,7 +1594,7 @@ export default function AdminPage() {
         return (
           <div>
             {/* Bulk College Import/Export */}
-            <div className="flex items-center gap-2 mb-5 flex-wrap p-4 bg-slate-50 border border-slate-200 rounded-xl">
+            <div className="flex items-center gap-2 mb-4 flex-wrap p-4 bg-slate-50 border border-slate-200 rounded-xl">
               <span className="text-xs font-bold text-slate-600 uppercase tracking-wide mr-2">Colleges:</span>
               <button data-testid="export-colleges-btn" onClick={exportBulkColleges}
                 className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-900 text-white text-xs font-bold uppercase tracking-wide rounded-lg transition-all">
@@ -1570,22 +1602,88 @@ export default function AdminPage() {
               </button>
               <label className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold uppercase tracking-wide rounded-lg transition-all cursor-pointer">
                 <Upload className="w-3.5 h-3.5" />
-                {bulkImporting ? "Importing..." : "Import / Add Colleges"}
+                {bulkImporting ? "Importing..." : "Import Colleges (CSV)"}
                 <input type="file" accept=".csv" className="hidden" onChange={handleBulkCollegeImport} disabled={bulkImporting} />
               </label>
-              <span className="text-xs text-slate-400">Empty college_id = add new college. Existing id = update.</span>
+              <span className="text-xs text-slate-400">New colleges are added as <strong>Pending</strong> for review. Duplicates are detected and skipped.</span>
             </div>
 
+            {/* Import result */}
             {bulkImportResult && (
-              <div data-testid="bulk-import-result" className={`mb-4 px-4 py-3 rounded-xl text-sm font-semibold border flex flex-wrap items-center gap-4 ${bulkImportResult.ok ? "bg-green-50 border-green-200 text-green-800" : "bg-red-50 border-red-200 text-red-800"}`}>
-                {bulkImportResult.ok ? (
+              <div data-testid="bulk-import-result" className={`mb-4 p-4 rounded-xl border ${bulkImportResult.error ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200"}`}>
+                {bulkImportResult.error ? (
+                  <div className="flex items-center gap-2 text-red-700 text-sm font-semibold">
+                    <XCircle className="w-4 h-4" /> {bulkImportResult.error}
+                  </div>
+                ) : (
                   <>
-                    <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-                    <span><strong>{bulkImportResult.created}</strong> added, <strong>{bulkImportResult.updated}</strong> updated, <strong>{bulkImportResult.skipped}</strong> skipped</span>
-                    {bulkImportResult.errors?.length > 0 && <span className="text-xs text-amber-700">{bulkImportResult.errors[0]}</span>}
+                    <div className="flex items-center gap-3 mb-2">
+                      <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />
+                      <span className="font-bold text-green-800 text-sm">Import complete</span>
+                      <span className="text-green-700 text-sm">
+                        <strong>{bulkImportResult.inserted}</strong> college{bulkImportResult.inserted !== 1 ? "s" : ""} added (pending approval)
+                        {bulkImportResult.errors > 0 && <span className="text-amber-600 ml-2">{bulkImportResult.errors} error{bulkImportResult.errors !== 1 ? "s" : ""}</span>}
+                      </span>
+                    </div>
+                    {bulkImportResult.duplicates?.length > 0 && (
+                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-2">
+                        <p className="text-xs font-bold text-amber-800 flex items-center gap-1.5 mb-1">
+                          <AlertTriangle className="w-3.5 h-3.5" />
+                          {bulkImportResult.duplicates.length} duplicate{bulkImportResult.duplicates.length !== 1 ? "s" : ""} found and skipped (existing records not overwritten):
+                        </p>
+                        <p className="text-xs text-amber-700 leading-relaxed">{bulkImportResult.duplicates.map(d => d.name).join(", ")}</p>
+                      </div>
+                    )}
                   </>
-                ) : <span>{bulkImportResult.error}</span>}
-                <button onClick={() => setBulkImportResult(null)} className="ml-auto text-slate-400 hover:text-slate-600 text-xs">Dismiss</button>
+                )}
+                <button onClick={() => setBulkImportResult(null)} className="mt-2 text-slate-400 hover:text-slate-600 text-xs">Dismiss</button>
+              </div>
+            )}
+
+            {/* Pending Colleges Section */}
+            {(pendingColleges.length > 0 || pendingLoading) && (
+              <div data-testid="pending-colleges-section" className="mb-6 bg-amber-50 border border-amber-200 rounded-xl overflow-hidden">
+                <div className="flex items-center gap-2 px-4 py-3 bg-amber-100 border-b border-amber-200">
+                  <Clock className="w-4 h-4 text-amber-600" />
+                  <span className="text-sm font-bold text-amber-800">
+                    Pending Approval — {pendingLoading ? "..." : pendingColleges.length} college{pendingColleges.length !== 1 ? "s" : ""} awaiting review
+                  </span>
+                </div>
+                {pendingLoading ? (
+                  <div className="p-6 text-center text-amber-600 text-sm">Loading pending colleges...</div>
+                ) : (
+                  <div className="divide-y divide-amber-100">
+                    {pendingColleges.map(c => (
+                      <div key={c.id} data-testid={`pending-college-${c.id}`} className="flex items-center gap-4 px-4 py-3 hover:bg-amber-50/80">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-slate-800 text-sm truncate">{c.name}</p>
+                          <p className="text-xs text-slate-500">{[c.division, c.conference, c.state].filter(Boolean).join(" · ")}</p>
+                          {(c.coaches || []).slice(0, 1).map(coach => (
+                            <p key={coach.id} className="text-xs text-slate-400">{coach.name} — {coach.email}</p>
+                          ))}
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <button
+                            onClick={() => approveCollege(c.id)}
+                            disabled={approvingId === c.id}
+                            data-testid={`approve-college-${c.id}`}
+                            className="flex items-center gap-1.5 text-xs font-bold bg-green-600 hover:bg-green-500 text-white px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            {approvingId === c.id ? "..." : "Approve"}
+                          </button>
+                          <button
+                            onClick={() => rejectCollege(c.id, c.name)}
+                            data-testid={`reject-college-${c.id}`}
+                            className="flex items-center gap-1.5 text-xs font-bold bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-3 py-1.5 rounded-lg transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" /> Delete
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
