@@ -154,13 +154,15 @@ Build "CourtBound," a web app to track USA and UK college basketball scholarship
 - [x] Unread message badges on player nav (DONE)
 - [x] Coach Onboarding Sequence (DONE — May 2026)
 - [x] Player NCAA Key Dates widget on dashboard (DONE — May 2026)
-  - GET /api/dashboard/ncaa-calendar endpoint with hardcoded 2025-26 & 2026-27 calendar
-  - Current active period banner (ACTIVE NOW + days remaining)
-  - Horizontal-scroll upcoming event cards, color-coded by category
-  - Categories: signing (purple), period (blue), eligibility (green), portal (amber), application (rose)
-- Coach analytics
-- Programme public page
-- Coach marketing/landing page
+- [x] Programme Public Page `/coach/program/:slug` (DONE — May 2026)
+  - Backend: GET /api/coach/public/:slug (no auth), slug auto-generated from institution_name
+  - Frontend: CoachProgramPage.js with header, about, recruiting needs, player CTA card
+  - 404 handling for unknown slugs
+- [x] Coach Analytics inline on dashboard (DONE — May 2026)
+  - Backend: GET /api/coach/analytics — views (7d/30d/all-time), saves by list, top positions, top grad years, daily 14-day view trend
+  - Frontend: KPI cards + recharts AreaChart + CSS bar charts at bottom of CoachDashboard
+- [x] Coach Marketing/Landing Page redesign (DONE — May 2026)
+  - Premium sporty dark aesthetic: gradient hero, stats ribbon (skew), numbered steps with background giant numbers, feature cards with hover glow, angular CTAs
 
 
 - Gender selector on onboarding step 0 (Men's / Women's)
