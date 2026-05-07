@@ -134,7 +134,14 @@ Build "CourtBound," a web app to track USA and UK college basketball scholarship
 - `coach_notifications` — in-app notification feed
 - `coach_player_views` — view tracking
 
-### Phase 2 (completed)
+### Promo Codes — Discount Support (May 2026)
+- Two code types: "Time Extension" (adds free days) + "% Discount at Checkout"
+- Discount codes: `discount_percent` + `applicable_plan_type` (all/annual/monthly)
+- Pricing page: real-time discounted price display with strikethrough original
+- Admin panel: code type toggle, green badge for discount codes, orange for extension
+- Promo code validated at checkout, applied to Stripe session amount, recorded post-payment
+- Migrations: v12 (discount_percent, applicable_plan_type columns), extension_days NOT NULL dropped
+
 - Admin verification queue (Coaches tab in Admin Panel) — approve/reject coaches
 - Messaging system: coach → player one-way messages with NCAA compliance warnings  
 - Coach notifications page (`/coach/notifications`)
