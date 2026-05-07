@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { apiRequest } from "../context/AuthContext";
 import { useAuth } from "../context/AuthContext";
 import { useTheme, DIVISION_THEME } from "../context/ThemeContext";
-import { Trophy, Mail, BookOpen, TrendingUp, ChevronRight, Bell, Plus, AlertTriangle, Clock, Calendar, CheckCircle, BarChart2, Newspaper, ArrowUp, ArrowDown, Minus } from "lucide-react";
+import { Trophy, Mail, BookOpen, TrendingUp, ChevronRight, Bell, Plus, AlertTriangle, Clock, Calendar, CheckCircle, BarChart2, Newspaper, ArrowUp, ArrowDown, Minus, PenLine, GraduationCap, ArrowRightLeft, FileText, Flag } from "lucide-react";
 import WeeklyGoalsWidget from "../components/WeeklyGoalsWidget";
 import ActivityHeatmap from "../components/ActivityHeatmap";
 import TrialBanner from "../components/TrialBanner";
@@ -26,6 +26,116 @@ const DIVISION_COLORS = ["#f97316", "#3b82f6", "#10b981", "#8b5cf6", "#ec4899", 
 function daysUntil(dateStr) {
   if (!dateStr) return null;
   return Math.ceil((new Date(dateStr).setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / 86400000);
+}
+
+// ── NCAA Calendar helpers ──────────────────────────────────────────────────
+
+const NCAA_CATEGORY_META = {
+  signing:     { icon: PenLine,          label: "Signing",     bg: "bg-purple-50",  border: "border-purple-200", text: "text-purple-700", accent: "bg-purple-600" },
+  period:      { icon: Calendar,         label: "Period",      bg: "bg-blue-50",    border: "border-blue-200",   text: "text-blue-700",   accent: "bg-blue-600"   },
+  eligibility: { icon: GraduationCap,    label: "Eligibility", bg: "bg-green-50",   border: "border-green-200",  text: "text-green-700",  accent: "bg-green-600"  },
+  portal:      { icon: ArrowRightLeft,   label: "Portal",      bg: "bg-amber-50",   border: "border-amber-200",  text: "text-amber-700",  accent: "bg-amber-500"  },
+  application: { icon: FileText,         label: "Application", bg: "bg-rose-50",    border: "border-rose-200",   text: "text-rose-700",   accent: "bg-rose-500"   },
+  general:     { icon: Flag,             label: "General",     bg: "bg-slate-50",   border: "border-slate-200",  text: "text-slate-700",  accent: "bg-slate-500"  },
+};
+
+const URGENCY_BADGE = {
+  high:     { pill: "bg-red-500 text-white",    label: (d) => `${d}d` },
+  medium:   { pill: "bg-orange-500 text-white", label: (d) => `${d}d` },
+  upcoming: { pill: "bg-blue-100 text-blue-700", label: (d) => `${d}d` },
+  current:  { pill: "bg-green-500 text-white",   label: () => "NOW"   },
+};
+
+function formatDateRange(dateStr, endDateStr) {
+  const opts = { day: "numeric", month: "short" };
+  const start = new Date(dateStr).toLocaleDateString("en-GB", opts);
+  if (!endDateStr || endDateStr === dateStr) return start;
+  const end = new Date(endDateStr).toLocaleDateString("en-GB", opts);
+  return `${start} – ${end}`;
+}
+
+function NcaaEventCard({ event, isCurrentBanner }) {
+  const meta = NCAA_CATEGORY_META[event.category] || NCAA_CATEGORY_META.general;
+  const Icon = meta.icon;
+  const urgency = URGENCY_BADGE[event.urgency] || URGENCY_BADGE.upcoming;
+  const dateLabel = formatDateRange(event.date, event.end_date);
+
+  if (isCurrentBanner) {
+    return (
+      <div className={`flex items-start gap-3 p-4 rounded-xl border ${meta.bg} ${meta.border}`} data-testid="ncaa-current-event">
+        <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${meta.accent}`}>
+          <Icon className="w-4 h-4 text-white" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{meta.label}</span>
+            <span className="bg-green-500 text-white text-xs font-black px-2 py-0.5 rounded-full">ACTIVE NOW</span>
+            {event.days_remaining > 0 && (
+              <span className="text-xs text-slate-500 font-medium">{event.days_remaining} day{event.days_remaining !== 1 ? "s" : ""} remaining</span>
+            )}
+          </div>
+          <p className="text-sm font-bold text-slate-900 mt-0.5">{event.title}</p>
+          <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{event.short_desc}</p>
+        </div>
+        <span className="text-xs text-slate-400 font-medium flex-shrink-0 hidden sm:block">{dateLabel}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`flex-shrink-0 w-52 border rounded-xl p-4 ${meta.bg} ${meta.border}`} data-testid="ncaa-upcoming-event">
+      <div className="flex items-center justify-between mb-3">
+        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${meta.accent}`}>
+          <Icon className="w-3.5 h-3.5 text-white" />
+        </div>
+        <span className={`text-xs font-black px-2 py-0.5 rounded-full ${urgency.pill}`}>
+          {urgency.label(event.days_until)}
+        </span>
+      </div>
+      <p className={`text-xs font-bold uppercase tracking-wide mb-1 ${meta.text}`}>{meta.label}</p>
+      <p className="text-sm font-bold text-slate-900 leading-snug mb-2">{event.title}</p>
+      <p className="text-xs text-slate-500 leading-relaxed line-clamp-2">{event.short_desc}</p>
+      <p className="text-xs text-slate-400 font-medium mt-2">{dateLabel}</p>
+    </div>
+  );
+}
+
+function NcaaCalendarWidget({ ncaaDates, theme }) {
+  const hasUpcoming = ncaaDates.upcoming && ncaaDates.upcoming.length > 0;
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden" data-testid="ncaa-calendar-widget">
+      <div className="flex items-center gap-2.5 px-5 py-3.5 border-b border-slate-100 bg-slate-900">
+        <Calendar className="w-4 h-4 text-blue-400" />
+        <h2 className="font-bold text-sm text-white uppercase tracking-widest">NCAA Key Dates</h2>
+        <span className="ml-auto text-xs text-slate-400 font-medium">2025–26 Season</span>
+      </div>
+
+      <div className="p-5 space-y-4">
+        {/* Active period highlight */}
+        {ncaaDates.current_event && (
+          <NcaaEventCard event={ncaaDates.current_event} isCurrentBanner />
+        )}
+
+        {/* Upcoming dates horizontal scroll */}
+        {hasUpcoming && (
+          <div>
+            {ncaaDates.current_event && (
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Coming Up</p>
+            )}
+            <div
+              className="flex gap-3 overflow-x-auto pb-1"
+              style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+              data-testid="ncaa-upcoming-scroll"
+            >
+              {ncaaDates.upcoming.map((event, i) => (
+                <NcaaEventCard key={i} event={event} isCurrentBanner={false} />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function CustomTooltip({ active, payload, label }) {
@@ -53,19 +163,21 @@ export default function Dashboard() {
   const [analytics, setAnalytics] = useState(null);
   const [digest, setDigest] = useState(null);
   const [heatmap, setHeatmap] = useState(null);
+  const [ncaaDates, setNcaaDates] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => { fetchData(); }, []);
 
   const fetchData = async () => {
     try {
-      const [statsRes, trackedRes, alertsRes, analyticsRes, digestRes, heatmapRes] = await Promise.all([
+      const [statsRes, trackedRes, alertsRes, analyticsRes, digestRes, heatmapRes, ncaaRes] = await Promise.all([
         apiRequest("get", "/dashboard/stats"),
         apiRequest("get", "/my-colleges"),
         apiRequest("get", "/dashboard/alerts"),
         apiRequest("get", "/dashboard/analytics"),
         apiRequest("get", "/dashboard/weekly-digest"),
         apiRequest("get", "/dashboard/heatmap"),
+        apiRequest("get", "/dashboard/ncaa-calendar"),
       ]);
       setStats(statsRes.data);
       setTracked(trackedRes.data);
@@ -73,6 +185,7 @@ export default function Dashboard() {
       setAnalytics(analyticsRes.data);
       setDigest(digestRes.data);
       setHeatmap(heatmapRes.data);
+      setNcaaDates(ncaaRes.data);
     } catch (err) {
       console.error(err);
     } finally {
@@ -323,6 +436,11 @@ export default function Dashboard() {
           <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
           <p className="text-sm text-green-700 font-medium">No urgent actions needed — you're on top of your recruitment!</p>
         </div>
+      )}
+
+      {/* NCAA Key Dates */}
+      {ncaaDates && (ncaaDates.current_event || (ncaaDates.upcoming && ncaaDates.upcoming.length > 0)) && (
+        <NcaaCalendarWidget ncaaDates={ncaaDates} theme={theme} />
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

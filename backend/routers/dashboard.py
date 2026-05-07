@@ -8,6 +8,96 @@ from auth_utils import UserModel, get_current_user
 router = APIRouter(tags=["dashboard"])
 
 
+# ── NCAA Player Calendar (2025-26 & 2026-27 seasons) ─────────────────────────
+
+NCAA_PLAYER_CALENDAR = [
+    {
+        "date": "2025-11-12", "end_date": "2025-11-19",
+        "title": "Early Signing Period",
+        "short_desc": "Sign your NLI early with a D1/D2 programme.",
+        "description": "D1 and D2 players can sign National Letters of Intent. This is your chance to commit early and secure your place.",
+        "category": "signing", "divisions": ["NCAA D1", "NCAA D2"],
+    },
+    {
+        "date": "2025-11-20", "end_date": "2026-01-11",
+        "title": "Quiet Period (D1)",
+        "short_desc": "No off-campus coach contact. On-campus visits permitted.",
+        "description": "No off-campus in-person contact with coaches. Official and unofficial campus visits are still allowed — a great time to visit programmes.",
+        "category": "period", "divisions": ["NCAA D1"],
+    },
+    {
+        "date": "2026-01-01",
+        "title": "Common App Regular Decision",
+        "short_desc": "Regular decision applications due at most schools.",
+        "description": "Most universities set January 1 as their Regular Decision deadline. Ensure all academic applications are submitted on time.",
+        "category": "application", "divisions": ["all"],
+    },
+    {
+        "date": "2026-01-12", "end_date": "2026-03-07",
+        "title": "Contact Period Resumes (D1)",
+        "short_desc": "Coaches can visit you off-campus again.",
+        "description": "NCAA D1 contact period reopens. Coaches may visit you at your school or club games. A key window to showcase your talent.",
+        "category": "period", "divisions": ["NCAA D1"],
+    },
+    {
+        "date": "2026-03-08", "end_date": "2026-04-15",
+        "title": "Evaluation Period (D1)",
+        "short_desc": "Coaches can watch you play but cannot make contact.",
+        "description": "NCAA D1 evaluation period. Coaches may attend your games to evaluate you but cannot initiate in-person contact. Keep playing your best.",
+        "category": "period", "divisions": ["NCAA D1"],
+    },
+    {
+        "date": "2026-04-16", "end_date": "2026-05-21",
+        "title": "Regular Signing Period",
+        "short_desc": "Last NLI signing window for the 2025-26 class.",
+        "description": "The regular NLI signing window. If you haven't signed yet, this is the final opportunity to officially commit to a D1 or D2 programme.",
+        "category": "signing", "divisions": ["NCAA D1", "NCAA D2"],
+    },
+    {
+        "date": "2026-05-01", "end_date": "2026-05-15",
+        "title": "Transfer Portal Spring Window",
+        "short_desc": "Current college players can enter the transfer portal.",
+        "description": "Current college athletes can enter the NCAA Transfer Portal. If you're considering a transfer, this is your spring window.",
+        "category": "portal", "divisions": ["NCAA D1", "NCAA D2"],
+    },
+    {
+        "date": "2026-05-22", "end_date": "2026-07-31",
+        "title": "Dead Period (D1)",
+        "short_desc": "No in-person coach contact until August.",
+        "description": "NCAA D1 dead period. No in-person recruiting contact or evaluations. Use this time to follow up via email and prepare for next year.",
+        "category": "period", "divisions": ["NCAA D1"],
+    },
+    {
+        "date": "2026-06-15",
+        "title": "Register with NCAA Eligibility Center",
+        "short_desc": "Class of 2027 should register now for D1/D2 eligibility.",
+        "description": "Rising seniors (class of 2027) should register with the NCAA Eligibility Center to begin academic certification for D1/D2 eligibility.",
+        "category": "eligibility", "divisions": ["NCAA D1", "NCAA D2"],
+    },
+    {
+        "date": "2026-08-01", "end_date": "2026-11-09",
+        "title": "Contact Period Opens (2026-27)",
+        "short_desc": "New recruiting year begins — coaches are active.",
+        "description": "A new D1 recruiting year begins. Coaches may make off-campus contact and attend showcases. Reach out to new programmes now.",
+        "category": "period", "divisions": ["NCAA D1"],
+    },
+    {
+        "date": "2026-11-01",
+        "title": "Early Action/Early Decision Deadline",
+        "short_desc": "EA/ED applications due at most universities.",
+        "description": "Most universities set November 1 as their Early Action or Early Decision deadline. Apply early for the best chance of admission.",
+        "category": "application", "divisions": ["all"],
+    },
+    {
+        "date": "2026-11-11", "end_date": "2026-11-18",
+        "title": "Early Signing Period (2026-27)",
+        "short_desc": "Sign your NLI to lock in your programme for next year.",
+        "description": "Early NLI signing window for the 2026-27 class. D1 and D2 coaches can secure verbal commitments.",
+        "category": "signing", "divisions": ["NCAA D1", "NCAA D2"],
+    },
+]
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -285,4 +375,45 @@ async def get_weekly_digest(current_user: UserModel = Depends(get_current_user))
         "top_college": top_college,
         "recommended_action": recommended_action,
         "recommended_link": recommended_link,
+    }
+
+
+
+@router.get("/dashboard/ncaa-calendar")
+async def get_ncaa_calendar(current_user: UserModel = Depends(get_current_user)):
+    today = datetime.now(timezone.utc).date()
+
+    current_event = None
+    upcoming = []
+
+    for event in NCAA_PLAYER_CALENDAR:
+        start = datetime.strptime(event["date"], "%Y-%m-%d").date()
+        end_str = event.get("end_date")
+        end = datetime.strptime(end_str, "%Y-%m-%d").date() if end_str else start
+
+        if start <= today <= end:
+            days_remaining = (end - today).days
+            urgency = "high" if days_remaining <= 7 else "medium" if days_remaining <= 14 else "current"
+            current_event = {
+                **event,
+                "days_until": 0,
+                "days_remaining": days_remaining,
+                "urgency": urgency,
+                "is_current": True,
+            }
+        elif start > today:
+            days_until = (start - today).days
+            urgency = "high" if days_until <= 14 else "medium" if days_until <= 30 else "upcoming"
+            upcoming.append({
+                **event,
+                "days_until": days_until,
+                "urgency": urgency,
+                "is_current": False,
+            })
+
+    upcoming_sorted = sorted(upcoming, key=lambda x: x["date"])[:6]
+
+    return {
+        "current_event": current_event,
+        "upcoming": upcoming_sorted,
     }
