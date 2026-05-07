@@ -153,13 +153,11 @@ Build "CourtBound," a web app to track USA and UK college basketball scholarship
 ### Phase 3 (upcoming)
 - [x] Unread message badges on player nav (DONE)
 - [x] Coach Onboarding Sequence (DONE — May 2026)
-  - 4-step modal wizard on first login (Welcome → Preferences → Find Player → Complete)
-  - Skippable via "Skip for now" (localStorage dismissal key)
-  - Step 2 requires saving a player before Continue enables
-  - `markOnboardingStep` helper in CoachAuthContext for background step tracking
-  - Checklist widget on dashboard with clickable steps + "Setup Wizard" reopen button
-  - Elite Recruiter badge when all 5 steps done
-  - `search_done` tracked in CoachPlayersPage, `profile_viewed` tracked in CoachPlayerProfile
+- [x] Player NCAA Key Dates widget on dashboard (DONE — May 2026)
+  - GET /api/dashboard/ncaa-calendar endpoint with hardcoded 2025-26 & 2026-27 calendar
+  - Current active period banner (ACTIVE NOW + days remaining)
+  - Horizontal-scroll upcoming event cards, color-coded by category
+  - Categories: signing (purple), period (blue), eligibility (green), portal (amber), application (rose)
 - Coach analytics
 - Programme public page
 - Coach marketing/landing page
