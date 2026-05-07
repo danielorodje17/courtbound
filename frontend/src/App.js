@@ -156,9 +156,26 @@ function NotificationBell() {
 
 function AppLayout({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [unreadMessages, setUnreadMessages] = useState(0);
   const location = useLocation();
   const { division, setDivision } = useTheme();
   const theme = DIVISION_THEME[division] || DIVISION_THEME.mens;
+
+  // Poll unread message count every 60s
+  useEffect(() => {
+    const fetchUnread = () =>
+      apiRequest("get", "/player/messages/unread-count")
+        .then(r => setUnreadMessages(r.data?.unread || 0))
+        .catch(() => {});
+    fetchUnread();
+    const iv = setInterval(fetchUnread, 60000);
+    return () => clearInterval(iv);
+  }, []);
+
+  // Reset count when user visits /messages
+  useEffect(() => {
+    if (location.pathname === "/messages") setUnreadMessages(0);
+  }, [location.pathname]);
 
   return (
     <div className="min-h-screen bg-slate-50" style={{ fontFamily: "var(--font-body, Manrope, sans-serif)" }}>
@@ -193,6 +210,11 @@ function AppLayout({ children }) {
               >
                 <Icon className="w-3.5 h-3.5" />
                 {label}
+                {path === "/messages" && unreadMessages > 0 && (
+                  <span data-testid="messages-unread-badge" className="ml-0.5 bg-red-500 text-white text-xs font-black rounded-full px-1.5 py-0.5 leading-none min-w-[18px] text-center">
+                    {unreadMessages > 9 ? "9+" : unreadMessages}
+                  </span>
+                )}
               </NavLink>
             ))}
           </nav>
@@ -223,6 +245,11 @@ function AppLayout({ children }) {
               >
                 <Icon className="w-3.5 h-3.5" />
                 {label}
+                {path === "/messages" && unreadMessages > 0 && (
+                  <span className="bg-red-500 text-white text-xs font-black rounded-full px-1.5 py-0.5 leading-none min-w-[18px] text-center">
+                    {unreadMessages > 9 ? "9+" : unreadMessages}
+                  </span>
+                )}
               </NavLink>
             ))}
           </div>

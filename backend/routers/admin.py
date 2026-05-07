@@ -500,6 +500,8 @@ async def admin_update_college(college_id: str, data: CollegeUpdate, _=Depends(r
                     }
                     if coach.get("id"):        # preserve UUID for existing rows
                         row["id"] = coach["id"]
+                    else:
+                        row["id"] = str(uuid.uuid4())  # generate UUID for new coaches
                     rows.append(row)
                 await run_in_threadpool(lambda: supa.table("coaches").insert(rows).execute())
             logger.info(f"College {college_id}: coaches upserted ({len(coaches_payload)} rows)")
