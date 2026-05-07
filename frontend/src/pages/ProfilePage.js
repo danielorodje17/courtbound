@@ -433,8 +433,15 @@ export default function ProfilePage() {
                 {editing ? <Select value={p.target_start_year} onChange={v => set("target_start_year", v)} options={YEARS} testId="profile-target-year" />
                   : <div className="py-2.5 px-3 bg-slate-50 rounded-lg text-sm font-semibold text-slate-800">{p.target_start_year || "—"}</div>}
               </Field>
-              <Field label="Target Division(s)">
-                <Input value={p.target_division} onChange={v => set("target_division", v)} placeholder="e.g. Division I, Division II, NAIA" testId="profile-target-division" disabled={!editing} />
+              <Field label="1st Choice Division">
+                {editing
+                  ? <Select value={p.target_division} onChange={v => set("target_division", v)} options={DIVISIONS} testId="profile-target-division" />
+                  : <div className="py-2.5 px-3 bg-slate-50 rounded-lg text-sm font-semibold text-slate-800">{p.target_division || "—"}</div>}
+              </Field>
+              <Field label="2nd Choice Division">
+                {editing
+                  ? <Select value={p.target_division_2} onChange={v => set("target_division_2", v)} options={DIVISIONS} testId="profile-target-division-2" />
+                  : <div className="py-2.5 px-3 bg-slate-50 rounded-lg text-sm font-semibold text-slate-800">{p.target_division_2 || "—"}</div>}
               </Field>
               <Field label="NCAA Eligibility Centre ID">
                 <Input value={p.ncaa_id} onChange={v => set("ncaa_id", v)} placeholder="Your NCAA EC ID number" testId="profile-ncaa-id" disabled={!editing} />

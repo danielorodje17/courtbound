@@ -133,6 +133,7 @@ class PlayerProfile(BaseModel):
     act_score: Optional[str] = ""
     target_start_year: Optional[str] = ""
     target_division: Optional[str] = ""
+    target_division_2: Optional[str] = ""
     ncaa_id: Optional[str] = ""
     ncaa_registered: Optional[bool] = False
     highlight_tape_url: Optional[str] = ""
