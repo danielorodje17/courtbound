@@ -242,5 +242,5 @@ Build "CourtBound," a web app to track USA and UK college basketball scholarship
 - Feature body: "over 300 US programmes" (was 274)
 
 ## Pending Migrations (User Must Run in Supabase SQL Editor)
-- `/app/memory/supabase_migration_v5.sql` — adds `lead_source TEXT` to profiles table
-- `/app/memory/supabase_migration_v14_division_second_choice.sql` — adds `target_division_2 TEXT` to profiles table (required for 2nd Choice Division to save)
+- `/app/memory/supabase_migration_v14_division_second_choice.sql` — adds `target_division_2 TEXT` to profiles (DONE ✅)
+- `/app/memory/supabase_migration_v15_programme_detail_fields.sql` — adds scholarship_type, nil_available, housing_type, f1_visa_support, international_players_count, scholarship_avg_value to coach_accounts (REQUIRED for What We Offer to save)
