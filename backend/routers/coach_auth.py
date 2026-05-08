@@ -236,13 +236,22 @@ async def update_privacy_settings(body: dict, coach=Depends(get_current_coach)):
     current = coach.get("privacy_settings") or {}
     updates = {k: bool(v) for k, v in body.items() if k in allowed_keys}
     merged = {**current, **updates}
-    result = await run_in_threadpool(
-        lambda: supa.table("coach_accounts")
-        .update({"privacy_settings": merged})
-        .eq("id", coach["id"])
-        .execute()
-    )
-    return _clean_coach(result.data[0]) if result.data else {"message": "Updated"}
+    try:
+        result = await run_in_threadpool(
+            lambda: supa.table("coach_accounts")
+            .update({"privacy_settings": merged})
+            .eq("id", coach["id"])
+            .execute()
+        )
+        return _clean_coach(result.data[0]) if result.data else {"message": "Updated"}
+    except Exception as e:
+        err_str = str(e)
+        if "privacy_settings" in err_str or "PGRST204" in err_str:
+            raise HTTPException(
+                status_code=503,
+                detail="Privacy settings not available yet — please run database migration v18."
+            )
+        raise
 
 
 # ── Logout ───────────────────────────────────────────────────────────────────

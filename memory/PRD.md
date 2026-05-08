@@ -243,4 +243,14 @@ Build "CourtBound," a web app to track USA and UK college basketball scholarship
 
 ## Pending Migrations (User Must Run in Supabase SQL Editor)
 - `/app/memory/supabase_migration_v14_division_second_choice.sql` — adds `target_division_2 TEXT` to profiles (DONE ✅)
-- `/app/memory/supabase_migration_v15_programme_detail_fields.sql` — adds scholarship_type, nil_available, housing_type, f1_visa_support, international_players_count, scholarship_avg_value to coach_accounts (REQUIRED for What We Offer to save)
+- `/app/memory/supabase_migration_v15_programme_detail_fields.sql` — adds scholarship_type, nil_available, housing_type, f1_visa_support, international_players_count, scholarship_avg_value to coach_accounts (DONE ✅)
+- `/app/memory/supabase_migration_v16_player_reply.sql` — adds `player_reply TEXT`, `player_replied_at TIMESTAMPTZ` to coach_messages (**MUST RUN** for player replies to save)
+- `/app/memory/supabase_migration_v17_commitment_status.sql` — adds `commitment_status TEXT DEFAULT 'uncommitted'`, `committed_to_institution TEXT` to profiles (**MUST RUN** for commitment status to save)
+- `/app/memory/supabase_migration_v18_coach_privacy.sql` — adds `privacy_settings JSONB DEFAULT '{}'`, `is_deleted BOOLEAN DEFAULT FALSE` to coach_accounts (**MUST RUN** for coach privacy settings to save)
+- `/app/memory/supabase_migration_v19_programme_views.sql` — creates `coach_programme_views` table (**MUST RUN** for programme page view tracking)
+
+## Phase B Features (Added May 2026)
+- [x] Player Replies in Messaging — players can reply once to a coach message; coaches see reply in sent messages (requires v16)
+- [x] Player Commitment Status — dropdown on player profile (Uncommitted/Soft Committed/Committed/Withdrawn) with institution field; badge on coach's player profile view (requires v17)
+- [x] Coach Privacy Settings — toggles on settings page: profile_visible, hide_recruiting_prefs, hide_contact_info; programme public page respects these (requires v18)
+- [x] Programme View Tracking — every `/coach/program/:slug` visit logs a row; analytics dashboard shows Programme Views KPI cards (7d, 30d) (requires v19)

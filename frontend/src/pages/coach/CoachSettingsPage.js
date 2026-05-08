@@ -112,8 +112,9 @@ export default function CoachSettingsPage() {
     try {
       await coachReq("patch", "/auth/privacy", privacy);
       toast.success("Privacy settings saved!");
-    } catch {
-      toast.error("Failed to save privacy settings");
+    } catch (e) {
+      const msg = e?.response?.data?.detail || "Failed to save privacy settings";
+      toast.error(msg);
     }
     setPrivacySaving(false);
   };
