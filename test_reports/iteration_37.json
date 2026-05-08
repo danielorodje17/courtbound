@@ -1,0 +1,47 @@
+{
+  "summary": "Phase C P1 testing: Committed player block, Scheduled send toggle, Messages page filter tabs. Fixed backend bug: GET /coach/messages/sent?status=sent|scheduled returned 500 (pre-v21 fallback missing for filter query). All features verified passing after fix.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase_c_p1.py",
+    "/app/test_reports/pytest/pytest_p1.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Fixed: /app/backend/routers/coach_messaging.py get_sent_messages() - pre-v21 graceful fallback was missing for status filter query. When status=sent or status=scheduled filter was applied, APIError was raised (column does not exist) but no fallback existed. Added try/except that rebuilds a fresh query without status filter on error. Note: the supabase query builder is mutable by reference, so base_query variable sharing caused fallback to also include the status filter."
+  ],
+  "updated_files": [
+    "/app/backend/routers/coach_messaging.py"
+  ],
+  "success_rate": {
+    "backend": "100% (5/5)",
+    "frontend": "100%"
+  },
+  "test_credentials": "testcoach@courtbound.edu / coach1234",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Phase C P1 fully verified. Committed player (fda135a9 = Test Player) shows message-blocked-btn (purple/disabled 'Committed') in sticky bar, open-message-modal-btn absent. Backend returns 403 with institution name. Schedule toggle: clicking opens datetime-local input + button changes to 'Schedule Message'; toggling off hides input and reverts to 'Send Message'. Messages page /coach/messages has 3 filter tabs (messages-filter-all/sent/scheduled) all clickable. Regular messages load correctly under all tabs (graceful fallback active pre-v21). No scheduled messages exist yet (v21 not run). committed-block-close-btn in modal was not directly tested (would require modal to open for committed player which is blocked at sticky bar level).",
+  "test_results": {
+    "committed_block_backend_403": "PASS - POST /api/coach/messages/{committed_id} returns 403 with 'committed' in detail + institution name",
+    "committed_block_ui_message_blocked_btn": "PASS - message-blocked-btn (purple, disabled) shown in sticky action bar",
+    "committed_block_ui_no_message_modal_btn": "PASS - open-message-modal-btn absent for committed player",
+    "schedule_toggle_visible": "PASS - schedule-toggle-btn visible in compose modal for non-committed player",
+    "schedule_toggle_on_datetime_input": "PASS - schedule-datetime-input appears after toggle ON",
+    "schedule_toggle_on_button_text": "PASS - Send button shows 'Schedule Message' when toggle ON",
+    "schedule_toggle_off_hides_input": "PASS - datetime input hidden after toggle OFF",
+    "schedule_toggle_off_reverts_button": "PASS - Send button reverts to 'Send Message'",
+    "messages_filter_tabs": "PASS - All 3 tabs present: messages-filter-all, messages-filter-sent, messages-filter-scheduled",
+    "messages_filter_sent_api": "PASS (after fix) - GET /api/coach/messages/sent?status=sent returns 200",
+    "messages_filter_scheduled_api": "PASS (after fix) - GET /api/coach/messages/sent?status=scheduled returns 200",
+    "messages_filter_all_api": "PASS - GET /api/coach/messages/sent returns 200"
+  },
+  "rca_of_bug_fixed": "Root cause: get_sent_messages() used query builder chaining without try/except around the filtered query. When v21 migration not run, .eq('status','sent') raises APIError: column coach_messages.status does not exist. The send endpoint had a fallback (strip status/scheduled_at and retry) but GET endpoint did not. Fix: wrapped the status-filtered query in try/except, falling back to unfiltered query on exception. Additional subtlety: query builder object is mutable by reference in supabase-py, so using 'base_query' as fallback reference also inherited the status filter. Fixed by rebuilding a fresh query object in the except block."
+}

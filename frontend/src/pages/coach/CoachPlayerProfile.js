@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useCoachAuth } from "../../context/CoachAuthContext";
 import { CoachNav } from "../../components/coach/CoachNav";
 import { toast } from "sonner";
-import { ArrowLeft, Film, Shield, Star, MapPin, GraduationCap, BarChart2, User, ExternalLink, Bookmark, Send, X, AlertCircle, CheckCircle, Lock } from "lucide-react";
+import { ArrowLeft, Film, Shield, Star, MapPin, GraduationCap, BarChart2, User, ExternalLink, Bookmark, Send, X, AlertCircle, CheckCircle, Lock, Clock } from "lucide-react";
 
 const PERIOD_WARNINGS = {
   dead: "You are in a NCAA Dead Period. In-person contact is not permitted. Ensure any written communication complies with your division rules.",
@@ -16,14 +16,31 @@ function SendMessageModal({ player, coach, onClose, onSent }) {
   const [form, setForm] = useState({ subject: "", body: "" });
   const [sending, setSending] = useState(false);
   const [periodWarning] = useState(PERIOD_WARNINGS[coach?.current_period_type] || null);
+  const [scheduleEnabled, setScheduleEnabled] = useState(false);
+  const [scheduledAt, setScheduledAt] = useState("");
+
+  const isCommitted = (player?.commitment_status || "uncommitted") === "committed";
+
+  // Min datetime for the picker: 30 minutes from now
+  const minDateTime = new Date(Date.now() + 30 * 60 * 1000)
+    .toISOString().slice(0, 16);
 
   const submit = async (e) => {
     e.preventDefault();
     if (!form.body.trim()) { toast.error("Message body is required"); return; }
+    if (scheduleEnabled && !scheduledAt) { toast.error("Please pick a date and time to schedule"); return; }
     setSending(true);
     try {
-      await coachReq("post", `/messages/${player.user_id}`, form);
-      toast.success("Message sent!");
+      const payload = { ...form };
+      if (scheduleEnabled && scheduledAt) {
+        payload.scheduled_at = new Date(scheduledAt).toISOString();
+      }
+      const res = await coachReq("post", `/messages/${player.user_id}`, payload);
+      if (res?.data?.status === "scheduled") {
+        toast.success("Message scheduled!");
+      } else {
+        toast.success("Message sent!");
+      }
       onSent();
       onClose();
     } catch (err) {
@@ -44,47 +61,108 @@ function SendMessageModal({ player, coach, onClose, onSent }) {
             <X className="w-5 h-5" />
           </button>
         </div>
-        {periodWarning && (
-          <div className="mx-5 mt-4 flex items-start gap-2 bg-amber-900/30 border border-amber-700/50 rounded-xl p-3">
-            <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
-            <p className="text-amber-300 text-xs leading-relaxed">{periodWarning}</p>
+
+        {/* Committed block */}
+        {isCommitted ? (
+          <div className="p-6 flex flex-col items-center text-center gap-4">
+            <div className="w-14 h-14 rounded-full bg-purple-900/40 border border-purple-700/50 flex items-center justify-center">
+              <Lock className="w-7 h-7 text-purple-400" />
+            </div>
+            <div>
+              <p className="text-white font-black text-base mb-1">Player is Committed</p>
+              <p className="text-slate-400 text-sm leading-relaxed">
+                {player?.full_name} has committed to{" "}
+                <strong className="text-purple-300">{player?.committed_to_institution || "another programme"}</strong>.
+                Messaging committed players is not permitted.
+              </p>
+            </div>
+            <button onClick={onClose} data-testid="committed-block-close-btn"
+              className="mt-2 bg-slate-800 hover:bg-slate-700 text-white font-bold px-6 py-2.5 rounded-xl transition-colors text-sm">
+              Close
+            </button>
           </div>
+        ) : (
+          <>
+            {periodWarning && (
+              <div className="mx-5 mt-4 flex items-start gap-2 bg-amber-900/30 border border-amber-700/50 rounded-xl p-3">
+                <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                <p className="text-amber-300 text-xs leading-relaxed">{periodWarning}</p>
+              </div>
+            )}
+            <form onSubmit={submit} className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Subject (optional)</label>
+                <input
+                  value={form.subject}
+                  onChange={e => setForm(p => ({ ...p, subject: e.target.value }))}
+                  placeholder="e.g. Recruiting Interest — Fort Hays State"
+                  className="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Message *</label>
+                <textarea
+                  value={form.body}
+                  onChange={e => setForm(p => ({ ...p, body: e.target.value }))}
+                  rows={5}
+                  maxLength={2000}
+                  placeholder="Introduce yourself and your programme..."
+                  className="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 resize-none"
+                  required
+                  data-testid="message-body-input"
+                />
+                <p className="text-slate-600 text-xs mt-1 text-right">{form.body.length}/2000</p>
+              </div>
+
+              {/* Schedule toggle */}
+              <div className="flex items-center justify-between bg-slate-800/60 rounded-xl px-4 py-3 border border-slate-700/60">
+                <div>
+                  <p className="text-sm font-bold text-slate-200">Schedule for later</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Send at a specific date and time</p>
+                </div>
+                <button
+                  type="button"
+                  data-testid="schedule-toggle-btn"
+                  onClick={() => { setScheduleEnabled(v => !v); setScheduledAt(""); }}
+                  className={`relative w-11 h-6 rounded-full transition-colors ${scheduleEnabled ? "bg-blue-600" : "bg-slate-700"}`}
+                >
+                  <span className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${scheduleEnabled ? "translate-x-5" : "translate-x-0"}`} />
+                </button>
+              </div>
+
+              {scheduleEnabled && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Send At</label>
+                  <input
+                    type="datetime-local"
+                    value={scheduledAt}
+                    min={minDateTime}
+                    onChange={e => setScheduledAt(e.target.value)}
+                    data-testid="schedule-datetime-input"
+                    className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                    required={scheduleEnabled}
+                  />
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-1">
+                <button
+                  type="submit"
+                  disabled={sending || !form.body.trim()}
+                  data-testid="send-message-btn"
+                  className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white font-black py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+                >
+                  {scheduleEnabled ? <Clock className="w-4 h-4" /> : <Send className="w-4 h-4" />}
+                  {sending ? "Sending..." : scheduleEnabled ? "Schedule Message" : "Send Message"}
+                </button>
+                <button type="button" onClick={onClose} className="px-5 py-3 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors font-semibold text-sm">
+                  Cancel
+                </button>
+              </div>
+              <p className="text-slate-600 text-xs text-center">By sending, you confirm this communication complies with your division's recruiting rules.</p>
+            </form>
+          </>
         )}
-        <form onSubmit={submit} className="p-5 space-y-4">
-          <div>
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Subject (optional)</label>
-            <input
-              value={form.subject}
-              onChange={e => setForm(p => ({ ...p, subject: e.target.value }))}
-              placeholder="e.g. Recruiting Interest — Fort Hays State"
-              className="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Message *</label>
-            <textarea
-              value={form.body}
-              onChange={e => setForm(p => ({ ...p, body: e.target.value }))}
-              rows={6}
-              maxLength={2000}
-              placeholder="Introduce yourself and your programme..."
-              className="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 resize-none"
-              required
-              data-testid="message-body-input"
-            />
-            <p className="text-slate-600 text-xs mt-1 text-right">{form.body.length}/2000</p>
-          </div>
-          <div className="flex gap-3 pt-1">
-            <button type="submit" disabled={sending || !form.body.trim()} data-testid="send-message-btn"
-              className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white font-black py-3 rounded-xl transition-colors flex items-center justify-center gap-2">
-              <Send className="w-4 h-4" /> {sending ? "Sending..." : "Send Message"}
-            </button>
-            <button type="button" onClick={onClose} className="px-5 py-3 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors font-semibold text-sm">
-              Cancel
-            </button>
-          </div>
-          <p className="text-slate-600 text-xs text-center">By sending, you confirm this communication complies with your division's recruiting rules.</p>
-        </form>
       </div>
     </div>
   );
@@ -206,13 +284,24 @@ export default function CoachPlayerProfile() {
           {/* Action buttons */}
           <div className="flex gap-2 items-center">
             {/* Send Message */}
-            <button
-              onClick={() => setShowMessageModal(true)}
-              data-testid="open-message-modal-btn"
-              className="flex items-center gap-1.5 px-3 py-2 bg-blue-700 hover:bg-blue-600 text-white rounded-lg text-xs font-bold transition-colors border border-blue-600"
-            >
-              <Send className="w-3.5 h-3.5" /> Message
-            </button>
+            {player?.commitment_status === "committed" ? (
+              <button
+                disabled
+                data-testid="message-blocked-btn"
+                title={`${player.full_name} is committed to ${player.committed_to_institution || "another programme"}`}
+                className="flex items-center gap-1.5 px-3 py-2 bg-purple-900/40 border border-purple-700/50 text-purple-400 rounded-lg text-xs font-bold cursor-not-allowed"
+              >
+                <Lock className="w-3.5 h-3.5" /> Committed
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowMessageModal(true)}
+                data-testid="open-message-modal-btn"
+                className="flex items-center gap-1.5 px-3 py-2 bg-blue-700 hover:bg-blue-600 text-white rounded-lg text-xs font-bold transition-colors border border-blue-600"
+              >
+                <Send className="w-3.5 h-3.5" /> Message
+              </button>
+            )}
             {/* Save button */}
             <div className="relative">
               <div className="flex gap-1">

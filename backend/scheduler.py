@@ -245,6 +245,22 @@ async def _send_reminder(supa, user_id: str, email: str, name: str, reminder_typ
 # Lifecycle
 # ---------------------------------------------------------------------------
 
+async def _dispatch_scheduled_messages():
+    """Flip 'scheduled' messages whose scheduled_at has passed to 'sent'."""
+    try:
+        from supabase_db import supa
+        now = datetime.now(timezone.utc).isoformat()
+        result = supa.table("coach_messages") \
+            .update({"status": "sent"}) \
+            .eq("status", "scheduled") \
+            .lte("scheduled_at", now) \
+            .execute()
+        dispatched = len(result.data or [])
+        if dispatched:
+            logger.info("Scheduled messages dispatched: %d", dispatched)
+    except Exception as exc:
+        logger.warning("Scheduled message dispatch failed: %s", exc)
+
 def start_scheduler():
     if not _scheduler.running:
         _scheduler.add_job(
@@ -253,8 +269,14 @@ def start_scheduler():
             id="trial_reminders",
             replace_existing=True,
         )
+        _scheduler.add_job(
+            _dispatch_scheduled_messages,
+            IntervalTrigger(minutes=15),
+            id="scheduled_messages",
+            replace_existing=True,
+        )
         _scheduler.start()
-        logger.info("Trial reminder scheduler started (runs every hour)")
+        logger.info("Scheduler started: trial reminders (every 1h) + scheduled messages (every 15m)")
 
 
 def stop_scheduler():

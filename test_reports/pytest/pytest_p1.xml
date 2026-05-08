@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="5" time="4.336" timestamp="2026-05-08T15:58:38.791974+00:00" hostname="agent-env-9baf01d2-71de-4960-8f05-a0dcddf62b61"><testcase classname="backend.tests.test_phase_c_p1.TestCommittedBlock" name="test_message_committed_player_returns_403" time="1.695" /><testcase classname="backend.tests.test_phase_c_p1.TestCommittedBlock" name="test_message_committed_player_detail_contains_institution" time="0.556" /><testcase classname="backend.tests.test_phase_c_p1.TestRegularMessage" name="test_get_sent_messages" time="0.940" /><testcase classname="backend.tests.test_phase_c_p1.TestRegularMessage" name="test_get_sent_messages_filter_sent" time="0.536"><failure message="AssertionError: Expected 200, got 500: Internal Server Error&#10;assert 500 == 200&#10; +  where 500 = &lt;Response [500]&gt;.status_code">backend/tests/test_phase_c_p1.py:67: in test_get_sent_messages_filter_sent
+    assert r.status_code == 200, f"Expected 200, got {r.status_code}: {r.text}"
+E   AssertionError: Expected 200, got 500: Internal Server Error
+E   assert 500 == 200
+E    +  where 500 = &lt;Response [500]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_phase_c_p1.TestRegularMessage" name="test_get_sent_messages_filter_scheduled" time="0.510"><failure message="AssertionError: Expected 200, got 500: Internal Server Error&#10;assert 500 == 200&#10; +  where 500 = &lt;Response [500]&gt;.status_code">backend/tests/test_phase_c_p1.py:71: in test_get_sent_messages_filter_scheduled
+    assert r.status_code == 200, f"Expected 200, got {r.status_code}: {r.text}"
+E   AssertionError: Expected 200, got 500: Internal Server Error
+E   assert 500 == 200
+E    +  where 500 = &lt;Response [500]&gt;.status_code</failure></testcase></testsuite></testsuites>

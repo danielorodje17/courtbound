@@ -44,18 +44,43 @@ def _ncaa_period_type(coach: dict) -> str:
 async def send_message(player_user_id: str, body: dict, coach=Depends(require_verified_coach)):
     subject = (body.get("subject") or "").strip()
     text = (body.get("body") or "").strip()
+    scheduled_at_raw = body.get("scheduled_at")
     if not text:
         raise HTTPException(status_code=400, detail="Message body is required")
     if len(text) > 2000:
         raise HTTPException(status_code=400, detail="Message too long (max 2000 characters)")
 
-    # Check player exists
+    # Check player exists and get commitment status
     player_res = await run_in_threadpool(
-        lambda: supa.table("profiles").select("user_id, full_name, basketball_gender")
+        lambda: supa.table("profiles")
+        .select("user_id, full_name, basketball_gender, commitment_status, committed_to_institution")
         .eq("user_id", player_user_id).limit(1).execute()
     )
     if not player_res.data:
         raise HTTPException(status_code=404, detail="Player not found")
+
+    player = player_res.data[0]
+    if (player.get("commitment_status") or "uncommitted") == "committed":
+        institution = player.get("committed_to_institution") or "another programme"
+        raise HTTPException(
+            status_code=403,
+            detail=f"This player is committed to {institution}. Messaging committed players is not permitted."
+        )
+
+    # Validate scheduled_at if provided
+    scheduled_at = None
+    status = "sent"
+    if scheduled_at_raw:
+        try:
+            scheduled_at = datetime.fromisoformat(scheduled_at_raw.replace("Z", "+00:00"))
+            if scheduled_at <= datetime.now(timezone.utc):
+                # Past/now → send immediately
+                scheduled_at = None
+                status = "sent"
+            else:
+                status = "scheduled"
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid scheduled_at format")
 
     ncaa_period = _ncaa_period_type(coach)
 
@@ -69,19 +94,30 @@ async def send_message(player_user_id: str, body: dict, coach=Depends(require_ve
         "body": text,
         "ncaa_period_type": ncaa_period,
         "sent_at": _now(),
+        "status": status,
     }
+    if scheduled_at:
+        row["scheduled_at"] = scheduled_at.isoformat()
 
-    result = await run_in_threadpool(lambda: supa.table("coach_messages").insert(row).execute())
+    try:
+        result = await run_in_threadpool(lambda: supa.table("coach_messages").insert(row).execute())
+    except Exception:
+        # Graceful pre-v21 fallback: remove columns that may not exist yet
+        row.pop("status", None)
+        row.pop("scheduled_at", None)
+        result = await run_in_threadpool(lambda: supa.table("coach_messages").insert(row).execute())
     if not result.data:
         raise HTTPException(status_code=500, detail="Failed to send message")
 
-    # Create notification for player (stored in coach_notifications for now — future: player notifs)
-    # For player-side unread badge we rely on is_read = false on the message itself
-    return {
-        "message": "Message sent",
+    resp = {
+        "message": "Message scheduled" if status == "scheduled" else "Message sent",
         "id": result.data[0]["id"],
         "ncaa_period_type": ncaa_period,
+        "status": status,
     }
+    if scheduled_at:
+        resp["scheduled_at"] = scheduled_at.isoformat()
+    return resp
 
 
 # ── Coach: Sent Messages ───────────────────────────────────────────────────────
@@ -90,21 +126,38 @@ async def send_message(player_user_id: str, body: dict, coach=Depends(require_ve
 async def get_sent_messages(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=50),
+    status_filter: str = Query("all", alias="status"),
     coach=Depends(get_current_coach),
 ):
     offset = (page - 1) * limit
-    result = await run_in_threadpool(
-        lambda: supa.table("coach_messages")
-        .select("*")
-        .eq("coach_id", coach["id"])
-        .order("sent_at", desc=True)
-        .range(offset, offset + limit - 1)
-        .execute()
-    )
+    coach_id = coach["id"]
+    try:
+        query = supa.table("coach_messages").select("*").eq("coach_id", coach_id)
+        if status_filter == "scheduled":
+            query = query.eq("status", "scheduled")
+        elif status_filter == "sent":
+            query = query.eq("status", "sent")
+        result = await run_in_threadpool(
+            lambda: query.order("sent_at", desc=True).range(offset, offset + limit - 1).execute()
+        )
+    except Exception:
+        # Pre-v21 fallback: status column may not exist yet, ignore filter
+        fallback_query = supa.table("coach_messages").select("*").eq("coach_id", coach_id)
+        result = await run_in_threadpool(
+            lambda: fallback_query.order("sent_at", desc=True).range(offset, offset + limit - 1).execute()
+        )
     count_res = await run_in_threadpool(
         lambda: supa.table("coach_messages").select("id", count="exact")
         .eq("coach_id", coach["id"]).execute()
     )
+    try:
+        scheduled_count_res = await run_in_threadpool(
+            lambda: supa.table("coach_messages").select("id", count="exact")
+            .eq("coach_id", coach["id"]).eq("status", "scheduled").execute()
+        )
+        scheduled_count = scheduled_count_res.count or 0
+    except Exception:
+        scheduled_count = 0
     messages = result.data or []
 
     # Enrich with player names
@@ -128,7 +181,13 @@ async def get_sent_messages(
         })
 
     total = count_res.count or 0
-    return {"messages": enriched, "total": total, "page": page, "pages": max(1, -(-total // limit))}
+    return {
+        "messages": enriched,
+        "total": total,
+        "scheduled_count": scheduled_count,
+        "page": page,
+        "pages": max(1, -(-total // limit)),
+    }
 
 
 # ── Player: Inbox (uses standard player auth) ────────────────────────────────
