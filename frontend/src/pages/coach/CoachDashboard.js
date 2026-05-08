@@ -4,7 +4,7 @@ import { useCoachAuth } from "../../context/CoachAuthContext";
 import { CoachNav } from "../../components/coach/CoachNav";
 import CoachOnboardingModal from "../../components/coach/CoachOnboardingModal";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { Users, BookmarkPlus, Bell, TrendingUp, ChevronRight, Star, Film, Shield, AlertCircle, CheckCircle, Calendar, Award, BarChart2, Eye, MessageSquare, X, KeyRound } from "lucide-react";
+import { Users, BookmarkPlus, Bell, TrendingUp, ChevronRight, Star, Film, Shield, AlertCircle, CheckCircle, Calendar, Award, BarChart2, Eye, MessageSquare, X, KeyRound, Globe } from "lucide-react";
 
 const PERIOD_COLORS = {
   contact: "bg-green-500",
@@ -392,10 +392,12 @@ export default function CoachDashboard() {
           </h2>
 
           {/* KPI cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
             {[
-              { label: "Total Profile Views", value: analytics?.views?.all_time ?? "—", icon: Eye, color: "text-blue-400" },
-              { label: "Views (7 days)", value: analytics?.views?.last_7d ?? "—", icon: TrendingUp, color: "text-purple-400" },
+              { label: "Profile Views (All)", value: analytics?.views?.all_time ?? "—", icon: Eye, color: "text-blue-400" },
+              { label: "Profile Views (7d)", value: analytics?.views?.last_7d ?? "—", icon: TrendingUp, color: "text-purple-400" },
+              { label: "Programme Views (7d)", value: analytics?.programme_views?.last_7d ?? "—", icon: Globe, color: "text-cyan-400" },
+              { label: "Programme Views (30d)", value: analytics?.programme_views?.last_30d ?? "—", icon: Globe, color: "text-teal-400" },
               { label: "Players Saved", value: analytics?.saves?.total ?? "—", icon: Star, color: "text-yellow-400" },
               { label: "Messages Sent", value: analytics?.messages_sent ?? "—", icon: MessageSquare, color: "text-green-400" },
             ].map(({ label, value, icon: Icon, color }) => (

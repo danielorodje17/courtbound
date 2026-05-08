@@ -443,6 +443,45 @@ export default function ProfilePage() {
                   ? <Select value={p.target_division_2} onChange={v => set("target_division_2", v)} options={DIVISIONS} testId="profile-target-division-2" />
                   : <div className="py-2.5 px-3 bg-slate-50 rounded-lg text-sm font-semibold text-slate-800">{p.target_division_2 || "—"}</div>}
               </Field>
+              <Field label="Commitment Status">
+                {editing
+                  ? (
+                    <div className="relative">
+                      <select
+                        data-testid="profile-commitment-status"
+                        value={p.commitment_status || "uncommitted"}
+                        onChange={e => set("commitment_status", e.target.value)}
+                        className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-orange-500 outline-none appearance-none bg-white pr-8"
+                      >
+                        <option value="uncommitted">Uncommitted</option>
+                        <option value="soft_committed">Soft Committed</option>
+                        <option value="committed">Committed</option>
+                        <option value="withdrawn">Commitment Withdrawn</option>
+                      </select>
+                      <ChevronDown className="absolute right-2.5 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
+                    </div>
+                  )
+                  : (
+                    <div className={`py-2.5 px-3 rounded-lg text-sm font-semibold ${
+                      p.commitment_status === "committed" ? "bg-green-50 text-green-700 border border-green-200" :
+                      p.commitment_status === "soft_committed" ? "bg-amber-50 text-amber-700 border border-amber-200" :
+                      p.commitment_status === "withdrawn" ? "bg-red-50 text-red-700 border border-red-200" :
+                      "bg-slate-50 text-slate-600"
+                    }`}>
+                      {p.commitment_status === "committed" ? "Committed" :
+                       p.commitment_status === "soft_committed" ? "Soft Committed" :
+                       p.commitment_status === "withdrawn" ? "Commitment Withdrawn" :
+                       "Uncommitted"}
+                    </div>
+                  )}
+              </Field>
+              {(p.commitment_status === "committed" || p.commitment_status === "soft_committed") && (
+                <Field label="Committed To Institution" span={2}>
+                  <Input value={p.committed_to_institution} onChange={v => set("committed_to_institution", v)}
+                    placeholder="e.g. Fort Hays State University" testId="profile-committed-institution"
+                    disabled={!editing} />
+                </Field>
+              )}
               <Field label="NCAA Eligibility Centre ID">
                 <Input value={p.ncaa_id} onChange={v => set("ncaa_id", v)} placeholder="Your NCAA EC ID number" testId="profile-ncaa-id" disabled={!editing} />
               </Field>

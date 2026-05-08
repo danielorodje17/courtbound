@@ -197,6 +197,38 @@ async def mark_all_messages_read(current_user=Depends(get_current_user)):
     return {"message": "All messages marked as read"}
 
 
+@player_router.post("/messages/{message_id}/reply")
+async def player_reply_message(message_id: str, body: dict, current_user=Depends(get_current_user)):
+    user_id = str(current_user.user_id)
+    reply_text = (body.get("reply") or "").strip()
+    if not reply_text:
+        raise HTTPException(status_code=400, detail="Reply text is required")
+    if len(reply_text) > 1000:
+        raise HTTPException(status_code=400, detail="Reply too long (max 1000 characters)")
+
+    # Ensure message belongs to this player
+    msg_res = await run_in_threadpool(
+        lambda: supa.table("coach_messages")
+        .select("id, player_reply")
+        .eq("id", message_id)
+        .eq("player_user_id", user_id)
+        .limit(1)
+        .execute()
+    )
+    if not msg_res.data:
+        raise HTTPException(status_code=404, detail="Message not found")
+    if msg_res.data[0].get("player_reply"):
+        raise HTTPException(status_code=409, detail="You have already replied to this message")
+
+    await run_in_threadpool(
+        lambda: supa.table("coach_messages")
+        .update({"player_reply": reply_text, "player_replied_at": _now(), "is_read": True})
+        .eq("id", message_id)
+        .execute()
+    )
+    return {"message": "Reply sent"}
+
+
 @player_router.get("/messages/unread-count")
 async def player_unread_count(current_user=Depends(get_current_user)):
     user_id = str(current_user.user_id)

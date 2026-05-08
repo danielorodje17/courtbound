@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { apiRequest } from "../context/AuthContext";
-import { Mail, CheckCircle, AlertCircle } from "lucide-react";
+import { Mail, CheckCircle, AlertCircle, Send, X } from "lucide-react";
 
 const PERIOD_WARNINGS = {
   dead: { label: "Dead Period Message", color: "border-red-700/50 bg-red-950/30 text-red-300", icon: AlertCircle },
@@ -8,6 +8,54 @@ const PERIOD_WARNINGS = {
   contact: null,
   evaluation: null,
 };
+
+function ReplyBox({ msg, onReplied }) {
+  const [text, setText] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
+
+  const submit = async () => {
+    if (!text.trim()) return;
+    setSending(true);
+    setError("");
+    try {
+      await apiRequest("post", `/player/messages/${msg.id}/reply`, { reply: text.trim() });
+      onReplied(msg.id, text.trim());
+    } catch (e) {
+      setError(e?.response?.data?.detail || "Failed to send reply");
+    }
+    setSending(false);
+  };
+
+  return (
+    <div className="mt-4 pt-3 border-t border-slate-100">
+      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Your Reply</p>
+      <textarea
+        value={text}
+        onChange={e => setText(e.target.value)}
+        maxLength={1000}
+        rows={3}
+        placeholder="Type your reply to the coach..."
+        data-testid="player-reply-input"
+        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-orange-500 outline-none resize-none"
+      />
+      <div className="flex items-center justify-between mt-2">
+        <span className="text-xs text-slate-400">{text.length}/1000</span>
+        <div className="flex items-center gap-2">
+          {error && <span className="text-xs text-red-500">{error}</span>}
+          <button
+            onClick={submit}
+            disabled={sending || !text.trim()}
+            data-testid="player-reply-submit-btn"
+            className="flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors"
+          >
+            <Send className="w-3 h-3" /> {sending ? "Sending..." : "Send Reply"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function PlayerMessagesPage() {
   const [messages, setMessages] = useState([]);
@@ -42,6 +90,12 @@ export default function PlayerMessagesPage() {
         setUnread(prev => Math.max(0, prev - 1));
       } catch {}
     }
+  };
+
+  const handleReplied = (msgId, replyText) => {
+    setMessages(prev => prev.map(m =>
+      m.id === msgId ? { ...m, player_reply: replyText, player_replied_at: new Date().toISOString() } : m
+    ));
   };
 
   const markAllRead = async () => {
@@ -131,9 +185,26 @@ export default function PlayerMessagesPage() {
                         </div>
                       )}
                       <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">{msg.body}</p>
-                      <div className="mt-4 pt-3 border-t border-slate-100">
+
+                      {/* Reply section */}
+                      {msg.player_reply ? (
+                        <div className="mt-4 pt-3 border-t border-slate-100">
+                          <p className="text-xs font-bold text-green-600 uppercase tracking-wider mb-2 flex items-center gap-1">
+                            <CheckCircle className="w-3 h-3" /> Your Reply Sent
+                          </p>
+                          <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2.5">
+                            <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{msg.player_reply}</p>
+                            <p className="text-xs text-slate-400 mt-1.5">
+                              {new Date(msg.player_replied_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <ReplyBox msg={msg} onReplied={handleReplied} />
+                      )}
+
+                      <div className="mt-3 pt-3 border-t border-slate-100">
                         <p className="text-slate-400 text-xs">Sent by <strong className="text-slate-600">{msg.coach_name}</strong> at {msg.coach_institution}</p>
-                        <p className="text-slate-400 text-xs mt-1">Replies are handled outside of CourtBound — contact the coach directly via your institution.</p>
                       </div>
                     </div>
                   )}

@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useCoachAuth } from "../../context/CoachAuthContext";
 import { CoachNav } from "../../components/coach/CoachNav";
 import { toast } from "sonner";
-import { ArrowLeft, Film, Shield, Star, MapPin, GraduationCap, BarChart2, User, ExternalLink, Bookmark, Send, X, AlertCircle } from "lucide-react";
+import { ArrowLeft, Film, Shield, Star, MapPin, GraduationCap, BarChart2, User, ExternalLink, Bookmark, Send, X, AlertCircle, CheckCircle, Lock } from "lucide-react";
 
 const PERIOD_WARNINGS = {
   dead: "You are in a NCAA Dead Period. In-person contact is not permitted. Ensure any written communication complies with your division rules.",
@@ -254,6 +254,21 @@ export default function CoachPlayerProfile() {
                     <Shield className="w-3 h-3" /> NCAA Reg.
                   </span>
                 )}
+                {player?.commitment_status === "committed" && (
+                  <span className="flex items-center gap-1 bg-purple-900/50 border border-purple-600/50 text-purple-300 text-xs font-bold px-2 py-0.5 rounded-full" data-testid="commitment-badge-committed">
+                    <Lock className="w-3 h-3" /> Committed{player.committed_to_institution ? ` — ${player.committed_to_institution}` : ""}
+                  </span>
+                )}
+                {player?.commitment_status === "soft_committed" && (
+                  <span className="flex items-center gap-1 bg-amber-900/50 border border-amber-600/50 text-amber-300 text-xs font-bold px-2 py-0.5 rounded-full" data-testid="commitment-badge-soft">
+                    <CheckCircle className="w-3 h-3" /> Soft Committed{player.committed_to_institution ? ` — ${player.committed_to_institution}` : ""}
+                  </span>
+                )}
+                {player?.commitment_status === "withdrawn" && (
+                  <span className="flex items-center gap-1 bg-red-900/50 border border-red-600/50 text-red-300 text-xs font-bold px-2 py-0.5 rounded-full" data-testid="commitment-badge-withdrawn">
+                    Commitment Withdrawn
+                  </span>
+                )}
               </div>
               <div className="flex flex-wrap gap-2 text-sm text-slate-300 mb-3">
                 <span className="font-bold text-blue-300">{player?.position}{player?.secondary_position ? ` / ${player.secondary_position}` : ""}</span>
@@ -346,6 +361,12 @@ export default function CoachPlayerProfile() {
               <InfoRow label="Dominant Hand" value={player?.dominant_hand} />
               <InfoRow label="Current Club" value={player?.club_team || player?.current_team} />
               <InfoRow label="Years Playing" value={player?.years_playing ? `${player.years_playing} years` : null} />
+              <InfoRow label="Commitment" value={
+                player?.commitment_status === "committed" ? `Committed${player.committed_to_institution ? ` — ${player.committed_to_institution}` : ""}` :
+                player?.commitment_status === "soft_committed" ? `Soft Committed${player.committed_to_institution ? ` — ${player.committed_to_institution}` : ""}` :
+                player?.commitment_status === "withdrawn" ? "Commitment Withdrawn" :
+                "Uncommitted"
+              } />
             </Section>
 
             {/* Academic Profile */}

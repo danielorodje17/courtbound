@@ -205,6 +205,8 @@ async def coach_update_profile(body: dict, coach=Depends(get_current_coach)):
         # Programme detail fields
         "scholarship_type", "scholarship_avg_value", "nil_available", "nil_description",
         "housing_type", "f1_visa_support", "international_players_count",
+        # Privacy
+        "privacy_settings",
     }
     updates = {k: v for k, v in body.items() if k in allowed}
     if not updates:
@@ -212,6 +214,33 @@ async def coach_update_profile(body: dict, coach=Depends(get_current_coach)):
 
     result = await run_in_threadpool(
         lambda: supa.table("coach_accounts").update(updates).eq("id", coach["id"]).execute()
+    )
+    return _clean_coach(result.data[0]) if result.data else {"message": "Updated"}
+
+
+# ── Privacy Settings ──────────────────────────────────────────────────────────
+
+@router.get("/auth/privacy")
+async def get_privacy_settings(coach=Depends(get_current_coach)):
+    settings = coach.get("privacy_settings") or {}
+    return {
+        "hide_recruiting_prefs": settings.get("hide_recruiting_prefs", False),
+        "hide_contact_info": settings.get("hide_contact_info", False),
+        "profile_visible": settings.get("profile_visible", True),
+    }
+
+
+@router.patch("/auth/privacy")
+async def update_privacy_settings(body: dict, coach=Depends(get_current_coach)):
+    allowed_keys = {"hide_recruiting_prefs", "hide_contact_info", "profile_visible"}
+    current = coach.get("privacy_settings") or {}
+    updates = {k: bool(v) for k, v in body.items() if k in allowed_keys}
+    merged = {**current, **updates}
+    result = await run_in_threadpool(
+        lambda: supa.table("coach_accounts")
+        .update({"privacy_settings": merged})
+        .eq("id", coach["id"])
+        .execute()
     )
     return _clean_coach(result.data[0]) if result.data else {"message": "Updated"}
 

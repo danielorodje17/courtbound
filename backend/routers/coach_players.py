@@ -284,6 +284,8 @@ async def get_player_profile(user_id: str, coach=Depends(require_verified_coach)
         "ai_summary": ai_summary,
         "is_saved": saved_info is not None,
         "saved_list": saved_info.get("list_name") if saved_info else None,
+        "commitment_status": player.get("commitment_status") or "uncommitted",
+        "committed_to_institution": player.get("committed_to_institution"),
     }
 
 

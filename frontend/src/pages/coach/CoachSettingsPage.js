@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useCoachAuth } from "../../context/CoachAuthContext";
 import { CoachNav } from "../../components/coach/CoachNav";
 import { toast } from "sonner";
-import { Save, SlidersHorizontal, User, GraduationCap, Award, Globe, Copy, ExternalLink } from "lucide-react";
+import { Save, SlidersHorizontal, User, GraduationCap, Award, Globe, Copy, ExternalLink, Lock } from "lucide-react";
 
 const POSITIONS = ["PG", "SG", "SF", "PF", "C", "G", "F"];
 const GRAD_YEARS = ["2025", "2026", "2027", "2028", "2029"];
@@ -24,6 +24,13 @@ export default function CoachSettingsPage() {
   const { coach, coachReq, updateCoach } = useCoachAuth();
   const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
+
+  const [privacy, setPrivacy] = useState({
+    hide_recruiting_prefs: false,
+    hide_contact_info: false,
+    profile_visible: true,
+  });
+  const [privacySaving, setPrivacySaving] = useState(false);
 
   const [prefs, setPrefs] = useState({
     positions: [],
@@ -85,7 +92,11 @@ export default function CoachSettingsPage() {
       f1_visa_support: coach.f1_visa_support || "",
       international_players_count: coach.international_players_count ?? "",
     });
-  }, [coach]);
+    // Load privacy settings
+    coachReq("get", "/auth/privacy").then(r => {
+      if (r?.data) setPrivacy(r.data);
+    }).catch(() => {});
+  }, [coach]); // eslint-disable-line
 
   const toggle = (field, value) => {
     setPrefs(prev => ({
@@ -94,6 +105,17 @@ export default function CoachSettingsPage() {
         ? prev[field].filter(v => v !== value)
         : [...prev[field], value],
     }));
+  };
+
+  const handlePrivacySave = async () => {
+    setPrivacySaving(true);
+    try {
+      await coachReq("patch", "/auth/privacy", privacy);
+      toast.success("Privacy settings saved!");
+    } catch {
+      toast.error("Failed to save privacy settings");
+    }
+    setPrivacySaving(false);
   };
 
   const handleSave = async () => {
@@ -343,6 +365,57 @@ export default function CoachSettingsPage() {
                   className="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 resize-none" />
               </div>
             )}
+          </div>
+        </div>
+
+        {/* Privacy Settings */}
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 mb-5">
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-2">
+              <Lock className="w-4 h-4 text-slate-400" />
+              <h2 className="font-black text-white text-sm uppercase tracking-wide">Privacy Settings</h2>
+            </div>
+            <button onClick={handlePrivacySave} disabled={privacySaving} data-testid="save-privacy-btn"
+              className="flex items-center gap-1.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-60 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors">
+              <Save className="w-3.5 h-3.5" /> {privacySaving ? "Saving..." : "Save Privacy"}
+            </button>
+          </div>
+          <div className="space-y-4">
+            {[
+              {
+                key: "profile_visible",
+                label: "Public Programme Page Visible",
+                desc: "Your programme page at /coach/program/[slug] is publicly accessible by players",
+                invert: false,
+              },
+              {
+                key: "hide_recruiting_prefs",
+                label: "Hide Recruiting Preferences",
+                desc: "Don't show target positions, grad years, and minimum requirements on your public page",
+                invert: true,
+              },
+              {
+                key: "hide_contact_info",
+                label: "Hide Contact Information",
+                desc: "Don't show your name and email address on the public programme page",
+                invert: true,
+              },
+            ].map(({ key, label, desc }) => (
+              <div key={key} className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-white">{label}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">{desc}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPrivacy(p => ({ ...p, [key]: !p[key] }))}
+                  data-testid={`privacy-toggle-${key}`}
+                  className={`relative flex-shrink-0 w-11 h-6 rounded-full transition-colors ${privacy[key] ? "bg-blue-600" : "bg-slate-700"}`}
+                >
+                  <span className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${privacy[key] ? "translate-x-5" : "translate-x-0"}`} />
+                </button>
+              </div>
+            ))}
           </div>
         </div>
 

@@ -337,6 +337,25 @@ async def get_coach_analytics(coach=Depends(require_verified_coach)):
         lambda: supa.table("coach_player_views").select("viewed_at").eq("coach_id", coach["id"]).gte("viewed_at", fourteen_days_ago).execute()
     )
 
+    # Programme page views (from coach_programme_views table)
+    try:
+        prog_views_all = await run_in_threadpool(
+            lambda: supa.table("coach_programme_views").select("id", count="exact").eq("coach_id", coach["id"]).execute()
+        )
+        prog_views_7d = await run_in_threadpool(
+            lambda: supa.table("coach_programme_views").select("id", count="exact").eq("coach_id", coach["id"]).gte("viewed_at", seven_days_ago).execute()
+        )
+        prog_views_30d = await run_in_threadpool(
+            lambda: supa.table("coach_programme_views").select("id", count="exact").eq("coach_id", coach["id"]).gte("viewed_at", thirty_days_ago).execute()
+        )
+        programme_views = {
+            "all_time": prog_views_all.count or 0,
+            "last_7d": prog_views_7d.count or 0,
+            "last_30d": prog_views_30d.count or 0,
+        }
+    except Exception:
+        programme_views = {"all_time": 0, "last_7d": 0, "last_30d": 0}
+
     saved = saved_res.data or []
     saves_by_list = {}
     for s in saved:
@@ -373,6 +392,7 @@ async def get_coach_analytics(coach=Depends(require_verified_coach)):
             "last_7d": views_7d.count or 0,
             "last_30d": views_30d.count or 0,
         },
+        "programme_views": programme_views,
         "saves": {
             "total": len(saved),
             "by_list": [{"list": k, "count": v} for k, v in saves_by_list.items()],

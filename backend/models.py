@@ -142,6 +142,8 @@ class PlayerProfile(BaseModel):
     twitter: Optional[str] = ""
     basketball_gender: Optional[str] = ""
     lead_source: Optional[str] = ""
+    commitment_status: Optional[str] = ""
+    committed_to_institution: Optional[str] = ""
 
 
 class NCAACHeckRequest(BaseModel):

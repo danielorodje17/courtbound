@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCoachAuth } from "../../context/CoachAuthContext";
 import { CoachNav } from "../../components/coach/CoachNav";
-import { Send, CheckCircle, Clock, ChevronRight } from "lucide-react";
+import { Send, CheckCircle, Clock, ChevronRight, MessageSquare } from "lucide-react";
 
 const PERIOD_LABELS = {
   contact: { label: "Contact Period", color: "text-green-400" },
@@ -96,7 +96,24 @@ export default function CoachMessagesPage() {
                           ) : (
                             <span className="text-slate-600">Not yet read</span>
                           )}
+                          {m.player_reply && (
+                            <span className="flex items-center gap-1 text-blue-400 font-semibold">
+                              <MessageSquare className="w-3 h-3" /> Replied
+                            </span>
+                          )}
                         </div>
+                        {/* Player reply preview */}
+                        {m.player_reply && (
+                          <div className="mt-3 bg-blue-950/40 border border-blue-800/40 rounded-lg px-3 py-2" data-testid={`player-reply-preview-${m.id}`}>
+                            <p className="text-xs text-blue-400 font-bold uppercase tracking-wider mb-1 flex items-center gap-1">
+                              <MessageSquare className="w-3 h-3" /> Player Reply
+                              <span className="text-blue-600 font-normal ml-1">
+                                · {new Date(m.player_replied_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                              </span>
+                            </p>
+                            <p className="text-slate-300 text-xs leading-relaxed line-clamp-3">{m.player_reply}</p>
+                          </div>
+                        )}
                       </div>
                       <button
                         onClick={() => navigate(`/coach/players/${m.player_user_id}`)}
