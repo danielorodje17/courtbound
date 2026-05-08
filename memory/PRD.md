@@ -249,8 +249,18 @@ Build "CourtBound," a web app to track USA and UK college basketball scholarship
 - `/app/memory/supabase_migration_v18_coach_privacy.sql` — adds `privacy_settings JSONB DEFAULT '{}'`, `is_deleted BOOLEAN DEFAULT FALSE` to coach_accounts (**MUST RUN** for coach privacy settings to save)
 - `/app/memory/supabase_migration_v19_programme_views.sql` — creates `coach_programme_views` table (**MUST RUN** for programme page view tracking)
 
-## Phase B Features (Added May 2026)
-- [x] Player Replies in Messaging — players can reply once to a coach message; coaches see reply in sent messages (requires v16)
-- [x] Player Commitment Status — dropdown on player profile (Uncommitted/Soft Committed/Committed/Withdrawn) with institution field; badge on coach's player profile view (requires v17)
-- [x] Coach Privacy Settings — toggles on settings page: profile_visible, hide_recruiting_prefs, hide_contact_info; programme public page respects these (requires v18)
-- [x] Programme View Tracking — every `/coach/program/:slug` visit logs a row; analytics dashboard shows Programme Views KPI cards (7d, 30d) (requires v19)
+## Phase C Features (Added May 2026)
+
+### P0 — Board Enhancements (DONE ✅)
+- [x] Table view for recruiting board — Kanban ↔ Table toggle, persisted in localStorage; sortable columns (Player, Pos, Height, Club, Grad, PPG, Match %, List)
+- [x] CSV export — "Export CSV" button downloads `courtbound-recruiting-board.csv` with all player fields
+- [x] PDF export — "PDF" button calls `window.print()` with print-optimised CSS (`@media print`)
+
+### P1 — Messaging Enhancements (DONE ✅)
+- [x] Committed player messaging block — Backend 403 with institution name; sticky bar shows locked "Committed" button; modal shows lock screen if somehow opened
+- [x] Scheduled message send — "Schedule for later" toggle in compose modal; datetime-local picker; `POST /coach/messages/{id}` accepts `scheduled_at`; scheduler job dispatches every 15 min; filter tabs (All/Sent/Scheduled) on messages page; "Scheduled for [date]" badge on pending messages
+  - Requires migration v21: `scheduled_at TIMESTAMPTZ`, `status TEXT DEFAULT 'sent'` on coach_messages
+  - Backend has graceful pre-v21 fallbacks on both INSERT and SELECT
+
+### P2 — Custom Lists (Upcoming)
+- [ ] Custom list names on board — stored as JSONB in coach_accounts.custom_lists; requires migration v20
