@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import axios from "axios";
-import { Shield, Trophy, Users, Star, ChevronRight, ArrowLeft, GraduationCap, TrendingUp, Ruler, BookOpen, CheckCircle } from "lucide-react";
+import { Shield, Trophy, Users, Star, ChevronRight, ArrowLeft, GraduationCap, TrendingUp, Ruler, BookOpen, CheckCircle, DollarSign, Globe, Home, Award } from "lucide-react";
 
 const API = process.env.REACT_APP_BACKEND_URL;
 
@@ -195,6 +195,63 @@ export default function CoachProgramPage() {
               </div>
             )}
           </div>
+
+          {/* What We Offer */}
+          {(programme.scholarship_type || programme.nil_available || programme.housing_type || programme.f1_visa_support) && (
+            <div className="col-span-full bg-slate-900 border border-slate-800 rounded-2xl p-6">
+              <div className="flex items-center gap-2 mb-5">
+                <Award className="w-4 h-4 text-amber-400" />
+                <h2 className="font-black text-white text-lg">What We Offer</h2>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {programme.scholarship_type && (
+                  <div className="flex items-center gap-3 bg-slate-800/60 rounded-xl p-3">
+                    <DollarSign className="w-5 h-5 text-green-400 flex-shrink-0" />
+                    <div>
+                      <p className="text-xs text-slate-400 uppercase tracking-wider font-bold">Scholarship</p>
+                      <p className="text-white font-bold text-sm">{programme.scholarship_type}{programme.scholarship_avg_value ? ` — $${Number(programme.scholarship_avg_value).toLocaleString()}/yr` : ""}</p>
+                    </div>
+                  </div>
+                )}
+                {programme.housing_type && (
+                  <div className="flex items-center gap-3 bg-slate-800/60 rounded-xl p-3">
+                    <Home className="w-5 h-5 text-blue-400 flex-shrink-0" />
+                    <div>
+                      <p className="text-xs text-slate-400 uppercase tracking-wider font-bold">Housing</p>
+                      <p className="text-white font-bold text-sm">{programme.housing_type}</p>
+                    </div>
+                  </div>
+                )}
+                {programme.f1_visa_support && (
+                  <div className="flex items-center gap-3 bg-slate-800/60 rounded-xl p-3">
+                    <Globe className="w-5 h-5 text-purple-400 flex-shrink-0" />
+                    <div>
+                      <p className="text-xs text-slate-400 uppercase tracking-wider font-bold">F-1 Visa Support</p>
+                      <p className="text-white font-bold text-sm">{programme.f1_visa_support}</p>
+                    </div>
+                  </div>
+                )}
+                {programme.nil_available && (
+                  <div className="flex items-center gap-3 bg-slate-800/60 rounded-xl p-3">
+                    <CheckCircle className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+                    <div>
+                      <p className="text-xs text-slate-400 uppercase tracking-wider font-bold">NIL</p>
+                      <p className="text-white font-bold text-sm">{programme.nil_description || "Available"}</p>
+                    </div>
+                  </div>
+                )}
+                {programme.international_players_count > 0 && (
+                  <div className="flex items-center gap-3 bg-slate-800/60 rounded-xl p-3">
+                    <Users className="w-5 h-5 text-amber-400 flex-shrink-0" />
+                    <div>
+                      <p className="text-xs text-slate-400 uppercase tracking-wider font-bold">International Players</p>
+                      <p className="text-white font-bold text-sm">{programme.international_players_count} current</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Right: CTA card */}
           <div className="space-y-4">

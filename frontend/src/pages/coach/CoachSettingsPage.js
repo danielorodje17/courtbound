@@ -3,11 +3,22 @@ import { useNavigate } from "react-router-dom";
 import { useCoachAuth } from "../../context/CoachAuthContext";
 import { CoachNav } from "../../components/coach/CoachNav";
 import { toast } from "sonner";
-import { Save, SlidersHorizontal, User, GraduationCap, BarChart2 } from "lucide-react";
+import { Save, SlidersHorizontal, User, GraduationCap, Award, Globe, Copy, ExternalLink } from "lucide-react";
 
 const POSITIONS = ["PG", "SG", "SF", "PF", "C", "G", "F"];
 const GRAD_YEARS = ["2025", "2026", "2027", "2028", "2029"];
 const DIVISIONS_FILTER = ["NCAA D1", "NCAA D2", "NCAA D3", "NAIA", "JUCO"];
+const SCHOLARSHIP_TYPES = ["Full", "Partial", "Academic only", "None (D3)"];
+const HOUSING_TYPES = ["On-campus", "Off-campus", "Both"];
+const F1_VISA_OPTS = ["Full", "Partial", "None"];
+
+function toSlug(name) {
+  return (name || "").toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .trim("-");
+}
 
 export default function CoachSettingsPage() {
   const { coach, coachReq, updateCoach } = useCoachAuth();
@@ -34,6 +45,16 @@ export default function CoachSettingsPage() {
     about_programme: "",
   });
 
+  const [offer, setOffer] = useState({
+    scholarship_type: "",
+    scholarship_avg_value: "",
+    nil_available: false,
+    nil_description: "",
+    housing_type: "",
+    f1_visa_support: "",
+    international_players_count: "",
+  });
+
   useEffect(() => {
     if (!coach) return;
     setProfile({
@@ -55,6 +76,15 @@ export default function CoachSettingsPage() {
       min_gpa: rp.min_gpa ?? "",
       min_sat: rp.min_sat ?? "",
     });
+    setOffer({
+      scholarship_type: coach.scholarship_type || "",
+      scholarship_avg_value: coach.scholarship_avg_value ?? "",
+      nil_available: coach.nil_available || false,
+      nil_description: coach.nil_description || "",
+      housing_type: coach.housing_type || "",
+      f1_visa_support: coach.f1_visa_support || "",
+      international_players_count: coach.international_players_count ?? "",
+    });
   }, [coach]);
 
   const toggle = (field, value) => {
@@ -71,6 +101,9 @@ export default function CoachSettingsPage() {
     try {
       const body = {
         ...profile,
+        ...offer,
+        scholarship_avg_value: offer.scholarship_avg_value !== "" ? Number(offer.scholarship_avg_value) : null,
+        international_players_count: offer.international_players_count !== "" ? Number(offer.international_players_count) : null,
         recruiting_prefs: {
           ...prefs,
           min_height_cm: prefs.min_height_cm !== "" ? Number(prefs.min_height_cm) : null,
@@ -224,7 +257,7 @@ export default function CoachSettingsPage() {
         </div>
 
         {/* Account Info */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 mb-8">
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 mb-5">
           <div className="flex items-center gap-2 mb-3">
             <GraduationCap className="w-4 h-4 text-blue-400" />
             <h2 className="font-black text-white text-sm uppercase tracking-wide">Account Status</h2>
@@ -246,6 +279,103 @@ export default function CoachSettingsPage() {
             </div>
           </div>
         </div>
+
+        {/* What We Offer */}
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 mb-5">
+          <div className="flex items-center gap-2 mb-5">
+            <Award className="w-4 h-4 text-amber-400" />
+            <h2 className="font-black text-white text-sm uppercase tracking-wide">What We Offer</h2>
+            <span className="text-xs text-slate-500 font-normal ml-1">Displayed on your public programme page</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Scholarship Type</label>
+              <select value={offer.scholarship_type} onChange={e => setOffer(p => ({ ...p, scholarship_type: e.target.value }))}
+                data-testid="offer-scholarship-type"
+                className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600">
+                <option value="">Select…</option>
+                {SCHOLARSHIP_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Avg Scholarship Value (USD/yr)</label>
+              <input type="number" value={offer.scholarship_avg_value} onChange={e => setOffer(p => ({ ...p, scholarship_avg_value: e.target.value }))}
+                placeholder="e.g. 35000" data-testid="offer-scholarship-value"
+                className="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Housing Type</label>
+              <select value={offer.housing_type} onChange={e => setOffer(p => ({ ...p, housing_type: e.target.value }))}
+                data-testid="offer-housing-type"
+                className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600">
+                <option value="">Select…</option>
+                {HOUSING_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">F-1 Visa Support</label>
+              <select value={offer.f1_visa_support} onChange={e => setOffer(p => ({ ...p, f1_visa_support: e.target.value }))}
+                data-testid="offer-f1-visa"
+                className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600">
+                <option value="">Select…</option>
+                {F1_VISA_OPTS.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Current International Players</label>
+              <input type="number" value={offer.international_players_count} onChange={e => setOffer(p => ({ ...p, international_players_count: e.target.value }))}
+                placeholder="e.g. 4" data-testid="offer-intl-count"
+                className="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600" />
+            </div>
+            <div className="flex items-center gap-3 pt-5">
+              <button type="button" onClick={() => setOffer(p => ({ ...p, nil_available: !p.nil_available }))}
+                data-testid="offer-nil-toggle"
+                className={`relative w-11 h-6 rounded-full transition-colors ${offer.nil_available ? "bg-blue-600" : "bg-slate-700"}`}>
+                <span className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${offer.nil_available ? "translate-x-5" : "translate-x-0"}`} />
+              </button>
+              <label className="text-sm font-semibold text-slate-300">NIL Opportunities Available</label>
+            </div>
+            {offer.nil_available && (
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">NIL Details</label>
+                <textarea value={offer.nil_description} onChange={e => setOffer(p => ({ ...p, nil_description: e.target.value }))}
+                  rows={2} placeholder="Describe NIL opportunities at your programme…" data-testid="offer-nil-description"
+                  className="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 resize-none" />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Programme Public URL */}
+        {coach?.institution_name && (
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 mb-8">
+            <div className="flex items-center gap-2 mb-3">
+              <Globe className="w-4 h-4 text-blue-400" />
+              <h2 className="font-black text-white text-sm uppercase tracking-wide">Your Public Programme Page</h2>
+            </div>
+            {(() => {
+              const slug = toSlug(coach.institution_name);
+              const url = `${window.location.origin}/coach/program/${slug}`;
+              return (
+                <div className="flex items-center gap-2">
+                  <input readOnly value={url} data-testid="programme-public-url"
+                    className="flex-1 bg-slate-800 border border-slate-700 text-slate-300 text-xs rounded-lg px-3 py-2.5 focus:outline-none cursor-default" />
+                  <button
+                    data-testid="copy-programme-url-btn"
+                    onClick={() => { navigator.clipboard.writeText(url); toast.success("Link copied!"); }}
+                    className="flex items-center gap-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold px-3 py-2.5 rounded-lg transition-colors flex-shrink-0">
+                    <Copy className="w-3.5 h-3.5" /> Copy
+                  </button>
+                  <a href={url} target="_blank" rel="noreferrer"
+                    data-testid="preview-programme-url-btn"
+                    className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-2.5 rounded-lg transition-colors flex-shrink-0">
+                    <ExternalLink className="w-3.5 h-3.5" /> Preview
+                  </a>
+                </div>
+              );
+            })()}
+          </div>
+        )}
 
         <div className="flex gap-3">
           <button onClick={handleSave} disabled={saving} data-testid="save-settings-bottom-btn"

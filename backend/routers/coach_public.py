@@ -38,7 +38,7 @@ async def get_public_coach_profile(slug: str):
         "primary_sport": match.get("primary_sport"),
         "division": match.get("division"),
         "conference": match.get("conference"),
-        "bio": match.get("bio"),
+        "bio": match.get("about_programme"),
         "slug": slug,
         "recruiting_prefs": {
             "positions": prefs.get("positions") or [],
@@ -48,5 +48,13 @@ async def get_public_coach_profile(slug: str):
             "min_ppg": prefs.get("min_ppg"),
             "min_gpa": prefs.get("min_gpa"),
         },
+        # Programme detail fields (What We Offer)
+        "scholarship_type": match.get("scholarship_type"),
+        "scholarship_avg_value": match.get("scholarship_avg_value"),
+        "nil_available": match.get("nil_available") or False,
+        "nil_description": match.get("nil_description"),
+        "housing_type": match.get("housing_type"),
+        "f1_visa_support": match.get("f1_visa_support"),
+        "international_players_count": match.get("international_players_count"),
         "is_verified": True,
     }

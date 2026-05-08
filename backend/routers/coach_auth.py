@@ -202,6 +202,9 @@ async def coach_update_profile(body: dict, coach=Depends(get_current_coach)):
         "full_name", "job_title", "institution_name", "division", "conference",
         "institution_website", "primary_sport", "country", "profile_photo",
         "about_programme", "recruiting_prefs", "onboarding_steps", "onboarding_completed",
+        # Programme detail fields
+        "scholarship_type", "scholarship_avg_value", "nil_available", "nil_description",
+        "housing_type", "f1_visa_support", "international_players_count",
     }
     updates = {k: v for k, v in body.items() if k in allowed}
     if not updates:
