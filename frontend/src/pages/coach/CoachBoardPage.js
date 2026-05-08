@@ -6,6 +6,7 @@ import {
   Bookmark, ChevronRight, Film, Trash2, StickyNote,
   LayoutGrid, List, Download, Printer,
   ArrowUpDown, ArrowUp, ArrowDown,
+  Plus, Pencil, Check, X,
 } from "lucide-react";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -52,10 +53,111 @@ const COLOR_BORDER = {
   purple: "border-l-4 border-l-purple-500",
 };
 
-// ── Kanban Card ───────────────────────────────────────────────────────────────
+const CUSTOM_LIST_COLOR = "border-violet-700/50 bg-violet-950/20";
+const CUSTOM_LIST_HEADER_COLOR = "text-violet-300 border-violet-700/50";
+const CUSTOM_LIST_BADGE = "bg-violet-900/50 text-violet-300";
 
-function BoardCard({ item, onRemove, onMove, onView, onColorLabel }) {
+// ── Custom Column Header ───────────────────────────────────────────────────────
+
+function CustomColumnHeader({ name, count, onRename, onDelete }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(name);
+  const inputRef = useRef(null);
+
+  const commitRename = () => {
+    const trimmed = draft.trim();
+    if (trimmed && trimmed !== name) onRename(name, trimmed);
+    setEditing(false);
+  };
+
+  useEffect(() => {
+    if (editing) { setDraft(name); inputRef.current?.focus(); }
+  }, [editing, name]);
+
+  return (
+    <div className={`flex items-center justify-between pb-2 mb-3 border-b ${CUSTOM_LIST_HEADER_COLOR}`}>
+      {editing ? (
+        <div className="flex items-center gap-1 flex-1">
+          <input
+            ref={inputRef}
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") commitRename(); if (e.key === "Escape") setEditing(false); }}
+            maxLength={40}
+            data-testid={`custom-list-rename-input-${name}`}
+            className="bg-slate-800 border border-violet-600 text-white text-xs font-bold rounded px-2 py-0.5 w-full focus:outline-none"
+          />
+          <button onClick={commitRename} data-testid={`custom-list-rename-confirm-${name}`}
+            className="text-green-400 hover:text-green-300 p-0.5"><Check className="w-3.5 h-3.5" /></button>
+          <button onClick={() => setEditing(false)} className="text-slate-500 hover:text-slate-300 p-0.5"><X className="w-3.5 h-3.5" /></button>
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <h3 className="font-black text-sm truncate">{name}</h3>
+            <span className="text-xs font-bold opacity-60">{count}</span>
+          </div>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <button onClick={() => setEditing(true)} data-testid={`custom-list-edit-${name}`}
+              className="p-0.5 text-slate-600 hover:text-violet-400 transition-colors" title="Rename list">
+              <Pencil className="w-3 h-3" />
+            </button>
+            <button onClick={() => onDelete(name)} data-testid={`custom-list-delete-${name}`}
+              className="p-0.5 text-slate-600 hover:text-red-400 transition-colors" title="Delete list">
+              <Trash2 className="w-3 h-3" />
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Add List Form ─────────────────────────────────────────────────────────────
+
+function AddListForm({ onAdd, onCancel }) {
+  const [name, setName] = useState("");
+  const inputRef = useRef(null);
+  useEffect(() => { inputRef.current?.focus(); }, []);
+
+  const submit = (e) => {
+    e.preventDefault();
+    const trimmed = name.trim();
+    if (trimmed) onAdd(trimmed);
+  };
+
+  return (
+    <div className="border border-violet-700/50 bg-violet-950/20 rounded-xl p-3 min-w-[180px]">
+      <p className="text-violet-300 text-xs font-bold uppercase tracking-wider mb-2">New List</p>
+      <form onSubmit={submit} className="space-y-2">
+        <input
+          ref={inputRef}
+          value={name}
+          onChange={e => setName(e.target.value)}
+          maxLength={40}
+          placeholder="e.g. 2026 Guards"
+          data-testid="add-custom-list-input"
+          className="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-violet-600"
+        />
+        <div className="flex gap-1.5">
+          <button type="submit" disabled={!name.trim()} data-testid="add-custom-list-confirm-btn"
+            className="flex-1 bg-violet-700 hover:bg-violet-600 disabled:opacity-50 text-white text-xs font-bold py-1.5 rounded-lg transition-colors">
+            Add
+          </button>
+          <button type="button" onClick={onCancel}
+            className="px-3 text-slate-400 hover:text-white text-xs py-1.5 rounded-lg hover:bg-slate-800 transition-colors">
+            Cancel
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+// ── Kanban Card ───────────────────────────────────────────────────────────────
+function BoardCard({ item, allLists, onRemove, onMove, onView, onColorLabel }) {
   const p = item.player || {};
+  const lists = allLists || LISTS;
   const [showColors, setShowColors] = useState(false);
   const colorBorder = item.color_label ? COLOR_BORDER[item.color_label] || "" : "";
 
@@ -122,7 +224,7 @@ function BoardCard({ item, onRemove, onMove, onView, onColorLabel }) {
         </button>
       </div>
       <div className="flex flex-wrap gap-1 mt-2">
-        {LISTS.filter(l => l !== item.list_name).map(l => (
+        {lists.filter(l => l !== item.list_name).map(l => (
           <button key={l} onClick={() => onMove(item.player_user_id, l)}
             className="text-xs text-slate-500 hover:text-slate-300 bg-slate-800 hover:bg-slate-700 px-2 py-0.5 rounded transition-colors">
             → {l}
@@ -236,7 +338,7 @@ function TableView({ saved, onRemove, onView }) {
                 </td>
                 {/* List badge */}
                 <td className="px-4 py-3">
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${LIST_BADGE[item.list_name] || LIST_BADGE["Watch List"]}`}>
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${LIST_BADGE[item.list_name] || CUSTOM_LIST_BADGE}`}>
                     {item.list_name || "Watch List"}
                   </span>
                 </td>
@@ -321,7 +423,12 @@ export default function CoachBoardPage() {
   const [saved, setSaved] = useState([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState(() => localStorage.getItem("boardViewMode") || "kanban");
+  const [customLists, setCustomLists] = useState([]);
+  const [showAddList, setShowAddList] = useState(false);
   const styleInjected = useRef(false);
+
+  // Merge default + custom lists
+  const allLists = [...LISTS, ...customLists];
 
   // Inject print styles once
   useEffect(() => {
@@ -341,8 +448,12 @@ export default function CoachBoardPage() {
   const load = async () => {
     setLoading(true);
     try {
-      const r = await coachReq("get", "/saved");
-      setSaved(r.data || []);
+      const [boardRes, listsRes] = await Promise.all([
+        coachReq("get", "/saved"),
+        coachReq("get", "/custom-lists").catch(() => ({ data: { custom_lists: [] } })),
+      ]);
+      setSaved(boardRes.data || []);
+      setCustomLists(listsRes.data?.custom_lists || []);
     } catch {}
     setLoading(false);
   };
@@ -370,7 +481,39 @@ export default function CoachBoardPage() {
     } catch {}
   };
 
-  const byList = LISTS.reduce((acc, l) => {
+  const handleAddList = async (name) => {
+    try {
+      const r = await coachReq("post", "/custom-lists", { name });
+      setCustomLists(r.data.custom_lists || []);
+      setShowAddList(false);
+    } catch (e) {
+      const msg = e?.response?.data?.detail || "Failed to create list";
+      alert(msg);
+    }
+  };
+
+  const handleRenameList = async (oldName, newName) => {
+    try {
+      const r = await coachReq("patch", `/custom-lists/${encodeURIComponent(oldName)}`, { name: newName });
+      setCustomLists(r.data.custom_lists || []);
+      setSaved(prev => prev.map(s => s.list_name === oldName ? { ...s, list_name: newName } : s));
+    } catch (e) {
+      alert(e?.response?.data?.detail || "Failed to rename list");
+    }
+  };
+
+  const handleDeleteList = async (name) => {
+    if (!window.confirm(`Delete "${name}"? Players in this list will move to Watch List.`)) return;
+    try {
+      const r = await coachReq("delete", `/custom-lists/${encodeURIComponent(name)}`);
+      setCustomLists(r.data.custom_lists || []);
+      setSaved(prev => prev.map(s => s.list_name === name ? { ...s, list_name: "Watch List" } : s));
+    } catch (e) {
+      alert(e?.response?.data?.detail || "Failed to delete list");
+    }
+  };
+
+  const byList = allLists.reduce((acc, l) => {
     acc[l] = saved.filter(s => s.list_name === l);
     return acc;
   }, {});
@@ -469,21 +612,23 @@ export default function CoachBoardPage() {
             onColorLabel={handleColorLabel}
           />
         ) : (
-          /* Kanban */
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          /* Kanban — default + custom columns */
+          <div className="flex gap-4 overflow-x-auto pb-2">
+            {/* Default columns */}
             {LISTS.map(listName => (
-              <div key={listName} className={`border rounded-xl p-3 ${LIST_COLORS[listName]}`}>
+              <div key={listName} className={`border rounded-xl p-3 flex-shrink-0 w-60 ${LIST_COLORS[listName]}`}>
                 <div className={`flex items-center justify-between pb-2 mb-3 border-b ${LIST_HEADER_COLORS[listName]}`}>
                   <h3 className="font-black text-sm">{listName}</h3>
-                  <span className="text-xs font-bold opacity-60">{byList[listName].length}</span>
+                  <span className="text-xs font-bold opacity-60">{byList[listName]?.length || 0}</span>
                 </div>
                 <div className="space-y-3">
-                  {byList[listName].length === 0 ? (
+                  {(byList[listName] || []).length === 0 ? (
                     <div className="text-center py-6 text-slate-600 text-xs">Empty</div>
-                  ) : byList[listName].map(item => (
+                  ) : (byList[listName] || []).map(item => (
                     <BoardCard
                       key={item.id}
                       item={item}
+                      allLists={allLists}
                       onRemove={handleRemove}
                       onMove={handleMove}
                       onColorLabel={handleColorLabel}
@@ -493,6 +638,50 @@ export default function CoachBoardPage() {
                 </div>
               </div>
             ))}
+
+            {/* Custom columns */}
+            {customLists.map(listName => (
+              <div key={listName} className={`border rounded-xl p-3 flex-shrink-0 w-60 ${CUSTOM_LIST_COLOR}`} data-testid={`custom-list-column-${listName}`}>
+                <CustomColumnHeader
+                  name={listName}
+                  count={byList[listName]?.length || 0}
+                  onRename={handleRenameList}
+                  onDelete={handleDeleteList}
+                />
+                <div className="space-y-3">
+                  {(byList[listName] || []).length === 0 ? (
+                    <div className="text-center py-6 text-slate-600 text-xs">Empty</div>
+                  ) : (byList[listName] || []).map(item => (
+                    <BoardCard
+                      key={item.id}
+                      item={item}
+                      allLists={allLists}
+                      onRemove={handleRemove}
+                      onMove={handleMove}
+                      onColorLabel={handleColorLabel}
+                      onView={(id) => navigate(`/coach/players/${id}`)}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            {/* Add new list */}
+            <div className="flex-shrink-0">
+              {showAddList ? (
+                <AddListForm onAdd={handleAddList} onCancel={() => setShowAddList(false)} />
+              ) : (
+                customLists.length < 10 && (
+                  <button
+                    onClick={() => setShowAddList(true)}
+                    data-testid="add-custom-list-btn"
+                    className="flex items-center gap-2 text-slate-500 hover:text-violet-400 border border-dashed border-slate-700 hover:border-violet-600 rounded-xl px-4 py-3 text-xs font-bold transition-all h-fit mt-0"
+                  >
+                    <Plus className="w-4 h-4" /> New List
+                  </button>
+                )
+              )}
+            </div>
           </div>
         )}
       </div>

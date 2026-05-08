@@ -254,9 +254,105 @@ async def update_privacy_settings(body: dict, coach=Depends(get_current_coach)):
         raise
 
 
-# ── Logout ───────────────────────────────────────────────────────────────────
+# ── Custom Lists ──────────────────────────────────────────────────────────────
 
-@router.post("/auth/logout")
+DEFAULT_LISTS = {"Watch List", "Priority Targets", "Contacted", "Offer Extended", "Committed"}
+MAX_CUSTOM_LISTS = 10
+MAX_LIST_NAME_LEN = 40
+
+
+def _get_custom_lists(coach: dict) -> list:
+    val = coach.get("custom_lists")
+    if isinstance(val, list):
+        return val
+    return []
+
+
+async def _save_custom_lists(coach_id: str, lists: list):
+    try:
+        await run_in_threadpool(
+            lambda: supa.table("coach_accounts")
+            .update({"custom_lists": lists})
+            .eq("id", coach_id)
+            .execute()
+        )
+    except Exception as e:
+        if "custom_lists" in str(e):
+            from fastapi import HTTPException as _H
+            raise _H(status_code=503, detail="Custom lists not available yet — please run database migration v20.")
+        raise
+
+
+@router.get("/custom-lists")
+async def get_custom_lists(coach=Depends(get_current_coach)):
+    return {"custom_lists": _get_custom_lists(coach)}
+
+
+@router.post("/custom-lists")
+async def add_custom_list(body: dict, coach=Depends(get_current_coach)):
+    name = (body.get("name") or "").strip()
+    if not name or len(name) < 2:
+        raise HTTPException(status_code=400, detail="List name must be at least 2 characters")
+    if len(name) > MAX_LIST_NAME_LEN:
+        raise HTTPException(status_code=400, detail=f"List name too long (max {MAX_LIST_NAME_LEN} characters)")
+    if name in DEFAULT_LISTS:
+        raise HTTPException(status_code=409, detail=f"'{name}' is a default list name")
+    current = _get_custom_lists(coach)
+    if name in current:
+        raise HTTPException(status_code=409, detail=f"List '{name}' already exists")
+    if len(current) >= MAX_CUSTOM_LISTS:
+        raise HTTPException(status_code=400, detail=f"Maximum {MAX_CUSTOM_LISTS} custom lists allowed")
+    updated = current + [name]
+    await _save_custom_lists(coach["id"], updated)
+    return {"custom_lists": updated}
+
+
+@router.patch("/custom-lists/{old_name}")
+async def rename_custom_list(old_name: str, body: dict, coach=Depends(get_current_coach)):
+    new_name = (body.get("name") or "").strip()
+    if not new_name or len(new_name) < 2:
+        raise HTTPException(status_code=400, detail="New name must be at least 2 characters")
+    if len(new_name) > MAX_LIST_NAME_LEN:
+        raise HTTPException(status_code=400, detail="Name too long")
+    if new_name in DEFAULT_LISTS:
+        raise HTTPException(status_code=409, detail=f"'{new_name}' is a default list name")
+    current = _get_custom_lists(coach)
+    if old_name not in current:
+        raise HTTPException(status_code=404, detail=f"List '{old_name}' not found")
+    if new_name in current:
+        raise HTTPException(status_code=409, detail=f"List '{new_name}' already exists")
+    updated = [new_name if lst == old_name else lst for lst in current]
+    await _save_custom_lists(coach["id"], updated)
+    # Rename all saved players on this list
+    await run_in_threadpool(
+        lambda: supa.table("coach_saved_players")
+        .update({"list_name": new_name})
+        .eq("coach_id", coach["id"])
+        .eq("list_name", old_name)
+        .execute()
+    )
+    return {"custom_lists": updated}
+
+
+@router.delete("/custom-lists/{list_name}")
+async def delete_custom_list(list_name: str, coach=Depends(get_current_coach)):
+    current = _get_custom_lists(coach)
+    if list_name not in current:
+        raise HTTPException(status_code=404, detail=f"List '{list_name}' not found")
+    updated = [lst for lst in current if lst != list_name]
+    await _save_custom_lists(coach["id"], updated)
+    # Move all players on this list to Watch List
+    await run_in_threadpool(
+        lambda: supa.table("coach_saved_players")
+        .update({"list_name": "Watch List"})
+        .eq("coach_id", coach["id"])
+        .eq("list_name", list_name)
+        .execute()
+    )
+    return {"custom_lists": updated}
+
+
+# ── Logout ───────────────────────────────────────────────────────────────────
 async def coach_logout(coach=Depends(get_current_coach)):
     await run_in_threadpool(
         lambda: supa.table("coach_accounts")
