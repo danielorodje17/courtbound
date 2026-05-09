@@ -4,12 +4,15 @@ import { X, ExternalLink, Film } from "lucide-react";
  * Converts a raw YouTube or Hudl URL to an embeddable iframe src.
  * Returns null for unsupported URLs (caller falls back to external link).
  */
-export function getEmbedUrl(url) {
+export function getEmbedUrl(url, { autoplay = false } = {}) {
   if (!url) return null;
 
   // YouTube: youtube.com/watch?v=ID  or  youtu.be/ID
   const ytId = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&?/#]+)/)?.[1]?.trim();
-  if (ytId) return `https://www.youtube.com/embed/${ytId}?autoplay=1&rel=0`;
+  if (ytId) {
+    const params = autoplay ? "?autoplay=1&rel=0" : "?rel=0";
+    return `https://www.youtube.com/embed/${ytId}${params}`;
+  }
 
   // Hudl: hudl.com/video/3/TEAM/ID  →  hudl.com/embed/video/3/TEAM/ID
   if (url.includes("hudl.com/video/")) {
@@ -68,7 +71,7 @@ export function VideoModal({ url, playerName, onClose }) {
         <div className="aspect-video bg-slate-900 rounded-xl overflow-hidden border border-slate-800">
           {embedUrl ? (
             <iframe
-              src={embedUrl}
+              src={getEmbedUrl(url, { autoplay: true })}
               className="w-full h-full"
               allowFullScreen
               allow="autoplay; fullscreen; picture-in-picture"
