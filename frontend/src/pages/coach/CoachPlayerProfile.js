@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useCoachAuth } from "../../context/CoachAuthContext";
 import { CoachNav } from "../../components/coach/CoachNav";
 import { toast } from "sonner";
-import { ArrowLeft, Film, Shield, Star, MapPin, GraduationCap, BarChart2, User, ExternalLink, Bookmark, Send, X, AlertCircle, CheckCircle, Lock, Clock } from "lucide-react";
+import { ArrowLeft, Film, Shield, Star, MapPin, GraduationCap, BarChart2, User, ExternalLink, Bookmark, Send, X, AlertCircle, CheckCircle, Lock, Clock, ChevronDown, BookOpen, Save, Trash2 } from "lucide-react";
 import { getEmbedUrl } from "../../components/coach/VideoModal";
 
 const PERIOD_WARNINGS = {
@@ -20,11 +20,75 @@ function SendMessageModal({ player, coach, onClose, onSent }) {
   const [scheduleEnabled, setScheduleEnabled] = useState(false);
   const [scheduledAt, setScheduledAt] = useState("");
 
+  // Template state
+  const [templates, setTemplates] = useState([]);
+  const [showTemplateDropdown, setShowTemplateDropdown] = useState(false);
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false);
+  const [templateName, setTemplateName] = useState("");
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const dropdownRef = useRef(null);
+
   const isCommitted = (player?.commitment_status || "uncommitted") === "committed";
 
   // Min datetime for the picker: 30 minutes from now
   const minDateTime = new Date(Date.now() + 30 * 60 * 1000)
     .toISOString().slice(0, 16);
+
+  // Fetch templates on mount
+  useEffect(() => {
+    if (isCommitted) return;
+    coachReq("get", "/messages/templates")
+      .then(r => setTemplates(r.data.templates || []))
+      .catch(() => {});
+  }, []); // eslint-disable-line
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!showTemplateDropdown) return;
+    const handler = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setShowTemplateDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showTemplateDropdown]);
+
+  const applyTemplate = (t) => {
+    setForm({ subject: t.subject || "", body: t.body });
+    setShowTemplateDropdown(false);
+  };
+
+  const deleteTemplate = async (e, templateId) => {
+    e.stopPropagation();
+    try {
+      await coachReq("delete", `/messages/templates/${templateId}`);
+      setTemplates(prev => prev.filter(t => t.id !== templateId));
+      toast.success("Template deleted");
+    } catch {
+      toast.error("Failed to delete template");
+    }
+  };
+
+  const saveTemplate = async () => {
+    if (!templateName.trim()) { toast.error("Template name is required"); return; }
+    if (!form.body.trim()) { toast.error("Write a message first to save as template"); return; }
+    setSavingTemplate(true);
+    try {
+      const res = await coachReq("post", "/messages/templates", {
+        name: templateName.trim(),
+        subject: form.subject || null,
+        body: form.body,
+      });
+      setTemplates(prev => [...prev, res.data.template]);
+      setTemplateName("");
+      setShowSaveTemplate(false);
+      toast.success("Template saved!");
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Failed to save template");
+    }
+    setSavingTemplate(false);
+  };
 
   const submit = async (e) => {
     e.preventDefault();
@@ -52,8 +116,8 @@ function SendMessageModal({ player, coach, onClose, onSent }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-lg bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl">
-        <div className="flex items-center justify-between p-5 border-b border-slate-800">
+      <div className="w-full max-w-lg bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between p-5 border-b border-slate-800 flex-shrink-0">
           <div>
             <h3 className="font-black text-white">Message {player?.full_name}</h3>
             <p className="text-slate-400 text-xs mt-0.5">{player?.position} · {player?.club_team || player?.hometown || "UK"}</p>
@@ -83,7 +147,7 @@ function SendMessageModal({ player, coach, onClose, onSent }) {
             </button>
           </div>
         ) : (
-          <>
+          <div className="overflow-y-auto flex-1">
             {periodWarning && (
               <div className="mx-5 mt-4 flex items-start gap-2 bg-amber-900/30 border border-amber-700/50 rounded-xl p-3">
                 <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
@@ -91,12 +155,65 @@ function SendMessageModal({ player, coach, onClose, onSent }) {
               </div>
             )}
             <form onSubmit={submit} className="p-5 space-y-4">
+
+              {/* Template selector */}
+              {templates.length > 0 && (
+                <div className="relative" ref={dropdownRef}>
+                  <button
+                    type="button"
+                    data-testid="use-template-btn"
+                    onClick={() => setShowTemplateDropdown(v => !v)}
+                    className="flex items-center gap-2 text-xs font-bold text-blue-400 hover:text-blue-300 bg-blue-900/20 hover:bg-blue-900/30 border border-blue-800/50 px-3 py-2 rounded-lg transition-colors w-full justify-between"
+                  >
+                    <span className="flex items-center gap-2">
+                      <BookOpen className="w-3.5 h-3.5" />
+                      Use Template
+                    </span>
+                    <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showTemplateDropdown ? "rotate-180" : ""}`} />
+                  </button>
+
+                  {showTemplateDropdown && (
+                    <div
+                      className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 max-h-64 overflow-y-auto"
+                      data-testid="template-dropdown"
+                    >
+                      {templates.map(t => (
+                        <div
+                          key={t.id}
+                          className="flex items-start gap-2 px-3 py-3 hover:bg-slate-700 cursor-pointer transition-colors border-b border-slate-700/50 last:border-0 group"
+                          onClick={() => applyTemplate(t)}
+                          data-testid={`template-item-${t.id}`}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="text-white text-sm font-semibold truncate">{t.name}</p>
+                            {t.subject && <p className="text-slate-400 text-xs truncate">{t.subject}</p>}
+                            <p className="text-slate-500 text-xs truncate mt-0.5">{t.body}</p>
+                          </div>
+                          {!t.is_default && (
+                            <button
+                              type="button"
+                              onClick={(e) => deleteTemplate(e, t.id)}
+                              data-testid={`delete-template-${t.id}`}
+                              className="flex-shrink-0 text-slate-600 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 p-0.5"
+                              title="Delete template"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Subject (optional)</label>
                 <input
                   value={form.subject}
                   onChange={e => setForm(p => ({ ...p, subject: e.target.value }))}
                   placeholder="e.g. Recruiting Interest — Fort Hays State"
+                  data-testid="message-subject-input"
                   className="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
                 />
               </div>
@@ -112,8 +229,43 @@ function SendMessageModal({ player, coach, onClose, onSent }) {
                   required
                   data-testid="message-body-input"
                 />
-                <p className="text-slate-600 text-xs mt-1 text-right">{form.body.length}/2000</p>
+                <div className="flex items-center justify-between mt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowSaveTemplate(v => !v)}
+                    data-testid="save-as-template-toggle"
+                    className="text-xs text-slate-500 hover:text-slate-300 flex items-center gap-1 transition-colors"
+                  >
+                    <Save className="w-3 h-3" />
+                    Save as template
+                  </button>
+                  <p className="text-slate-600 text-xs">{form.body.length}/2000</p>
+                </div>
               </div>
+
+              {/* Save as template inline form */}
+              {showSaveTemplate && (
+                <div className="flex gap-2 items-center bg-slate-800/60 border border-slate-700/60 rounded-xl px-3 py-2.5" data-testid="save-template-form">
+                  <input
+                    type="text"
+                    value={templateName}
+                    onChange={e => setTemplateName(e.target.value)}
+                    placeholder="Template name..."
+                    data-testid="template-name-input"
+                    className="flex-1 bg-transparent text-white placeholder-slate-500 text-sm focus:outline-none"
+                    maxLength={80}
+                  />
+                  <button
+                    type="button"
+                    onClick={saveTemplate}
+                    disabled={savingTemplate || !templateName.trim()}
+                    data-testid="save-template-submit-btn"
+                    className="flex-shrink-0 bg-blue-700 hover:bg-blue-600 disabled:opacity-50 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"
+                  >
+                    {savingTemplate ? "Saving..." : "Save"}
+                  </button>
+                </div>
+              )}
 
               {/* Schedule toggle */}
               <div className="flex items-center justify-between bg-slate-800/60 rounded-xl px-4 py-3 border border-slate-700/60">
@@ -162,7 +314,7 @@ function SendMessageModal({ player, coach, onClose, onSent }) {
               </div>
               <p className="text-slate-600 text-xs text-center">By sending, you confirm this communication complies with your division's recruiting rules.</p>
             </form>
-          </>
+          </div>
         )}
       </div>
     </div>
