@@ -271,6 +271,18 @@ Build "CourtBound," a web app to track USA and UK college basketball scholarship
 
 ### Phase E — UX Gaps (Added Feb 2026)
 
+#### Gap 7 — Account Deletion (DONE ✅)
+- [x] `DELETE /api/coach/auth/account` — deletes all coach data (messages, saved players, notifications, templates, views) then hard-deletes the account row
+- [x] Settings UI — "Delete Account" red button in Data & Account section (data-testid: delete-account-btn)
+- [x] Confirmation modal (data-testid: delete-account-modal) — lists what will be deleted, requires typing "DELETE" to enable confirm button, cancel closes safely
+- [x] On success: toast → coachLogout() → redirect to /coach/login
+
+#### Gap 8 — Board PDF Export (DONE ✅)
+- [x] `reportlab` installed (`pip install reportlab`)
+- [x] `POST /api/coach/board/export-pdf` — generates formatted PDF with: header (coach name, institution, date), one section per list, player table (name, pos, height, club, grad, PPG, match %, notes), alternating row colours
+- [x] Returns `StreamingResponse` with `Content-Type: application/pdf` and `Content-Disposition: attachment`
+- [x] Board page — "PDF" button (data-testid: export-pdf-btn) replaced `window.print()` with proper server-side PDF download; shows "Generating..." during fetch
+
 #### Gap 5 — Email Notification Preferences (DONE ✅)
 - [x] `supabase_migration_v24_notification_prefs.sql` — adds `notification_prefs JSONB DEFAULT '{}'` to `coach_accounts` (**user must run**)
 - [x] `GET /api/coach/auth/notification-prefs` — returns prefs with sensible defaults (works before v24)
