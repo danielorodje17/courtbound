@@ -284,6 +284,11 @@ Build "CourtBound," a web app to track USA and UK college basketball scholarship
 - [x] Clear All now resets URL too
 - [x] Bulk Message ("Message All") — Send icon on each board column header (except Committed); BulkMessageModal with eligible/skipped count, subject + body compose, success state; POST /api/coach/messages/bulk skips committed players; routing conflict resolved (bulk before parameterized route)
 
+#### P2 — "Who Viewed My Profile" for Players (DONE ✅)
+- [x] GET /api/player/profile-views — deduplicated by coach, sorted newest-first; returns view_count, last_viewed_at, coach details, programme_slug, is_verified
+- [x] PlayerMessagesPage split into two tabs: "Messages" + "Profile Views" (with unread badge on Messages tab)
+- [x] Profile view card: coach avatar, name, institution/division, Verified badge, view count, date, Programme external link
+
 ### P3 — Drag-and-Drop Kanban (DONE ✅)
 - [x] True drag-and-drop on Kanban board using `@dnd-kit/core` (v6.3.1)
   - `useDraggable` on cards with GripVertical drag handle; `useDroppable` on columns
