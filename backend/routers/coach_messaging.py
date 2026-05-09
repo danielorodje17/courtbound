@@ -46,6 +46,108 @@ def _ncaa_period_type(coach: dict) -> str:
     return "dead"  # default safe fallback
 
 
+# ── Message Templates ─────────────────────────────────────────────────────────
+
+DEFAULT_TEMPLATES = [
+    {
+        "name": "Initial Interest Introduction",
+        "subject": "Recruiting Interest",
+        "body": (
+            "Hi, I'm Coach [Name] from [Institution]. We've been following your development "
+            "closely and believe you could be a great fit for our programme. We'd love to "
+            "connect and tell you more about what we offer. Please feel free to reply with any questions."
+        ),
+        "is_default": True,
+    },
+    {
+        "name": "Highlight Reel Request",
+        "subject": "Film Request",
+        "body": (
+            "Thank you for your interest in our programme. To continue our evaluation, we'd "
+            "love to review your most recent highlight reel and any available game film. "
+            "Could you please share a link to your current footage? Any recent competition "
+            "film would be very helpful for our process."
+        ),
+        "is_default": True,
+    },
+    {
+        "name": "Official Visit Invitation",
+        "subject": "Official Visit Invitation",
+        "body": (
+            "We'd like to formally invite you for an official visit to our campus. This would "
+            "be a wonderful opportunity to meet our coaching staff, see our facilities, and "
+            "experience campus life first-hand. Please let us know your availability and "
+            "we'll arrange a date that works for both of us."
+        ),
+        "is_default": True,
+    },
+]
+
+
+async def _seed_default_templates(coach_id: str):
+    """Insert default templates for a coach. Safe to call multiple times (checks first)."""
+    try:
+        existing = await run_in_threadpool(
+            lambda: supa.table("coach_message_templates")
+            .select("id", count="exact").eq("coach_id", coach_id).execute()
+        )
+        if (existing.count or 0) > 0:
+            return
+        rows = [{"coach_id": coach_id, **t} for t in DEFAULT_TEMPLATES]
+        await run_in_threadpool(
+            lambda: supa.table("coach_message_templates").insert(rows).execute()
+        )
+    except Exception as e:
+        logger.warning(f"Template seeding failed for coach {coach_id}: {e}")
+
+
+@router.get("/messages/templates")
+async def list_templates(coach=Depends(get_current_coach)):
+    await _seed_default_templates(str(coach["id"]))
+    res = await run_in_threadpool(
+        lambda: supa.table("coach_message_templates")
+        .select("id, name, subject, body, is_default, created_at")
+        .eq("coach_id", coach["id"])
+        .order("created_at")
+        .execute()
+    )
+    return {"templates": res.data or []}
+
+
+@router.post("/messages/templates")
+async def save_template(body: dict, coach=Depends(get_current_coach)):
+    name = (body.get("name") or "").strip()
+    tmpl_body = (body.get("body") or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Template name is required")
+    if not tmpl_body:
+        raise HTTPException(status_code=400, detail="Template body is required")
+    row = {
+        "coach_id": coach["id"],
+        "name": name,
+        "subject": (body.get("subject") or "").strip() or None,
+        "body": tmpl_body,
+        "is_default": False,
+    }
+    res = await run_in_threadpool(lambda: supa.table("coach_message_templates").insert(row).execute())
+    if not res.data:
+        raise HTTPException(status_code=500, detail="Failed to save template")
+    t = res.data[0]
+    return {"template": {k: t[k] for k in ("id", "name", "subject", "body", "is_default", "created_at")}}
+
+
+@router.delete("/messages/templates/{template_id}")
+async def delete_template(template_id: str, coach=Depends(get_current_coach)):
+    await run_in_threadpool(
+        lambda: supa.table("coach_message_templates")
+        .delete()
+        .eq("id", template_id)
+        .eq("coach_id", coach["id"])
+        .execute()
+    )
+    return {"message": "Template deleted"}
+
+
 # ── Send Message (Coach → Player) ─────────────────────────────────────────────
 
 # NOTE: /messages/bulk must be defined BEFORE /messages/{player_user_id} to avoid routing conflict
