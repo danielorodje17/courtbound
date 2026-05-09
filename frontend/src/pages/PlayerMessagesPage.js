@@ -1,61 +1,184 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { apiRequest } from "../context/AuthContext";
-import { Mail, CheckCircle, AlertCircle, Send, Eye, ExternalLink, ShieldCheck, Trophy } from "lucide-react";
+import { Mail, CheckCircle, AlertCircle, Send, Eye, ExternalLink, ShieldCheck, X, Clock, ArrowRight, MessageSquare, ChevronRight } from "lucide-react";
 
 const PERIOD_WARNINGS = {
-  dead: { label: "Dead Period Message", color: "border-red-200 bg-red-50 text-red-700", icon: AlertCircle },
-  quiet: { label: "Quiet Period", color: "border-amber-200 bg-amber-50 text-amber-700", icon: AlertCircle },
-  contact: null,
+  dead:       { label: "Dead Period",   color: "border-red-200 bg-red-50 text-red-700",    icon: AlertCircle },
+  quiet:      { label: "Quiet Period",  color: "border-amber-200 bg-amber-50 text-amber-700", icon: AlertCircle },
+  contact:    null,
   evaluation: null,
 };
 
-// ── Reply Box ────────────────────────────────────────────────────────────────
+// ── Thread Panel (slide-in from right) ────────────────────────────────────────
 
-function ReplyBox({ msg, onReplied }) {
-  const [text, setText] = useState("");
+function ThreadPanel({ msg, onClose, onReplied }) {
+  const [replyText, setReplyText] = useState("");
   const [sending, setSending] = useState(false);
-  const [error, setError] = useState("");
+  const [replyError, setReplyError] = useState("");
+  const [localReply, setLocalReply] = useState(msg.player_reply || null);
+  const [localRepliedAt, setLocalRepliedAt] = useState(msg.player_replied_at || null);
 
-  const submit = async () => {
-    if (!text.trim()) return;
+  const periodWarn = PERIOD_WARNINGS[msg.ncaa_period_type];
+  const WarnIcon = periodWarn?.icon;
+
+  useEffect(() => {
+    const handle = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handle);
+    return () => document.removeEventListener("keydown", handle);
+  }, [onClose]);
+
+  const submitReply = async () => {
+    if (!replyText.trim() || sending) return;
     setSending(true);
-    setError("");
+    setReplyError("");
     try {
-      await apiRequest("post", `/player/messages/${msg.id}/reply`, { reply: text.trim() });
-      onReplied(msg.id, text.trim());
+      await apiRequest("post", `/player/messages/${msg.id}/reply`, { reply: replyText.trim() });
+      const now = new Date().toISOString();
+      setLocalReply(replyText.trim());
+      setLocalRepliedAt(now);
+      onReplied(msg.id, replyText.trim(), now);
+      setReplyText("");
     } catch (e) {
-      setError(e?.response?.data?.detail || "Failed to send reply");
+      setReplyError(e?.response?.data?.detail || "Failed to send reply");
     }
     setSending(false);
   };
 
+  const programmeSlug = (msg.coach_institution || "").toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-").replace(/-+/g, "-").trim();
+
   return (
-    <div className="mt-4 pt-3 border-t border-slate-100">
-      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Your Reply</p>
-      <textarea
-        value={text}
-        onChange={e => setText(e.target.value)}
-        maxLength={1000}
-        rows={3}
-        placeholder="Type your reply to the coach..."
-        data-testid="player-reply-input"
-        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-orange-500 outline-none resize-none"
+    <>
+      <div
+        className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm"
+        onClick={onClose}
+        data-testid="player-thread-backdrop"
       />
-      <div className="flex items-center justify-between mt-2">
-        <span className="text-xs text-slate-400">{text.length}/1000</span>
-        <div className="flex items-center gap-2">
-          {error && <span className="text-xs text-red-500">{error}</span>}
-          <button
-            onClick={submit}
-            disabled={sending || !text.trim()}
-            data-testid="player-reply-submit-btn"
-            className="flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors"
-          >
-            <Send className="w-3 h-3" /> {sending ? "Sending..." : "Send Reply"}
-          </button>
+      <div
+        className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-md bg-white shadow-2xl border-l border-slate-200 flex flex-col"
+        style={{ animation: "slideInRight 0.2s ease-out" }}
+        data-testid="player-thread-panel"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 flex-shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-full bg-slate-800 flex items-center justify-center text-white font-black text-sm flex-shrink-0">
+              {(msg.coach_name || "C")[0]}
+            </div>
+            <div className="min-w-0">
+              <p className="font-black text-slate-900 text-sm truncate">{msg.coach_name}</p>
+              <p className="text-slate-500 text-xs truncate">
+                {msg.coach_institution}{msg.coach_division ? ` · ${msg.coach_division}` : ""}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {programmeSlug && (
+              <a
+                href={`/coach/program/${programmeSlug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-testid="player-thread-programme-link"
+                className="flex items-center gap-1 text-xs text-orange-600 hover:text-orange-700 font-bold px-2 py-1.5 rounded-lg hover:bg-orange-50 transition-colors"
+              >
+                Programme <ArrowRight className="w-3 h-3" />
+              </a>
+            )}
+            <button
+              onClick={onClose}
+              data-testid="player-thread-close-btn"
+              className="text-slate-400 hover:text-slate-700 transition-colors p-1.5 rounded-lg hover:bg-slate-100"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Thread content */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {/* Period warning */}
+          {periodWarn && (
+            <div className={`flex items-start gap-2 p-3 rounded-xl border text-xs ${periodWarn.color}`}>
+              <WarnIcon className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <p className="font-semibold">This message was sent during a {periodWarn.label}. Confirm compliance with your coach before responding.</p>
+            </div>
+          )}
+
+          {/* Subject */}
+          {msg.subject && (
+            <div>
+              <p className="text-xs text-slate-400 uppercase tracking-wider font-bold mb-1">Subject</p>
+              <p className="text-slate-800 font-semibold text-sm">{msg.subject}</p>
+            </div>
+          )}
+
+          {/* Coach message bubble */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Coach</span>
+              <span className="text-xs text-slate-400 flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                {new Date(msg.sent_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+              </span>
+            </div>
+            <div className="bg-slate-800 rounded-2xl rounded-tl-sm p-4" data-testid="player-thread-coach-msg">
+              <p className="text-slate-100 text-sm leading-relaxed whitespace-pre-wrap">{msg.body}</p>
+            </div>
+          </div>
+
+          {/* Player reply or compose */}
+          {localReply ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-orange-500 uppercase tracking-wider flex items-center gap-1">
+                  <CheckCircle className="w-3 h-3" /> Your Reply
+                </span>
+                <span className="text-xs text-slate-400 flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  {new Date(localRepliedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                </span>
+              </div>
+              <div className="bg-orange-50 border border-orange-200 rounded-2xl rounded-tr-sm p-4" data-testid="player-thread-reply-sent">
+                <p className="text-slate-800 text-sm leading-relaxed whitespace-pre-wrap">{localReply}</p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Write Your Reply</p>
+              <textarea
+                value={replyText}
+                onChange={e => setReplyText(e.target.value)}
+                maxLength={1000}
+                rows={4}
+                placeholder="Type your reply to the coach..."
+                data-testid="player-reply-input"
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-orange-400 focus:border-orange-400 outline-none resize-none bg-slate-50"
+              />
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-400">{replyText.length}/1000</span>
+                {replyError && <span className="text-xs text-red-500">{replyError}</span>}
+                <button
+                  onClick={submitReply}
+                  disabled={sending || !replyText.trim()}
+                  data-testid="player-reply-submit-btn"
+                  className="flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors"
+                >
+                  <Send className="w-3 h-3" />
+                  {sending ? "Sending..." : "Send Reply"}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
-    </div>
+
+      <style>{`
+        @keyframes slideInRight {
+          from { transform: translateX(100%); opacity: 0; }
+          to   { transform: translateX(0);    opacity: 1; }
+        }
+      `}</style>
+    </>
   );
 }
 
@@ -68,7 +191,7 @@ function MessagesTab() {
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [expanded, setExpanded] = useState(null);
+  const [selectedMsg, setSelectedMsg] = useState(null);
 
   const load = async (p = 1) => {
     setLoading(true);
@@ -86,7 +209,7 @@ function MessagesTab() {
   useEffect(() => { load(1); }, []);
 
   const openMessage = async (msg) => {
-    setExpanded(expanded?.id === msg.id ? null : msg);
+    setSelectedMsg(msg);
     if (!msg.is_read) {
       try {
         await apiRequest("patch", `/player/messages/${msg.id}/read`);
@@ -96,10 +219,15 @@ function MessagesTab() {
     }
   };
 
-  const handleReplied = (msgId, replyText) => {
+  const handleReplied = (msgId, replyText, repliedAt) => {
     setMessages(prev => prev.map(m =>
-      m.id === msgId ? { ...m, player_reply: replyText, player_replied_at: new Date().toISOString() } : m
+      m.id === msgId ? { ...m, player_reply: replyText, player_replied_at: repliedAt } : m
     ));
+    // Update selected msg state so the panel reflects the reply immediately
+    setSelectedMsg(prev => prev?.id === msgId
+      ? { ...prev, player_reply: replyText, player_replied_at: repliedAt }
+      : prev
+    );
   };
 
   const markAllRead = async () => {
@@ -139,68 +267,52 @@ function MessagesTab() {
       ) : (
         <>
           <div className="space-y-3">
-            {messages.map(msg => {
-              const isExpanded = expanded?.id === msg.id;
-              const periodWarn = PERIOD_WARNINGS[msg.ncaa_period_type];
-              const WarnIcon = periodWarn?.icon;
-              return (
-                <div key={msg.id} data-testid={`player-msg-${msg.id}`}
-                  className={`border rounded-xl overflow-hidden transition-all cursor-pointer ${!msg.is_read ? "border-orange-300 bg-orange-50/60" : "border-slate-200 bg-white"} hover:border-slate-300`}
-                  onClick={() => openMessage(msg)}>
-                  <div className="p-4">
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-white font-black text-sm flex-shrink-0">
-                        {(msg.coach_name || "C")[0]}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className={`font-bold text-sm truncate ${!msg.is_read ? "text-slate-900" : "text-slate-700"}`}>{msg.coach_name}</span>
-                            {!msg.is_read && <span className="w-2 h-2 rounded-full bg-orange-500 flex-shrink-0" />}
-                          </div>
-                          <span className="text-slate-400 text-xs flex-shrink-0">
-                            {new Date(msg.sent_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
-                          </span>
-                        </div>
-                        <p className="text-slate-500 text-xs">{msg.coach_institution}{msg.coach_division ? ` · ${msg.coach_division}` : ""}</p>
-                        {msg.subject && <p className={`text-sm mt-1 ${!msg.is_read ? "font-semibold text-slate-800" : "text-slate-600"}`}>{msg.subject}</p>}
-                        {!isExpanded && <p className="text-slate-500 text-xs mt-1 line-clamp-1">{msg.body}</p>}
-                      </div>
-                    </div>
+            {messages.map(msg => (
+              <div
+                key={msg.id}
+                data-testid={`player-msg-${msg.id}`}
+                onClick={() => openMessage(msg)}
+                className={`border rounded-xl p-4 cursor-pointer transition-all hover:border-slate-300 hover:shadow-sm ${
+                  !msg.is_read ? "border-orange-300 bg-orange-50/60" : "border-slate-200 bg-white"
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-white font-black text-sm flex-shrink-0">
+                    {(msg.coach_name || "C")[0]}
                   </div>
-                  {isExpanded && (
-                    <div className="px-4 pb-4 border-t border-slate-100 pt-3">
-                      {periodWarn && (
-                        <div className={`flex items-start gap-2 p-3 rounded-lg border mb-3 ${periodWarn.color}`}>
-                          <WarnIcon className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                          <p className="text-xs font-semibold">This message was sent during a {periodWarn.label}. Confirm compliance with your coach before responding.</p>
-                        </div>
-                      )}
-                      <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">{msg.body}</p>
-                      {msg.player_reply ? (
-                        <div className="mt-4 pt-3 border-t border-slate-100">
-                          <p className="text-xs font-bold text-green-600 uppercase tracking-wider mb-2 flex items-center gap-1">
-                            <CheckCircle className="w-3 h-3" /> Your Reply Sent
-                          </p>
-                          <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2.5">
-                            <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{msg.player_reply}</p>
-                            <p className="text-xs text-slate-400 mt-1.5">
-                              {new Date(msg.player_replied_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-                            </p>
-                          </div>
-                        </div>
-                      ) : (
-                        <ReplyBox msg={msg} onReplied={handleReplied} />
-                      )}
-                      <div className="mt-3 pt-3 border-t border-slate-100">
-                        <p className="text-slate-400 text-xs">Sent by <strong className="text-slate-600">{msg.coach_name}</strong> at {msg.coach_institution}</p>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={`font-bold text-sm truncate ${!msg.is_read ? "text-slate-900" : "text-slate-700"}`}>
+                          {msg.coach_name}
+                        </span>
+                        {!msg.is_read && <span className="w-2 h-2 rounded-full bg-orange-500 flex-shrink-0" />}
                       </div>
+                      <span className="text-slate-400 text-xs flex-shrink-0">
+                        {new Date(msg.sent_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                      </span>
                     </div>
-                  )}
+                    <p className="text-slate-500 text-xs">
+                      {msg.coach_institution}{msg.coach_division ? ` · ${msg.coach_division}` : ""}
+                    </p>
+                    {msg.subject && (
+                      <p className={`text-sm mt-0.5 ${!msg.is_read ? "font-semibold text-slate-800" : "text-slate-600"}`}>
+                        {msg.subject}
+                      </p>
+                    )}
+                    <p className="text-slate-400 text-xs mt-0.5 line-clamp-1">{msg.body}</p>
+                    {msg.player_reply && (
+                      <div className="flex items-center gap-1 mt-1 text-xs text-orange-500 font-semibold">
+                        <MessageSquare className="w-3 h-3" /> Replied
+                      </div>
+                    )}
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-300 flex-shrink-0 mt-1" />
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
+
           {pages > 1 && (
             <div className="flex justify-center gap-2 mt-6">
               <button disabled={page === 1} onClick={e => { e.stopPropagation(); load(page - 1); }} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg disabled:opacity-40 hover:bg-slate-200 text-sm">← Prev</button>
@@ -209,6 +321,14 @@ function MessagesTab() {
             </div>
           )}
         </>
+      )}
+
+      {selectedMsg && (
+        <ThreadPanel
+          msg={selectedMsg}
+          onClose={() => setSelectedMsg(null)}
+          onReplied={handleReplied}
+        />
       )}
     </>
   );
