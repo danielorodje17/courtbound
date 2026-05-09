@@ -289,6 +289,13 @@ Build "CourtBound," a web app to track USA and UK college basketball scholarship
 - [x] PlayerMessagesPage split into two tabs: "Messages" + "Profile Views" (with unread badge on Messages tab)
 - [x] Profile view card: coach avatar, name, institution/division, Verified badge, view count, date, Programme external link
 
+#### P3 — Video Reel Preview + Analytics CSV Export (DONE ✅)
+- [x] VideoModal component (`/components/coach/VideoModal.js`) — parses YouTube (youtu.be/watch?v=) and Hudl (hudl.com/video/ → embed/video/) URLs; fallback external link for unsupported URLs; backdrop click to close
+- [x] Reel button on player search cards (`CoachPlayersPage`) opens VideoModal with player name in header
+- [x] CoachPlayerProfile inline reel section uses `getEmbedUrl()` — handles both YouTube and Hudl iframes
+- [x] Analytics CSV Export — GET /api/coach/analytics/export (StreamingResponse); sections: Summary KPIs, Daily Views (14d), Saves by List, Top Positions, Top Grad Years
+- [x] "Export CSV" button on dashboard analytics header — JS fetch with auth header, blob download
+
 ### P3 — Drag-and-Drop Kanban (DONE ✅)
 - [x] True drag-and-drop on Kanban board using `@dnd-kit/core` (v6.3.1)
   - `useDraggable` on cards with GripVertical drag handle; `useDroppable` on columns

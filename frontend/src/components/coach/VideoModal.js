@@ -8,7 +8,7 @@ export function getEmbedUrl(url) {
   if (!url) return null;
 
   // YouTube: youtube.com/watch?v=ID  or  youtu.be/ID
-  const ytId = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&?/#]+)/)?.[1];
+  const ytId = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&?/#]+)/)?.[1]?.trim();
   if (ytId) return `https://www.youtube.com/embed/${ytId}?autoplay=1&rel=0`;
 
   // Hudl: hudl.com/video/3/TEAM/ID  →  hudl.com/embed/video/3/TEAM/ID
