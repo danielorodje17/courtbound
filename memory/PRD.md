@@ -269,6 +269,23 @@ Build "CourtBound," a web app to track USA and UK college basketball scholarship
   - Rename inline (pencil icon), delete with confirmation (moves players to Watch List)
   - Up to 10 custom lists; validation blocks default list names and duplicates
 
+### Phase E — UX Gaps (Added Feb 2026)
+
+#### Gap 1 — Full Thread View (DONE ✅)
+- [x] Slide-in thread panel on `/coach/messages` — clicking a message row opens a right-side panel
+- [x] ThreadPanel shows: full coach message body, sent date + NCAA period + read status, player reply bubble (if exists) with replied date
+- [x] Close on backdrop click, Escape key, or X button; "View Full Profile" button navigates to player profile
+- [x] Reply teaser on message cards: italic preview + "click to expand" hint
+
+#### Gap 2 — Message Template Library (DONE ✅)
+- [x] `coach_message_templates` table (migration v23 — already run by user)
+- [x] 3 default templates backfilled for all existing coaches via v23 migration
+- [x] "Use Template" dropdown button in SendMessageModal — lists templates with name/subject/body preview
+- [x] Clicking a template populates Subject + Body fields and closes dropdown
+- [x] "Save as template" toggle reveals inline name input + Save button → POST /api/coach/messages/templates
+- [x] Delete custom templates (Trash icon on hover, hidden for default templates)
+- [x] Backend: GET/POST/DELETE /api/coach/messages/templates (all coaches, requires auth)
+
 ### Phase D Features (Added May 2026)
 
 #### P0 — Quick Wins (DONE ✅)
