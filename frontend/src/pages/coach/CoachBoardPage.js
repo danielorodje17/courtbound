@@ -287,6 +287,45 @@ function TableView({ saved, onRemove, onView }) {
   );
 }
 
+// ── Delete List Confirmation Modal ────────────────────────────────────────────
+
+function DeleteListModal({ listName, playerCount, onConfirm, onCancel }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+      <div className="w-full max-w-sm bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl">
+        <div className="p-6">
+          <div className="w-12 h-12 rounded-full bg-red-900/40 border border-red-700/50 flex items-center justify-center mx-auto mb-4">
+            <Trash2 className="w-6 h-6 text-red-400" />
+          </div>
+          <h3 className="text-white font-black text-base text-center mb-2">Delete "{listName}"?</h3>
+          <p className="text-slate-400 text-sm text-center leading-relaxed">
+            {playerCount > 0
+              ? <><strong className="text-slate-300">{playerCount} player{playerCount !== 1 ? "s" : ""}</strong> will be moved to <strong className="text-slate-300">Watch List</strong>.</>
+              : "This list is empty and will be removed."
+            }
+          </p>
+        </div>
+        <div className="flex gap-3 px-6 pb-6">
+          <button
+            onClick={onCancel}
+            data-testid="delete-list-cancel-btn"
+            className="flex-1 py-2.5 text-sm font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 rounded-xl transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            data-testid="delete-list-confirm-btn"
+            className="flex-1 py-2.5 text-sm font-bold text-white bg-red-600 hover:bg-red-500 rounded-xl transition-colors"
+          >
+            Delete List
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Custom Column Header ───────────────────────────────────────────────────────
 
 function CustomColumnHeader({ name, count, onRename, onDelete }) {
@@ -398,6 +437,7 @@ export default function CoachBoardPage() {
   const [viewMode, setViewMode] = useState(() => localStorage.getItem("boardViewMode") || "kanban");
   const [customLists, setCustomLists] = useState([]);
   const [showAddList, setShowAddList] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null); // { name, playerCount }
   const [activeItem, setActiveItem] = useState(null); // DnD active drag item
   const [overColumn, setOverColumn] = useState(null);  // column being hovered
   const styleInjected = useRef(false);
@@ -475,7 +515,14 @@ export default function CoachBoardPage() {
   };
 
   const handleDeleteList = async (name) => {
-    if (!window.confirm(`Delete "${name}"? Players in this list will move to Watch List.`)) return;
+    const playerCount = (byList[name] || []).length;
+    setDeleteTarget({ name, playerCount });
+  };
+
+  const confirmDeleteList = async () => {
+    if (!deleteTarget) return;
+    const { name } = deleteTarget;
+    setDeleteTarget(null);
     try {
       const r = await coachReq("delete", `/custom-lists/${encodeURIComponent(name)}`);
       setCustomLists(r.data.custom_lists || []);
@@ -646,6 +693,16 @@ export default function CoachBoardPage() {
           </DndContext>
         )}
       </div>
+
+      {/* Delete list confirmation modal */}
+      {deleteTarget && (
+        <DeleteListModal
+          listName={deleteTarget.name}
+          playerCount={deleteTarget.playerCount}
+          onConfirm={confirmDeleteList}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
     </div>
   );
 }
