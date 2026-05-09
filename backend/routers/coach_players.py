@@ -378,7 +378,8 @@ async def get_saved_players(coach=Depends(require_verified_coach)):
     profiles_res = await run_in_threadpool(
         lambda: supa.table("profiles").select(
             "user_id,full_name,position,height_ft,height_cm,club_team,"
-            "expected_graduation,ppg,rpg,apg,highlight_tape_url,updated_at,basketball_gender"
+            "expected_graduation,ppg,rpg,apg,highlight_tape_url,updated_at,basketball_gender,"
+            "commitment_status"
         ).in_("user_id", user_ids).execute()
     )
     profile_map = {str(p["user_id"]): p for p in (profiles_res.data or [])}

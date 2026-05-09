@@ -40,6 +40,87 @@ def _ncaa_period_type(coach: dict) -> str:
 
 # ── Send Message (Coach → Player) ─────────────────────────────────────────────
 
+# NOTE: /messages/bulk must be defined BEFORE /messages/{player_user_id} to avoid routing conflict
+
+@router.post("/messages/bulk")
+async def send_bulk_message(body: dict, coach=Depends(require_verified_coach)):
+    """Send the same message to all non-committed players in a board list."""
+    list_name = (body.get("list_name") or "").strip()
+    subject = (body.get("subject") or "").strip()
+    text = (body.get("body") or "").strip()
+
+    if not list_name:
+        raise HTTPException(status_code=400, detail="list_name is required")
+    if not text:
+        raise HTTPException(status_code=400, detail="Message body is required")
+    if len(text) > 2000:
+        raise HTTPException(status_code=400, detail="Message too long (max 2000 characters)")
+
+    # Fetch all saved player IDs in this list for this coach
+    saved_res = await run_in_threadpool(
+        lambda: supa.table("coach_saved_players")
+        .select("player_user_id")
+        .eq("coach_id", coach["id"])
+        .eq("list_name", list_name)
+        .execute()
+    )
+    player_ids = [s["player_user_id"] for s in (saved_res.data or [])]
+    if not player_ids:
+        raise HTTPException(status_code=400, detail="No players in this list")
+
+    # Fetch commitment status for all players
+    profiles_res = await run_in_threadpool(
+        lambda: supa.table("profiles")
+        .select("user_id, full_name, commitment_status")
+        .in_("user_id", player_ids)
+        .execute()
+    )
+    profile_map = {str(p["user_id"]): p for p in (profiles_res.data or [])}
+
+    ncaa_period = _ncaa_period_type(coach)
+    sent = 0
+    skipped = 0
+    skipped_names = []
+
+    for pid in player_ids:
+        profile = profile_map.get(str(pid), {})
+        if (profile.get("commitment_status") or "uncommitted") == "committed":
+            skipped += 1
+            skipped_names.append(profile.get("full_name") or "Unknown")
+            continue
+
+        row = {
+            "coach_id": coach["id"],
+            "player_user_id": pid,
+            "coach_name": coach["full_name"],
+            "coach_institution": coach["institution_name"],
+            "coach_division": coach.get("division"),
+            "subject": subject or None,
+            "body": text,
+            "ncaa_period_type": ncaa_period,
+            "sent_at": _now(),
+            "status": "sent",
+        }
+        try:
+            await run_in_threadpool(lambda r=row: supa.table("coach_messages").insert(r).execute())
+            sent += 1
+        except Exception as e:
+            logger.warning(f"Bulk message insert failed for player {pid}: {e}")
+
+    if sent == 0 and skipped > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"All {skipped} player(s) in this list are committed — no messages sent."
+        )
+
+    return {
+        "sent": sent,
+        "skipped": skipped,
+        "skipped_names": skipped_names,
+        "list_name": list_name,
+    }
+
+
 @router.post("/messages/{player_user_id}")
 async def send_message(player_user_id: str, body: dict, coach=Depends(require_verified_coach)):
     subject = (body.get("subject") or "").strip()
