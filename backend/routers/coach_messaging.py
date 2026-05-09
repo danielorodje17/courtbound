@@ -1,4 +1,5 @@
 import logging
+import re
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.concurrency import run_in_threadpool
 from datetime import datetime, timezone
@@ -12,6 +13,13 @@ router = APIRouter(prefix="/coach", tags=["coach-messaging"])
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _slug(name: str) -> str:
+    s = (name or "").lower()
+    s = re.sub(r"[^a-z0-9\s-]", "", s)
+    s = re.sub(r"\s+", "-", s.strip())
+    return re.sub(r"-+", "-", s).strip("-")
 
 
 def _ncaa_period_type(coach: dict) -> str:
@@ -377,3 +385,70 @@ async def player_unread_count(current_user=Depends(get_current_user)):
         .eq("player_user_id", user_id).eq("is_read", False).execute()
     )
     return {"unread": res.count or 0}
+
+
+@player_router.get("/profile-views")
+async def get_profile_views(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=50),
+    current_user=Depends(get_current_user),
+):
+    """Return paginated list of coaches who viewed this player's profile (deduplicated)."""
+    user_id = str(current_user.user_id)
+
+    # All views for this player, newest first
+    views_res = await run_in_threadpool(
+        lambda: supa.table("coach_player_views")
+        .select("coach_id, viewed_at")
+        .eq("player_user_id", user_id)
+        .order("viewed_at", desc=True)
+        .execute()
+    )
+    views = views_res.data or []
+
+    # Deduplicate: keep most-recent viewed_at per coach + count total views per coach
+    seen: dict = {}
+    for v in views:
+        cid = str(v["coach_id"])
+        if cid not in seen:
+            seen[cid] = {"coach_id": cid, "last_viewed_at": v["viewed_at"], "view_count": 0}
+        seen[cid]["view_count"] += 1
+
+    unique = sorted(seen.values(), key=lambda x: x["last_viewed_at"], reverse=True)
+    total = len(unique)
+    offset = (page - 1) * limit
+    page_items = unique[offset: offset + limit]
+
+    if not page_items:
+        return {"views": [], "total": total, "page": page, "pages": max(1, -(-total // limit))}
+
+    coach_ids = [item["coach_id"] for item in page_items]
+    coaches_res = await run_in_threadpool(
+        lambda: supa.table("coach_accounts")
+        .select("id, full_name, institution_name, division, verification_status")
+        .in_("id", coach_ids)
+        .execute()
+    )
+    coach_map = {str(c["id"]): c for c in (coaches_res.data or [])}
+
+    result = []
+    for item in page_items:
+        c = coach_map.get(item["coach_id"], {})
+        inst = c.get("institution_name") or ""
+        result.append({
+            "coach_id": item["coach_id"],
+            "coach_name": c.get("full_name") or "Unknown Coach",
+            "institution_name": inst,
+            "division": c.get("division"),
+            "is_verified": c.get("verification_status") == "verified",
+            "view_count": item["view_count"],
+            "last_viewed_at": item["last_viewed_at"],
+            "programme_slug": _slug(inst) if inst else None,
+        })
+
+    return {
+        "views": result,
+        "total": total,
+        "page": page,
+        "pages": max(1, -(-total // limit)),
+    }
