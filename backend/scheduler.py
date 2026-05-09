@@ -261,6 +261,95 @@ async def _dispatch_scheduled_messages():
     except Exception as exc:
         logger.warning("Scheduled message dispatch failed: %s", exc)
 
+
+async def _notify_contact_period_countdown():
+    """
+    Daily job: notify NCAA D1 coaches when a contact period is 7 or 1 day away.
+    NAIA/D2/JUCO are always in open recruiting — no countdown needed for them.
+    """
+    try:
+        from supabase_db import supa
+        from routers.coach_dashboard import RECRUITING_CALENDAR
+
+        today = datetime.now(timezone.utc).date()
+        d1_calendar = RECRUITING_CALENDAR.get("NCAA D1", [])
+
+        # Find the next upcoming contact or evaluation period
+        upcoming = [
+            p for p in d1_calendar
+            if p["type"] in ("contact", "evaluation")
+            and datetime.strptime(p["start"], "%Y-%m-%d").date() > today
+        ]
+        if not upcoming:
+            return
+
+        upcoming.sort(key=lambda p: p["start"])
+        next_period = upcoming[0]
+        start_date = datetime.strptime(next_period["start"], "%Y-%m-%d").date()
+        days_away = (start_date - today).days
+
+        if days_away not in (7, 1):
+            return  # Only notify at 7-day and 1-day marks
+
+        period_label = next_period["label"]
+        formatted_start = start_date.strftime("%d %b %Y")
+
+        if days_away == 7:
+            title = f"{period_label} starts in 7 days"
+            message = (
+                f"Your {period_label} window opens on {formatted_start}. "
+                "Plan your player outreach and campus visit invitations now."
+            )
+        else:
+            title = f"{period_label} starts tomorrow"
+            message = (
+                f"Your {period_label} window opens tomorrow ({formatted_start}). "
+                "Make sure your outreach messages are ready to go."
+            )
+
+        # Fetch all verified D1 coaches
+        coaches_res = supa.table("coach_accounts") \
+            .select("id") \
+            .eq("verification_status", "verified") \
+            .eq("division", "NCAA D1") \
+            .execute()
+        coaches = coaches_res.data or []
+        if not coaches:
+            return
+
+        # Dedup: skip if this coach already received a contact_countdown notification in last 36h
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=36)).isoformat()
+        recent_res = supa.table("coach_notifications") \
+            .select("coach_id") \
+            .eq("type", "contact_countdown") \
+            .gte("created_at", cutoff) \
+            .execute()
+        already_notified = {str(r["coach_id"]) for r in (recent_res.data or [])}
+
+        rows = []
+        now_iso = datetime.now(timezone.utc).isoformat()
+        for coach in coaches:
+            cid = str(coach["id"])
+            if cid not in already_notified:
+                rows.append({
+                    "coach_id": cid,
+                    "type": "contact_countdown",
+                    "title": title,
+                    "message": message,
+                    "link": "/coach/dashboard",
+                    "is_read": False,
+                    "created_at": now_iso,
+                })
+
+        if rows:
+            supa.table("coach_notifications").insert(rows).execute()
+            logger.info(
+                "Contact period countdown: sent '%s' to %d D1 coach(es)",
+                title, len(rows)
+            )
+    except Exception as exc:
+        logger.error("Contact period countdown job failed: %s", exc)
+
 def start_scheduler():
     if not _scheduler.running:
         _scheduler.add_job(
@@ -275,8 +364,17 @@ def start_scheduler():
             id="scheduled_messages",
             replace_existing=True,
         )
+        _scheduler.add_job(
+            _notify_contact_period_countdown,
+            IntervalTrigger(hours=24),
+            id="contact_period_countdown",
+            replace_existing=True,
+        )
         _scheduler.start()
-        logger.info("Scheduler started: trial reminders (every 1h) + scheduled messages (every 15m)")
+        logger.info(
+            "Scheduler started: trial reminders (1h) + "
+            "scheduled messages (15m) + contact period countdown (24h)"
+        )
 
 
 def stop_scheduler():

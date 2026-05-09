@@ -117,15 +117,31 @@ async def get_public_coach_profile(slug: str, request: Request):
         raise HTTPException(status_code=404, detail="Programme not found")
 
     # Track this programme view asynchronously (fire and forget, don't break on error)
+    coach_id_str = str(match["id"])
     try:
         view_row = {
-            "coach_id": str(match["id"]),
+            "coach_id": coach_id_str,
             "viewer_type": "player",
             "viewed_at": datetime.now(timezone.utc).isoformat(),
         }
         await run_in_threadpool(lambda: supa.table("coach_programme_views").insert(view_row).execute())
     except Exception:
         pass  # Don't fail the page load if tracking fails
+
+    # Fire a throttled in-app notification for the coach (max 1 per hour)
+    try:
+        import asyncio
+        from notifications_utils import _notify_coach_direct
+        asyncio.ensure_future(_notify_coach_direct(
+            coach_id=coach_id_str,
+            notif_type="programme_view",
+            title="Your programme page was viewed",
+            message="A player just visited your programme profile on CourtBound.",
+            link=f"/coach/program/{slug}",
+            throttle_minutes=60,
+        ))
+    except Exception:
+        pass
 
     prefs = match.get("recruiting_prefs") or {}
     hide_prefs = privacy.get("hide_recruiting_prefs", False)
