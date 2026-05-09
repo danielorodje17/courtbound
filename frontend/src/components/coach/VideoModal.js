@@ -8,7 +8,7 @@ export function getEmbedUrl(url, { autoplay = false } = {}) {
   if (!url) return null;
 
   // YouTube: youtube.com/watch?v=ID  or  youtu.be/ID
-  const ytId = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&?/#]+)/)?.[1]?.trim();
+  const ytId = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^\s&?/#]+)/)?.[1]?.trim();
   if (ytId) {
     const params = autoplay ? "?autoplay=1&rel=0" : "?rel=0";
     return `https://www.youtube.com/embed/${ytId}${params}`;
