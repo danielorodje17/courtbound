@@ -284,10 +284,11 @@ Build "CourtBound," a web app to track USA and UK college basketball scholarship
 - [x] Clear All now resets URL too
 - [x] Bulk Message ("Message All") — Send icon on each board column header (except Committed); BulkMessageModal with eligible/skipped count, subject + body compose, success state; POST /api/coach/messages/bulk skips committed players; routing conflict resolved (bulk before parameterized route)
 
-#### P2 — "Who Viewed My Profile" for Players (DONE ✅)
+#### P2 — "Who Viewed My Profile" + Programme Discovery (DONE ✅)
 - [x] GET /api/player/profile-views — deduplicated by coach, sorted newest-first; returns view_count, last_viewed_at, coach details, programme_slug, is_verified
 - [x] PlayerMessagesPage split into two tabs: "Messages" + "Profile Views" (with unread badge on Messages tab)
 - [x] Profile view card: coach avatar, name, institution/division, Verified badge, view count, date, Programme external link
+- [x] Programme Discovery (`/programmes`) — public directory page; GET /api/coach/public/programmes with search/division/sport/nil_available/f1_visa filters; quick division pills + NIL/F-1 toggle pills; URL-persisted state; individual slug route unaffected (ordering fix); "Programmes" nav item added to player nav
 
 #### P3 — Video Reel Preview + Analytics CSV Export (DONE ✅)
 - [x] VideoModal component (`/components/coach/VideoModal.js`) — parses YouTube (youtu.be/watch?v=) and Hudl (hudl.com/video/ → embed/video/) URLs; fallback external link for unsupported URLs; backdrop click to close
