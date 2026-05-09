@@ -271,6 +271,20 @@ Build "CourtBound," a web app to track USA and UK college basketball scholarship
 
 ### Phase E — UX Gaps (Added Feb 2026)
 
+#### Gap 3 — Notification Backend Triggers (DONE ✅)
+- [x] `notifications_utils.py` — shared helpers: `_notify_coaches_about_player()` and `_notify_coach_direct()`
+- [x] Highlight reel trigger: `profile.py` PUT detects `highlight_tape_url` change → notifies all coaches who saved the player (`type=highlight_reel`)
+- [x] Commitment trigger: `profile.py` PUT detects `commitment_status` → "committed" → notifies saved coaches (`type=commitment`)
+- [x] Programme view trigger: `coach_public.py` GET `/:slug` → throttled notification to the coach (`type=programme_view`, max 1/hour)
+- [x] All triggers are fire-and-forget via `asyncio.ensure_future` — profile save is never blocked
+
+#### Gap 4 — Contact Period Countdown Notifications (DONE ✅)
+- [x] Daily scheduler job `_notify_contact_period_countdown()` in `scheduler.py` (every 24h)
+- [x] Notifies all verified NCAA D1 coaches 7 days AND 1 day before a contact/evaluation period starts
+- [x] 36-hour dedup window prevents duplicate notifications
+- [x] NAIA/D2/JUCO coaches skipped (open recruiting — no countdown needed)
+- [x] `RECRUITING_CALENDAR` extended through 2026-27 season (to 2027-07-31)
+
 #### Gap 1 — Full Thread View (DONE ✅)
 - [x] Slide-in thread panel on `/coach/messages` — clicking a message row opens a right-side panel
 - [x] ThreadPanel shows: full coach message body, sent date + NCAA period + read status, player reply bubble (if exists) with replied date
