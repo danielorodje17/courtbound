@@ -275,13 +275,14 @@ Build "CourtBound," a web app to track USA and UK college basketball scholarship
 - [x] Inline Notes on Board Cards — per-card sticky note with 300-char limit; amber edit UI; persists via PATCH /api/coach/players/{uid}/save; saves on blur or Cmd+Enter
 - [x] Within-Column Card Reordering — @dnd-kit/sortable + SortableContext per column; drag handles; PATCH /api/coach/board/reorder bulk endpoint; sort_order column via migration v22
 
-#### P1 — Advanced Player Search Filters (DONE ✅)
+#### P1 — Advanced Player Search Filters + Bulk Message (DONE ✅)
 - [x] Nationality filter — text input (ilike match) in filters panel; nationality badge on player cards
 - [x] Commitment Status filter — Uncommitted/Committed/Any dropdown; "Uncommitted" quick toggle pill; "Committed" badge on cards
 - [x] Active filter chips — dismissable tags for nationality, commitment, PPG, GPA, height range
 - [x] URL params persistence — all filters sync to URL query string (shareable, survives page reload)
 - [x] Filter count badge on Filters button
 - [x] Clear All now resets URL too
+- [x] Bulk Message ("Message All") — Send icon on each board column header (except Committed); BulkMessageModal with eligible/skipped count, subject + body compose, success state; POST /api/coach/messages/bulk skips committed players; routing conflict resolved (bulk before parameterized route)
 
 ### P3 — Drag-and-Drop Kanban (DONE ✅)
 - [x] True drag-and-drop on Kanban board using `@dnd-kit/core` (v6.3.1)
