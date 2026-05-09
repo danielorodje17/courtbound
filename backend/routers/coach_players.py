@@ -146,6 +146,7 @@ def _player_card(player: dict, coach_prefs: dict, saved_ids: set) -> dict:
         "bio": (player.get("bio") or "")[:120],
         "hometown": player.get("hometown"),
         "nationality": player.get("nationality"),
+        "commitment_status": player.get("commitment_status") or "uncommitted",
         "updated_at": player.get("updated_at"),
         "match_score": calculate_match_score(coach_prefs, player),
         "is_saved": uid in saved_ids,
@@ -164,6 +165,8 @@ async def search_players(
     min_gpa: Optional[float] = Query(None),
     min_sat: Optional[int] = Query(None),
     ncaa_registered: Optional[bool] = Query(None),
+    nationality: Optional[str] = Query(None),
+    commitment_status: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     sort: Optional[str] = Query("match"),
     page: int = Query(1, ge=1),
@@ -193,6 +196,10 @@ async def search_players(
         query = query.gte("ppg", min_ppg)
     if ncaa_registered is not None:
         query = query.eq("ncaa_registered", ncaa_registered)
+    if nationality:
+        query = query.ilike("nationality", f"%{nationality}%")
+    if commitment_status:
+        query = query.eq("commitment_status", commitment_status)
     if search:
         query = query.or_(
             f"full_name.ilike.%{search}%,club_team.ilike.%{search}%,hometown.ilike.%{search}%"

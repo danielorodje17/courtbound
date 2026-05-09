@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="8" skipped="0" tests="8" time="1.445" timestamp="2026-05-09T01:29:30.680463+00:00" hostname="agent-env-9baf01d2-71de-4960-8f05-a0dcddf62b61"><testcase classname="backend.tests.test_phase_d_features.TestAdvancedSearchFilters" name="test_search_no_filters_returns_players" time="1.006"><failure message="assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">backend/tests/test_phase_d_features.py:24: in test_search_no_filters_returns_players
+    assert r.status_code == 200
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_phase_d_features.TestAdvancedSearchFilters" name="test_filter_by_nationality_british" time="0.043"><failure message="assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">backend/tests/test_phase_d_features.py:32: in test_filter_by_nationality_british
+    assert r.status_code == 200
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_phase_d_features.TestAdvancedSearchFilters" name="test_filter_by_commitment_status_uncommitted" time="0.050"><failure message="assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">backend/tests/test_phase_d_features.py:43: in test_filter_by_commitment_status_uncommitted
+    assert r.status_code == 200
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_phase_d_features.TestAdvancedSearchFilters" name="test_filter_by_commitment_status_committed" time="0.047"><failure message="assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">backend/tests/test_phase_d_features.py:53: in test_filter_by_commitment_status_committed
+    assert r.status_code == 200
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_phase_d_features.TestAdvancedSearchFilters" name="test_commitment_status_field_in_response" time="0.044"><failure message="assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">backend/tests/test_phase_d_features.py:63: in test_commitment_status_field_in_response
+    assert r.status_code == 200
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_phase_d_features.TestBoardInlineNotes" name="test_get_saved_players" time="0.046"><failure message="assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">backend/tests/test_phase_d_features.py:73: in test_get_saved_players
+    assert r.status_code == 200
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_phase_d_features.TestBoardInlineNotes" name="test_patch_note_on_saved_player" time="0.052"><failure message="assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">backend/tests/test_phase_d_features.py:81: in test_patch_note_on_saved_player
+    assert r.status_code == 200
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_phase_d_features.TestBoardReorder" name="test_board_reorder_endpoint" time="0.047"><failure message="assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">backend/tests/test_phase_d_features.py:110: in test_board_reorder_endpoint
+    assert r.status_code == 200
+E   assert 401 == 200
+E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase></testsuite></testsuites>
