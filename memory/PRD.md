@@ -271,6 +271,14 @@ Build "CourtBound," a web app to track USA and UK college basketball scholarship
 
 ### Phase E — UX Gaps (Added Feb 2026)
 
+#### Player Reply Flow (DONE ✅)
+- [x] `PlayerMessagesPage.js` — replaced inline expand with slide-in `ThreadPanel` (right-side panel, same pattern as coach Gap 1)
+- [x] Panel shows: coach message bubble (dark slate), reply compose box OR sent reply bubble (orange tint)
+- [x] "Programme" link in panel header → `/coach/program/:slug`
+- [x] NCAA period warning banner in panel if applicable
+- [x] Auto-marks message as read on open; "Replied" badge on message card after submitting
+- [x] Backend: UUID validation on reply endpoint (returns 404 not 500 for invalid IDs)
+
 #### Gap 7 — Account Deletion (DONE ✅)
 - [x] `DELETE /api/coach/auth/account` — deletes all coach data (messages, saved players, notifications, templates, views) then hard-deletes the account row
 - [x] Settings UI — "Delete Account" red button in Data & Account section (data-testid: delete-account-btn)

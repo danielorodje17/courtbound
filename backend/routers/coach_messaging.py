@@ -456,15 +456,25 @@ async def player_reply_message(message_id: str, body: dict, current_user=Depends
     if len(reply_text) > 1000:
         raise HTTPException(status_code=400, detail="Reply too long (max 1000 characters)")
 
+    # Validate UUID format before hitting DB
+    import re as _re
+    UUID_RE = _re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', _re.I)
+    if not UUID_RE.match(message_id):
+        raise HTTPException(status_code=404, detail="Message not found")
+
     # Ensure message belongs to this player
-    msg_res = await run_in_threadpool(
-        lambda: supa.table("coach_messages")
-        .select("id, player_reply")
-        .eq("id", message_id)
-        .eq("player_user_id", user_id)
-        .limit(1)
-        .execute()
-    )
+    try:
+        msg_res = await run_in_threadpool(
+            lambda: supa.table("coach_messages")
+            .select("id, player_reply")
+            .eq("id", message_id)
+            .eq("player_user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+    except Exception:
+        raise HTTPException(status_code=404, detail="Message not found")
+
     if not msg_res.data:
         raise HTTPException(status_code=404, detail="Message not found")
     if msg_res.data[0].get("player_reply"):
