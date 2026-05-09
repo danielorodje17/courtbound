@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useCoachAuth } from "../../context/CoachAuthContext";
 import { CoachNav } from "../../components/coach/CoachNav";
 import { Search, BookmarkPlus, Film, Shield, ChevronRight, SlidersHorizontal, X } from "lucide-react";
+import { VideoModal } from "../../components/coach/VideoModal";
 
 const POSITIONS = ["PG", "SG", "SF", "PF", "C", "G", "F"];
 const GRAD_YEARS = ["2025", "2026", "2027", "2028", "2029"];
@@ -40,6 +41,7 @@ export default function CoachPlayersPage() {
   const [pages, setPages] = useState(1);
   const [loading, setLoading] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [videoTarget, setVideoTarget] = useState(null); // { url, name }
 
   // Initialise filters from URL query params (enables shareable/back-button state)
   const filtersFromUrl = () => ({
@@ -390,7 +392,15 @@ export default function CoachPlayersPage() {
                   </div>
                   <div className="flex items-center gap-2 mb-3 flex-wrap">
                     <MatchBadge score={player.match_score} />
-                    {player.highlight_tape_url && <span className="flex items-center gap-1 text-blue-400 text-xs"><Film className="w-3 h-3" /> Reel</span>}
+                    {player.highlight_tape_url && (
+                      <button
+                        onClick={e => { e.stopPropagation(); setVideoTarget({ url: player.highlight_tape_url, name: player.full_name }); }}
+                        data-testid={`reel-btn-${player.user_id}`}
+                        className="flex items-center gap-1 text-blue-400 hover:text-blue-300 text-xs transition-colors cursor-pointer"
+                      >
+                        <Film className="w-3 h-3" /> Reel
+                      </button>
+                    )}
                     {player.ncaa_registered && <span className="flex items-center gap-1 text-green-400 text-xs"><Shield className="w-3 h-3" /> NCAA</span>}
                     {player.commitment_status === "committed" && (
                       <span className="bg-emerald-900/40 border border-emerald-700/50 text-emerald-300 text-xs font-bold px-1.5 py-0.5 rounded-full" data-testid={`committed-badge-${player.user_id}`}>Committed</span>
@@ -423,6 +433,14 @@ export default function CoachPlayersPage() {
           </>
         )}
       </div>
+
+      {videoTarget && (
+        <VideoModal
+          url={videoTarget.url}
+          playerName={videoTarget.name}
+          onClose={() => setVideoTarget(null)}
+        />
+      )}
     </div>
   );
 }

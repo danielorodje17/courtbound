@@ -4,7 +4,7 @@ import { useCoachAuth } from "../../context/CoachAuthContext";
 import { CoachNav } from "../../components/coach/CoachNav";
 import CoachOnboardingModal from "../../components/coach/CoachOnboardingModal";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { Users, BookmarkPlus, Bell, TrendingUp, ChevronRight, Star, Film, Shield, AlertCircle, CheckCircle, Calendar, Award, BarChart2, Eye, MessageSquare, X, KeyRound, Globe } from "lucide-react";
+import { Users, BookmarkPlus, Bell, TrendingUp, ChevronRight, Star, Film, Shield, AlertCircle, CheckCircle, Calendar, Award, BarChart2, Eye, MessageSquare, X, KeyRound, Globe, Download } from "lucide-react";
 
 const PERIOD_COLORS = {
   contact: "bg-green-500",
@@ -387,9 +387,32 @@ export default function CoachDashboard() {
 
         {/* ── Recruiting Activity Analytics ── */}
         <div className="border-t border-slate-800 pt-8 pb-4" data-testid="coach-analytics-section">
-          <h2 className="font-black text-white text-base mb-5 flex items-center gap-2">
-            <BarChart2 className="w-5 h-5 text-blue-400" /> Recruiting Activity
-          </h2>
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="font-black text-white text-base flex items-center gap-2">
+              <BarChart2 className="w-5 h-5 text-blue-400" /> Recruiting Activity
+            </h2>
+            <button
+              onClick={async () => {
+                try {
+                  const token = localStorage.getItem("cb_coach_token");
+                  const r = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/coach/analytics/export`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                  });
+                  const blob = await r.blob();
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = "courtbound_analytics.csv";
+                  a.click();
+                  URL.revokeObjectURL(url);
+                } catch {}
+              }}
+              data-testid="export-analytics-csv-btn"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white text-xs font-bold rounded-lg transition-colors"
+            >
+              <Download className="w-3.5 h-3.5" /> Export CSV
+            </button>
+          </div>
 
           {/* KPI cards */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">

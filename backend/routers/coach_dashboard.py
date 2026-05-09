@@ -1,7 +1,10 @@
 import os
+import csv
+import io
 import logging
 from fastapi import APIRouter, Depends, Path, HTTPException
 from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import StreamingResponse
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 from supabase_db import supa
@@ -311,8 +314,8 @@ async def admin_verify_coach(
 
 # ── Coach Analytics ───────────────────────────────────────────────────────────
 
-@router.get("/analytics")
-async def get_coach_analytics(coach=Depends(require_verified_coach)):
+async def _fetch_analytics(coach: dict) -> dict:
+    """Shared analytics data — used by both /analytics and /analytics/export."""
     now = datetime.now(timezone.utc)
     seven_days_ago = (now - timedelta(days=7)).isoformat()
     thirty_days_ago = (now - timedelta(days=30)).isoformat()
@@ -337,7 +340,6 @@ async def get_coach_analytics(coach=Depends(require_verified_coach)):
         lambda: supa.table("coach_player_views").select("viewed_at").eq("coach_id", coach["id"]).gte("viewed_at", fourteen_days_ago).execute()
     )
 
-    # Programme page views (from coach_programme_views table)
     try:
         prog_views_all = await run_in_threadpool(
             lambda: supa.table("coach_programme_views").select("id", count="exact").eq("coach_id", coach["id"]).execute()
@@ -357,7 +359,7 @@ async def get_coach_analytics(coach=Depends(require_verified_coach)):
         programme_views = {"all_time": 0, "last_7d": 0, "last_30d": 0}
 
     saved = saved_res.data or []
-    saves_by_list = {}
+    saves_by_list: dict = {}
     for s in saved:
         lst = s.get("list_name") or "Watch List"
         saves_by_list[lst] = saves_by_list.get(lst, 0) + 1
@@ -368,7 +370,8 @@ async def get_coach_analytics(coach=Depends(require_verified_coach)):
         profiles_res = await run_in_threadpool(
             lambda: supa.table("profiles").select("position,expected_graduation").in_("user_id", user_ids).execute()
         )
-        positions, grad_years = {}, {}
+        positions: dict = {}
+        grad_years: dict = {}
         for p in (profiles_res.data or []):
             pos = p.get("position") or ""
             yr = str(p.get("expected_graduation") or "")
@@ -384,7 +387,7 @@ async def get_coach_analytics(coach=Depends(require_verified_coach)):
         day = (v.get("viewed_at") or "")[:10]
         if day in daily_map:
             daily_map[day] += 1
-    daily_views = [{"date": k[5:], "views": v} for k, v in daily_map.items()]
+    daily_views = [{"date": k[5:], "views": val} for k, val in daily_map.items()]
 
     return {
         "views": {
@@ -402,3 +405,75 @@ async def get_coach_analytics(coach=Depends(require_verified_coach)):
         "messages_sent": msgs_res.count or 0,
         "daily_views": daily_views,
     }
+
+
+@router.get("/analytics")
+async def get_coach_analytics(coach=Depends(require_verified_coach)):
+    return await _fetch_analytics(coach)
+
+
+@router.get("/analytics/export")
+async def export_analytics_csv(coach=Depends(require_verified_coach)):
+    """Download a CSV snapshot of the coach's recruiting analytics."""
+    data = await _fetch_analytics(coach)
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+    buf = io.StringIO()
+    w = csv.writer(buf)
+
+    # ── Header ────────────────────────────────────────────────────────────────
+    w.writerow(["COURTBOUND RECRUITING ANALYTICS"])
+    w.writerow(["Coach", coach.get("full_name", "")])
+    w.writerow(["Institution", coach.get("institution_name", "")])
+    w.writerow(["Division", coach.get("division", "")])
+    w.writerow(["Generated", now_str])
+    w.writerow([])
+
+    # ── Summary KPIs ──────────────────────────────────────────────────────────
+    w.writerow(["SUMMARY"])
+    w.writerow(["Metric", "Value"])
+    w.writerow(["Profile Views (All Time)", data["views"]["all_time"]])
+    w.writerow(["Profile Views (Last 7 Days)", data["views"]["last_7d"]])
+    w.writerow(["Profile Views (Last 30 Days)", data["views"]["last_30d"]])
+    w.writerow(["Programme Views (All Time)", data["programme_views"]["all_time"]])
+    w.writerow(["Programme Views (Last 7 Days)", data["programme_views"]["last_7d"]])
+    w.writerow(["Programme Views (Last 30 Days)", data["programme_views"]["last_30d"]])
+    w.writerow(["Players Saved (Total)", data["saves"]["total"]])
+    w.writerow(["Messages Sent (Total)", data["messages_sent"]])
+    w.writerow([])
+
+    # ── Daily Profile Views (last 14 days) ────────────────────────────────────
+    w.writerow(["PROFILE VIEWS — LAST 14 DAYS"])
+    w.writerow(["Date", "Views"])
+    for row in data["daily_views"]:
+        w.writerow([row["date"], row["views"]])
+    w.writerow([])
+
+    # ── Saved players by board list ───────────────────────────────────────────
+    w.writerow(["SAVED PLAYERS BY BOARD LIST"])
+    w.writerow(["List", "Players"])
+    for row in data["saves"]["by_list"]:
+        w.writerow([row["list"], row["count"]])
+    w.writerow([])
+
+    # ── Top positions ─────────────────────────────────────────────────────────
+    w.writerow(["TOP POSITIONS RECRUITED"])
+    w.writerow(["Position", "Count"])
+    for row in data["top_positions"]:
+        w.writerow([row["position"], row["count"]])
+    w.writerow([])
+
+    # ── Top grad years ────────────────────────────────────────────────────────
+    w.writerow(["TOP GRADUATION YEARS"])
+    w.writerow(["Year", "Count"])
+    for row in data["top_grad_years"]:
+        w.writerow([row["year"], row["count"]])
+
+    inst_slug = (coach.get("institution_name") or "coach").lower().replace(" ", "_")
+    filename = f"courtbound_analytics_{inst_slug}_{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv"
+    buf.seek(0)
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )

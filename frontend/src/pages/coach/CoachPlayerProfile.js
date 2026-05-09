@@ -4,6 +4,7 @@ import { useCoachAuth } from "../../context/CoachAuthContext";
 import { CoachNav } from "../../components/coach/CoachNav";
 import { toast } from "sonner";
 import { ArrowLeft, Film, Shield, Star, MapPin, GraduationCap, BarChart2, User, ExternalLink, Bookmark, Send, X, AlertCircle, CheckCircle, Lock, Clock } from "lucide-react";
+import { getEmbedUrl } from "../../components/coach/VideoModal";
 
 const PERIOD_WARNINGS = {
   dead: "You are in a NCAA Dead Period. In-person contact is not permitted. Ensure any written communication complies with your division rules.",
@@ -411,18 +412,20 @@ export default function CoachPlayerProfile() {
             {player?.highlight_tape_url && (
               <Section title="Highlight Reel" icon={Film}>
                 <div className="aspect-video bg-slate-800 rounded-xl overflow-hidden">
-                  {player.highlight_tape_url.includes("youtube.com") || player.highlight_tape_url.includes("youtu.be") ? (
+                  {getEmbedUrl(player.highlight_tape_url) ? (
                     <iframe
-                      src={`https://www.youtube.com/embed/${player.highlight_tape_url.split("v=")[1]?.split("&")[0] || player.highlight_tape_url.split("/").pop()}`}
+                      src={getEmbedUrl(player.highlight_tape_url)}
                       className="w-full h-full"
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                       allowFullScreen
                       title="Highlight reel"
+                      data-testid="profile-reel-iframe"
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
                       <a href={player.highlight_tape_url} target="_blank" rel="noopener noreferrer"
-                        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold px-6 py-3 rounded-xl transition-colors">
+                        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold px-6 py-3 rounded-xl transition-colors"
+                        data-testid="profile-reel-link">
                         <Film className="w-5 h-5" /> Watch Highlight Reel <ExternalLink className="w-4 h-4" />
                       </a>
                     </div>

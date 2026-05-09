@@ -1,0 +1,65 @@
+{
+  "summary": "Phase D P3 features tested: Video Reel Inline Preview and Analytics CSV Export. All 13 backend tests passed. Frontend: Reel button, VideoModal (iframe, close, backdrop), Export CSV button all working. Profile page reel iframe not verified due to page load timing in automation.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Profile page reel section",
+        "issue": "profile-reel-iframe not verified via automation — profile page showed blank loading state (likely token not carried over properly to single player profile route in automation). Manual check recommended.",
+        "affected_selectors": ["[data-testid='profile-reel-iframe']", "[data-testid='profile-reel-link']"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_video_reel_analytics.py",
+    "/app/test_reports/pytest/pytest_video_reel_analytics.xml"
+  ],
+  "action_items": [
+    "MINOR: highlight_tape_url for Daniel Orodje contains multiple space-separated URLs ('https://youtu.be/liRkxGk0fsU https://x.com/...') — getEmbedUrl regex captures trailing space in YouTube ID ('liRkxGk0fsU '), making embed src technically invalid. YouTube player is lenient so it works, but ideally the field should contain only one URL. Consider stripping whitespace from captured YouTube ID: `ytId.trim()` in getEmbedUrl(). Data fix: update Daniel Orodje's highlight_tape_url to contain only the YouTube URL.",
+    "OPTIONAL: Verify profile-reel-iframe renders on /coach/players/8b1bfa77-e2eb-5940-9589-1603bd0ece73 manually — automation timing issue prevented verification"
+  ],
+  "critical_code_review_comments": [
+    "getEmbedUrl regex `([^&?/#]+)` does not exclude spaces — if highlight_tape_url contains multiple space-separated URLs, the YouTube ID will include a trailing space. Fix: add `.trim()` on ytId before constructing embed URL.",
+    "CoachPlayersPage login redirect: page.wait_for_url('**/coach/**') also matches /coach/login — this caused Playwright auth injection issue (not a production bug)"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_video_reel_analytics.py"
+  ],
+  "success_rate": {
+    "backend": "100% (13/13 tests passed)",
+    "frontend": "85% (6/7 frontend checks passed — profile reel iframe not verified)"
+  },
+  "test_credentials": "Coach: testcoach@courtbound.edu / coach1234 (token: 3ce6e553-e23e-4508-b877-123cdaff6d18)",
+  "seed_data_creation": "None — Daniel Orodje already had highlight_tape_url set",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Phase D P3 features working. Use localStorage.setItem('cb_coach_token', '<token>') to bypass Playwright login. Coach token obtained via POST /api/coach/auth/login. Player with reel: Daniel Orodje (user_id: 8b1bfa77-e2eb-5940-9589-1603bd0ece73). Reel btn testid: reel-btn-8b1bfa77-e2eb-5940-9589-1603bd0ece73. VideoModal opens with iframe, close and backdrop all work. Export CSV button (data-testid=export-analytics-csv-btn) visible on dashboard. Minor: getEmbedUrl should trim whitespace from captured YouTube ID.",
+  "test_results_detail": {
+    "backend_analytics_200": "PASS",
+    "backend_analytics_fields": "PASS",
+    "backend_analytics_views_structure": "PASS",
+    "backend_analytics_daily_views_14_entries": "PASS",
+    "backend_analytics_unauthorized": "PASS",
+    "backend_export_200": "PASS",
+    "backend_export_content_type_csv": "PASS",
+    "backend_export_content_disposition_attachment": "PASS",
+    "backend_export_csv_sections": "PASS",
+    "backend_export_unauthorized": "PASS",
+    "backend_players_search": "PASS",
+    "backend_players_highlight_field": "PASS",
+    "backend_players_reel_exists": "PASS",
+    "frontend_reel_btn_found": "PASS",
+    "frontend_video_modal_opens": "PASS",
+    "frontend_iframe_present": "PASS (embed URL has minor trailing space issue)",
+    "frontend_open_original_link": "PASS",
+    "frontend_close_btn_works": "PASS",
+    "frontend_backdrop_closes_modal": "PASS",
+    "frontend_export_csv_btn_on_dashboard": "PASS",
+    "frontend_profile_reel_iframe": "NOT VERIFIED (automation timing)"
+  }
+}
