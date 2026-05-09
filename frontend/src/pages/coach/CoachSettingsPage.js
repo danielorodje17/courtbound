@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useCoachAuth } from "../../context/CoachAuthContext";
 import { CoachNav } from "../../components/coach/CoachNav";
 import { toast } from "sonner";
-import { Save, SlidersHorizontal, User, GraduationCap, Award, Globe, Copy, ExternalLink, Lock } from "lucide-react";
+import { Save, SlidersHorizontal, User, GraduationCap, Award, Globe, Copy, ExternalLink, Lock, Bell, Download } from "lucide-react";
 
 const POSITIONS = ["PG", "SG", "SF", "PF", "C", "G", "F"];
 const GRAD_YEARS = ["2025", "2026", "2027", "2028", "2029"];
@@ -31,6 +31,16 @@ export default function CoachSettingsPage() {
     profile_visible: true,
   });
   const [privacySaving, setPrivacySaving] = useState(false);
+
+  const DEFAULT_NOTIF_PREFS = {
+    highlight_reel: true,
+    commitment: true,
+    programme_view: false,
+    contact_countdown: true,
+  };
+  const [notifPrefs, setNotifPrefs] = useState(DEFAULT_NOTIF_PREFS);
+  const [notifSaving, setNotifSaving] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const [prefs, setPrefs] = useState({
     positions: [],
@@ -96,6 +106,10 @@ export default function CoachSettingsPage() {
     coachReq("get", "/auth/privacy").then(r => {
       if (r?.data) setPrivacy(r.data);
     }).catch(() => {});
+    // Load notification prefs
+    coachReq("get", "/auth/notification-prefs").then(r => {
+      if (r?.data) setNotifPrefs(prev => ({ ...prev, ...r.data }));
+    }).catch(() => {});
   }, [coach]); // eslint-disable-line
 
   const toggle = (field, value) => {
@@ -117,6 +131,42 @@ export default function CoachSettingsPage() {
       toast.error(msg);
     }
     setPrivacySaving(false);
+  };
+
+  const handleNotifSave = async () => {
+    setNotifSaving(true);
+    try {
+      const res = await coachReq("patch", "/auth/notification-prefs", notifPrefs);
+      if (res?.data) setNotifPrefs(prev => ({ ...prev, ...res.data }));
+      toast.success("Notification preferences saved!");
+    } catch (e) {
+      const msg = e?.response?.data?.detail || "Failed to save notification preferences";
+      toast.error(msg);
+    }
+    setNotifSaving(false);
+  };
+
+  const handleDataExport = async () => {
+    setExporting(true);
+    try {
+      const API = process.env.REACT_APP_BACKEND_URL;
+      const token = localStorage.getItem("cb_coach_token");
+      const res = await fetch(`${API}/api/coach/auth/data-export`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Export failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `courtbound-data-export-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Data export downloaded!");
+    } catch {
+      toast.error("Failed to export data — please try again");
+    }
+    setExporting(false);
   };
 
   const handleSave = async () => {
@@ -417,6 +467,85 @@ export default function CoachSettingsPage() {
                 </button>
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* Email Notification Preferences */}
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 mb-5">
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-2">
+              <Bell className="w-4 h-4 text-blue-400" />
+              <h2 className="font-black text-white text-sm uppercase tracking-wide">Email Notifications</h2>
+            </div>
+            <button onClick={handleNotifSave} disabled={notifSaving} data-testid="save-notif-prefs-btn"
+              className="flex items-center gap-1.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-60 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors">
+              <Save className="w-3.5 h-3.5" /> {notifSaving ? "Saving..." : "Save"}
+            </button>
+          </div>
+          <p className="text-slate-500 text-xs mb-4">Choose which events send you an in-app notification.</p>
+          <div className="space-y-4">
+            {[
+              {
+                key: "highlight_reel",
+                label: "New Highlight Reel",
+                desc: "Notify me when a saved player updates their highlight footage",
+              },
+              {
+                key: "commitment",
+                label: "Player Commits",
+                desc: "Notify me when a saved player commits to a programme",
+              },
+              {
+                key: "programme_view",
+                label: "Programme Page Viewed",
+                desc: "Notify me when a player visits my public programme page (max once per hour)",
+              },
+              {
+                key: "contact_countdown",
+                label: "Contact Period Countdown",
+                desc: "Remind me 7 days and 1 day before a contact period opens (NCAA D1 only)",
+              },
+            ].map(({ key, label, desc }) => (
+              <div key={key} className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-white">{label}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">{desc}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setNotifPrefs(p => ({ ...p, [key]: !p[key] }))}
+                  data-testid={`notif-toggle-${key}`}
+                  className={`relative flex-shrink-0 w-11 h-6 rounded-full transition-colors ${notifPrefs[key] ? "bg-blue-600" : "bg-slate-700"}`}
+                >
+                  <span className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${notifPrefs[key] ? "translate-x-5" : "translate-x-0"}`} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Data & Account */}
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 mb-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Download className="w-4 h-4 text-slate-400" />
+            <h2 className="font-black text-white text-sm uppercase tracking-wide">Data & Account</h2>
+          </div>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold text-white">Download My Data</p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Export all your account data — messages, saved players, templates, and notifications — as a JSON file (GDPR Art. 20).
+              </p>
+            </div>
+            <button
+              onClick={handleDataExport}
+              disabled={exporting}
+              data-testid="download-data-btn"
+              className="flex-shrink-0 flex items-center gap-1.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-60 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors"
+            >
+              <Download className="w-3.5 h-3.5" />
+              {exporting ? "Exporting..." : "Download"}
+            </button>
           </div>
         </div>
 

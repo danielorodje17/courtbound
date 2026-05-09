@@ -1,10 +1,12 @@
 import os
 import uuid
+import asyncio
 import bcrypt
 import logging
 import json
 from fastapi import APIRouter, HTTPException, Header, Depends
 from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import StreamingResponse
 from datetime import datetime, timezone
 from typing import Optional
 from supabase_db import supa
@@ -252,6 +254,128 @@ async def update_privacy_settings(body: dict, coach=Depends(get_current_coach)):
                 detail="Privacy settings not available yet — please run database migration v18."
             )
         raise
+
+
+# ── Notification Preferences ──────────────────────────────────────────────────
+
+NOTIFICATION_PREF_KEYS = {
+    "highlight_reel",
+    "commitment",
+    "programme_view",
+    "contact_countdown",
+}
+
+NOTIFICATION_PREF_DEFAULTS = {
+    "highlight_reel": True,
+    "commitment": True,
+    "programme_view": False,
+    "contact_countdown": True,
+}
+
+
+@router.get("/auth/notification-prefs")
+async def get_notification_prefs(coach=Depends(get_current_coach)):
+    stored = coach.get("notification_prefs") or {}
+    return {k: bool(stored.get(k, v)) for k, v in NOTIFICATION_PREF_DEFAULTS.items()}
+
+
+@router.patch("/auth/notification-prefs")
+async def update_notification_prefs(body: dict, coach=Depends(get_current_coach)):
+    current = coach.get("notification_prefs") or {}
+    updates = {k: bool(v) for k, v in body.items() if k in NOTIFICATION_PREF_KEYS}
+    merged = {**current, **updates}
+    try:
+        result = await run_in_threadpool(
+            lambda: supa.table("coach_accounts")
+            .update({"notification_prefs": merged})
+            .eq("id", coach["id"])
+            .execute()
+        )
+        updated_coach = result.data[0] if result.data else {}
+        stored = updated_coach.get("notification_prefs") or merged
+        return {k: bool(stored.get(k, v)) for k, v in NOTIFICATION_PREF_DEFAULTS.items()}
+    except Exception as e:
+        err_str = str(e)
+        if "notification_prefs" in err_str or "PGRST204" in err_str:
+            raise HTTPException(
+                status_code=503,
+                detail="Notification preferences not available yet — please run database migration v24.",
+            )
+        raise
+
+
+# ── GDPR Data Export ───────────────────────────────────────────────────────────
+
+@router.get("/auth/data-export")
+async def data_export(coach=Depends(get_current_coach)):
+    """Download all personal data for this coach account as a JSON file (GDPR Art. 20)."""
+    coach_id = str(coach["id"])
+
+    # Gather all data in parallel
+    messages_res, saved_res, notifs_res, templates_res = await asyncio.gather(
+        run_in_threadpool(
+            lambda: supa.table("coach_messages")
+            .select("id,player_user_id,subject,body,sent_at,status,scheduled_at,is_read,player_reply,player_replied_at,ncaa_period_type")
+            .eq("coach_id", coach_id)
+            .order("sent_at", desc=True)
+            .execute()
+        ),
+        run_in_threadpool(
+            lambda: supa.table("coach_saved_players")
+            .select("player_user_id,list_name,notes,sort_order,saved_at")
+            .eq("coach_id", coach_id)
+            .execute()
+        ),
+        run_in_threadpool(
+            lambda: supa.table("coach_notifications")
+            .select("id,type,title,message,link,is_read,created_at")
+            .eq("coach_id", coach_id)
+            .order("created_at", desc=True)
+            .limit(200)
+            .execute()
+        ),
+        run_in_threadpool(
+            lambda: supa.table("coach_message_templates")
+            .select("id,name,subject,body,is_default,created_at")
+            .eq("coach_id", coach_id)
+            .execute()
+        ),
+    )
+
+    # Enrich saved players with names
+    saved = saved_res.data or []
+    player_ids = [s["player_user_id"] for s in saved]
+    player_names: dict = {}
+    if player_ids:
+        p_res = await run_in_threadpool(
+            lambda: supa.table("profiles")
+            .select("user_id,full_name")
+            .in_("user_id", player_ids)
+            .execute()
+        )
+        player_names = {str(p["user_id"]): p.get("full_name") for p in (p_res.data or [])}
+
+    account_data = _clean_coach(coach)
+
+    export = {
+        "export_generated_at": datetime.now(timezone.utc).isoformat(),
+        "account": account_data,
+        "messages_sent": messages_res.data or [],
+        "saved_players": [
+            {**s, "player_name": player_names.get(str(s["player_user_id"]))}
+            for s in saved
+        ],
+        "notifications": notifs_res.data or [],
+        "message_templates": templates_res.data or [],
+    }
+
+    json_bytes = json.dumps(export, indent=2, default=str).encode("utf-8")
+    filename = f"courtbound-data-export-{datetime.now(timezone.utc).strftime('%Y%m%d')}.json"
+    return StreamingResponse(
+        iter([json_bytes]),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 # ── Custom Lists ──────────────────────────────────────────────────────────────
