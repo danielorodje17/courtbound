@@ -271,6 +271,19 @@ Build "CourtBound," a web app to track USA and UK college basketball scholarship
 
 ### Phase E — UX Gaps (Added Feb 2026)
 
+#### Gap 5 — Email Notification Preferences (DONE ✅)
+- [x] `supabase_migration_v24_notification_prefs.sql` — adds `notification_prefs JSONB DEFAULT '{}'` to `coach_accounts` (**user must run**)
+- [x] `GET /api/coach/auth/notification-prefs` — returns prefs with sensible defaults (works before v24)
+- [x] `PATCH /api/coach/auth/notification-prefs` — saves prefs (returns 503 with migration message until v24 is run)
+- [x] 4 notification types: `highlight_reel` (on), `commitment` (on), `programme_view` (off), `contact_countdown` (on)
+- [x] Settings UI — "Email Notifications" section with toggles (data-testid: notif-toggle-{key}) + Save button
+
+#### Gap 6 — GDPR Data Export (DONE ✅)
+- [x] `GET /api/coach/auth/data-export` — streams JSON with: account (no secrets), messages_sent, saved_players (with names), notifications, message_templates
+- [x] Filename: `courtbound-data-export-YYYYMMDD.json`, Content-Disposition: attachment
+- [x] Settings UI — "Data & Account" section with "Download" button (data-testid: download-data-btn)
+- [x] No migration required — works immediately
+
 #### Gap 3 — Notification Backend Triggers (DONE ✅)
 - [x] `notifications_utils.py` — shared helpers: `_notify_coaches_about_player()` and `_notify_coach_direct()`
 - [x] Highlight reel trigger: `profile.py` PUT detects `highlight_tape_url` change → notifies all coaches who saved the player (`type=highlight_reel`)
