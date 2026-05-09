@@ -268,3 +268,12 @@ Build "CourtBound," a web app to track USA and UK college basketball scholarship
   - Violet-styled columns in Kanban alongside default 5; violet badge in Table view
   - Rename inline (pencil icon), delete with confirmation (moves players to Watch List)
   - Up to 10 custom lists; validation blocks default list names and duplicates
+
+### P3 — Drag-and-Drop Kanban (DONE ✅)
+- [x] True drag-and-drop on Kanban board using `@dnd-kit/core` (v6.3.1)
+  - `useDraggable` on cards with GripVertical drag handle; `useDroppable` on columns
+  - `DragOverlay` ghost card with slight rotation + blue ring while dragging
+  - Optimistic update on drop with backend error revert
+  - Drop zone blue ring highlight; "Drop here" placeholder in empty columns
+  - `PointerSensor` (distance: 8px) + `TouchSensor` (delay: 200ms) for mouse + mobile
+  - All previous board features intact (Table view, CSV, PDF, Custom Lists, color labels)
