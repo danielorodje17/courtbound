@@ -262,5 +262,9 @@ Build "CourtBound," a web app to track USA and UK college basketball scholarship
   - Requires migration v21: `scheduled_at TIMESTAMPTZ`, `status TEXT DEFAULT 'sent'` on coach_messages
   - Backend has graceful pre-v21 fallbacks on both INSERT and SELECT
 
-### P2 — Custom Lists (Upcoming)
-- [ ] Custom list names on board — stored as JSONB in coach_accounts.custom_lists; requires migration v20
+### P2 — Custom Lists (DONE ✅)
+- [x] Custom list names on board — stored as JSONB `custom_lists` in `coach_accounts` (requires migration v20)
+  - GET/POST/PATCH/DELETE /api/coach/custom-lists endpoints
+  - Violet-styled columns in Kanban alongside default 5; violet badge in Table view
+  - Rename inline (pencil icon), delete with confirmation (moves players to Watch List)
+  - Up to 10 custom lists; validation blocks default list names and duplicates
