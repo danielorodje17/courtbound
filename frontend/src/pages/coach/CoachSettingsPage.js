@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useCoachAuth } from "../../context/CoachAuthContext";
 import { CoachNav } from "../../components/coach/CoachNav";
 import { toast } from "sonner";
-import { Save, SlidersHorizontal, User, GraduationCap, Award, Globe, Copy, ExternalLink, Lock, Bell, Download } from "lucide-react";
+import { Save, SlidersHorizontal, User, GraduationCap, Award, Globe, Copy, ExternalLink, Lock, Bell, Download, Trash2, AlertTriangle, X } from "lucide-react";
 
 const POSITIONS = ["PG", "SG", "SF", "PF", "C", "G", "F"];
 const GRAD_YEARS = ["2025", "2026", "2027", "2028", "2029"];
@@ -21,7 +21,7 @@ function toSlug(name) {
 }
 
 export default function CoachSettingsPage() {
-  const { coach, coachReq, updateCoach } = useCoachAuth();
+  const { coach, coachReq, logout: coachLogout, updateCoach } = useCoachAuth();
   const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
 
@@ -41,6 +41,9 @@ export default function CoachSettingsPage() {
   const [notifPrefs, setNotifPrefs] = useState(DEFAULT_NOTIF_PREFS);
   const [notifSaving, setNotifSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   const [prefs, setPrefs] = useState({
     positions: [],
@@ -169,6 +172,22 @@ export default function CoachSettingsPage() {
     setExporting(false);
   };
 
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== "DELETE") return;
+    setDeleting(true);
+    try {
+      await coachReq("delete", "/auth/account");
+      toast.success("Account deleted. Goodbye.");
+      setTimeout(() => {
+        coachLogout();
+        navigate("/coach/login");
+      }, 1200);
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Failed to delete account");
+      setDeleting(false);
+    }
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -199,6 +218,7 @@ export default function CoachSettingsPage() {
   };
 
   return (
+    <>
     <div className="min-h-screen bg-slate-950">
       <CoachNav />
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
@@ -530,22 +550,44 @@ export default function CoachSettingsPage() {
             <Download className="w-4 h-4 text-slate-400" />
             <h2 className="font-black text-white text-sm uppercase tracking-wide">Data & Account</h2>
           </div>
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-sm font-semibold text-white">Download My Data</p>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Export all your account data — messages, saved players, templates, and notifications — as a JSON file (GDPR Art. 20).
-              </p>
+          <div className="space-y-4">
+            {/* Download data */}
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-white">Download My Data</p>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Export all your account data — messages, saved players, templates, and notifications — as a JSON file (GDPR Art. 20).
+                </p>
+              </div>
+              <button
+                onClick={handleDataExport}
+                disabled={exporting}
+                data-testid="download-data-btn"
+                className="flex-shrink-0 flex items-center gap-1.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-60 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors"
+              >
+                <Download className="w-3.5 h-3.5" />
+                {exporting ? "Exporting..." : "Download"}
+              </button>
             </div>
-            <button
-              onClick={handleDataExport}
-              disabled={exporting}
-              data-testid="download-data-btn"
-              className="flex-shrink-0 flex items-center gap-1.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-60 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors"
-            >
-              <Download className="w-3.5 h-3.5" />
-              {exporting ? "Exporting..." : "Download"}
-            </button>
+
+            <div className="border-t border-slate-800" />
+
+            {/* Delete account */}
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-red-400">Delete Account</p>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Permanently delete your CourtBound account and all associated data. This cannot be undone.
+                </p>
+              </div>
+              <button
+                onClick={() => { setShowDeleteModal(true); setDeleteConfirmText(""); }}
+                data-testid="delete-account-btn"
+                className="flex-shrink-0 flex items-center gap-1.5 bg-red-900/30 hover:bg-red-900/50 border border-red-800/60 text-red-400 hover:text-red-300 text-xs font-bold px-4 py-2 rounded-lg transition-colors"
+              >
+                <Trash2 className="w-3.5 h-3.5" /> Delete
+              </button>
+            </div>
           </div>
         </div>
 
@@ -592,5 +634,66 @@ export default function CoachSettingsPage() {
         </div>
       </div>
     </div>
+
+    {/* Delete Account Confirmation Modal */}
+    {showDeleteModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+        <div className="w-full max-w-md bg-slate-900 border border-red-900/60 rounded-2xl shadow-2xl" data-testid="delete-account-modal">
+          <div className="flex items-center justify-between p-5 border-b border-slate-800">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-red-400" />
+              <h3 className="text-white font-black">Delete Account</h3>
+            </div>
+            <button onClick={() => setShowDeleteModal(false)} className="text-slate-500 hover:text-white transition-colors p-1">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="p-5 space-y-4">
+            <p className="text-slate-300 text-sm leading-relaxed">
+              This will <strong className="text-red-400">permanently delete</strong> your CourtBound account and all associated data, including:
+            </p>
+            <ul className="text-xs text-slate-400 space-y-1 ml-4 list-disc">
+              <li>All sent messages</li>
+              <li>Your recruiting board and saved players</li>
+              <li>Message templates</li>
+              <li>Notifications and activity history</li>
+              <li>Programme views and player views</li>
+            </ul>
+            <p className="text-slate-500 text-xs">This action <strong className="text-slate-300">cannot be undone</strong>.</p>
+            <div>
+              <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                Type <span className="text-red-400 font-black">DELETE</span> to confirm
+              </label>
+              <input
+                type="text"
+                value={deleteConfirmText}
+                onChange={e => setDeleteConfirmText(e.target.value)}
+                placeholder="DELETE"
+                data-testid="delete-confirm-input"
+                className="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-600 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-700"
+              />
+            </div>
+            <div className="flex gap-3 pt-1">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                data-testid="delete-account-cancel-btn"
+                className="flex-1 py-2.5 text-sm font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 rounded-xl transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={deleteConfirmText !== "DELETE" || deleting}
+                data-testid="delete-account-confirm-btn"
+                className="flex-1 py-2.5 text-sm font-bold text-white bg-red-700 hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition-colors"
+              >
+                {deleting ? "Deleting..." : "Delete My Account"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

@@ -1,8 +1,10 @@
 import os
 import uuid
 import logging
+import io
 from fastapi import APIRouter, Depends, Query
 from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import StreamingResponse
 from datetime import datetime, timezone
 from typing import Optional
 from supabase_db import supa
@@ -357,6 +359,167 @@ async def reorder_board(body: dict, coach=Depends(require_verified_coach)):
             .execute()
         )
     return {"message": "Reordered", "count": len(items)}
+
+
+# ── Board PDF Export ───────────────────────────────────────────────────────────
+
+BOARD_LISTS = ["Watch List", "Priority Targets", "Contacted", "Offer Extended", "Committed"]
+
+
+@router.post("/board/export-pdf")
+async def export_board_pdf(coach=Depends(require_verified_coach)):
+    """Generate a formatted PDF of the coach's recruiting board using reportlab."""
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib import colors
+    from reportlab.lib.units import inch
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+
+    coach_id = str(coach["id"])
+
+    # Fetch saved players + profiles
+    saved_res = await run_in_threadpool(
+        lambda: supa.table("coach_saved_players")
+        .select("*")
+        .eq("coach_id", coach_id)
+        .order("sort_order", desc=False)
+        .execute()
+    )
+    saved = saved_res.data or []
+
+    custom_lists_res = await run_in_threadpool(
+        lambda: supa.table("coach_accounts")
+        .select("custom_lists")
+        .eq("id", coach_id)
+        .limit(1)
+        .execute()
+    )
+    custom_lists = (custom_lists_res.data or [{}])[0].get("custom_lists") or []
+
+    player_names_map: dict = {}
+    if saved:
+        uids = [s["player_user_id"] for s in saved]
+        p_res = await run_in_threadpool(
+            lambda: supa.table("profiles")
+            .select("user_id,full_name,position,height_ft,club_team,expected_graduation,ppg,highlight_tape_url")
+            .in_("user_id", uids)
+            .execute()
+        )
+        player_names_map = {str(p["user_id"]): p for p in (p_res.data or [])}
+
+    prefs = coach.get("recruiting_prefs") or {}
+    all_lists = BOARD_LISTS + [lst for lst in custom_lists if lst not in BOARD_LISTS]
+
+    # ── Build PDF ─────────────────────────────────────────────────────────────
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=letter,
+        rightMargin=0.6 * inch,
+        leftMargin=0.6 * inch,
+        topMargin=0.7 * inch,
+        bottomMargin=0.6 * inch,
+    )
+
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle("Title", parent=styles["Normal"],
+                                 fontSize=18, fontName="Helvetica-Bold",
+                                 spaceAfter=4, textColor=colors.HexColor("#0f172a"))
+    sub_style   = ParagraphStyle("Sub",   parent=styles["Normal"],
+                                 fontSize=9,  fontName="Helvetica",
+                                 spaceAfter=2, textColor=colors.HexColor("#64748b"))
+    list_style  = ParagraphStyle("List",  parent=styles["Normal"],
+                                 fontSize=11, fontName="Helvetica-Bold",
+                                 spaceBefore=14, spaceAfter=6,
+                                 textColor=colors.HexColor("#1e293b"))
+    note_style  = ParagraphStyle("Note",  parent=styles["Normal"],
+                                 fontSize=7,  fontName="Helvetica",
+                                 textColor=colors.HexColor("#64748b"))
+
+    story = []
+
+    # Header
+    story.append(Paragraph("CourtBound — Recruiting Board", title_style))
+    story.append(Paragraph(
+        f"{coach.get('full_name', 'Coach')} · {coach.get('institution_name', '')} · "
+        f"Exported {datetime.now(timezone.utc).strftime('%d %b %Y')}",
+        sub_style,
+    ))
+    story.append(Spacer(1, 0.15 * inch))
+    story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#e2e8f0")))
+
+    # Table header style
+    header_bg   = colors.HexColor("#1e293b")
+    row_alt_bg  = colors.HexColor("#f8fafc")
+    header_text = colors.white
+
+    col_headers = ["#", "Player", "Pos", "Height", "Club", "Grad", "PPG", "Match", "Notes"]
+    col_widths  = [0.25*inch, 1.4*inch, 0.45*inch, 0.5*inch, 1.1*inch,
+                   0.4*inch, 0.4*inch, 0.45*inch, 1.5*inch]
+
+    for list_name in all_lists:
+        items = [s for s in saved if s.get("list_name") == list_name]
+        if not items:
+            continue
+
+        story.append(Paragraph(f"{list_name}  ({len(items)})", list_style))
+
+        table_data = [col_headers]
+        for idx, item in enumerate(items, 1):
+            p = player_names_map.get(str(item["player_user_id"]), {})
+            match = calculate_match_score(prefs, p) if p else "—"
+            note_text = (item.get("notes") or "").strip()
+            note_para = Paragraph(note_text[:120] + ("…" if len(note_text) > 120 else ""), note_style)
+            table_data.append([
+                str(idx),
+                (p.get("full_name") or "Unknown")[:22],
+                (p.get("position") or "—")[:6],
+                p.get("height_ft") or "—",
+                (p.get("club_team") or "—")[:18],
+                str(p.get("expected_graduation") or "—"),
+                str(p.get("ppg") or "—"),
+                f"{match}%" if isinstance(match, int) else "—",
+                note_para,
+            ])
+
+        tbl = Table(table_data, colWidths=col_widths, repeatRows=1)
+        tbl.setStyle(TableStyle([
+            # Header row
+            ("BACKGROUND",   (0, 0), (-1, 0),   header_bg),
+            ("TEXTCOLOR",    (0, 0), (-1, 0),   header_text),
+            ("FONTNAME",     (0, 0), (-1, 0),   "Helvetica-Bold"),
+            ("FONTSIZE",     (0, 0), (-1, 0),   7),
+            ("BOTTOMPADDING",(0, 0), (-1, 0),   5),
+            ("TOPPADDING",   (0, 0), (-1, 0),   5),
+            # Data rows
+            ("FONTNAME",     (0, 1), (-1, -1),  "Helvetica"),
+            ("FONTSIZE",     (0, 1), (-1, -1),  8),
+            ("TOPPADDING",   (0, 1), (-1, -1),  4),
+            ("BOTTOMPADDING",(0, 1), (-1, -1),  4),
+            # Alternating rows
+            *[("BACKGROUND", (0, r), (-1, r), row_alt_bg) for r in range(2, len(table_data), 2)],
+            # Grid
+            ("GRID",         (0, 0), (-1, -1),  0.4, colors.HexColor("#e2e8f0")),
+            ("VALIGN",       (0, 0), (-1, -1),  "MIDDLE"),
+        ]))
+        story.append(tbl)
+
+    if not any(
+        s.get("list_name") in all_lists for s in saved
+    ):
+        story.append(Spacer(1, 0.3 * inch))
+        story.append(Paragraph("No players on your board yet.", sub_style))
+
+    doc.build(story)
+    buf.seek(0)
+
+    filename = f"courtbound-board-{datetime.now(timezone.utc).strftime('%Y%m%d')}.pdf"
+    return StreamingResponse(
+        buf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 # ── Saved Players Board ────────────────────────────────────────────────────────

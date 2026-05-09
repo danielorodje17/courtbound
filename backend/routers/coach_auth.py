@@ -256,6 +256,40 @@ async def update_privacy_settings(body: dict, coach=Depends(get_current_coach)):
         raise
 
 
+# ── Account Deletion (GDPR Art. 17) ───────────────────────────────────────────
+
+@router.delete("/auth/account")
+async def delete_account(coach=Depends(get_current_coach)):
+    """
+    Permanently delete the coach account and all associated data.
+    1. Delete child table rows (messages, saved players, notifications, templates, views).
+    2. Hard-delete the coach_accounts row.
+    """
+    coach_id = str(coach["id"])
+
+    # Delete all coach data in dependency order
+    delete_tasks = [
+        lambda: supa.table("coach_messages").delete().eq("coach_id", coach_id).execute(),
+        lambda: supa.table("coach_saved_players").delete().eq("coach_id", coach_id).execute(),
+        lambda: supa.table("coach_notifications").delete().eq("coach_id", coach_id).execute(),
+        lambda: supa.table("coach_message_templates").delete().eq("coach_id", coach_id).execute(),
+        lambda: supa.table("coach_programme_views").delete().eq("coach_id", coach_id).execute(),
+        lambda: supa.table("coach_player_views").delete().eq("coach_id", coach_id).execute(),
+    ]
+    for task in delete_tasks:
+        try:
+            await run_in_threadpool(task)
+        except Exception as exc:
+            logger.warning("Account deletion cleanup error (continuing): %s", exc)
+
+    # Hard-delete the account row
+    await run_in_threadpool(
+        lambda: supa.table("coach_accounts").delete().eq("id", coach_id).execute()
+    )
+    logger.info("Coach account deleted: %s", coach_id)
+    return {"message": "Account deleted"}
+
+
 # ── Notification Preferences ──────────────────────────────────────────────────
 
 NOTIFICATION_PREF_KEYS = {

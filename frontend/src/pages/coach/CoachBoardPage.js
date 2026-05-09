@@ -599,6 +599,7 @@ export default function CoachBoardPage() {
   const [activeItem, setActiveItem] = useState(null);
   const [overColumnId, setOverColumnId] = useState(null);
   const [bulkTarget, setBulkTarget] = useState(null); // listName when bulk modal is open
+  const [exportingPDF, setExportingPDF] = useState(false);
   const dragOriginRef = useRef(null); // { id, list_name } — original position before drag
   const styleInjected = useRef(false);
 
@@ -660,6 +661,29 @@ export default function CoachBoardPage() {
       alert(e?.response?.data?.detail || "Failed to send messages");
       return null;
     }
+  };
+
+  const handleExportPDF = async () => {
+    setExportingPDF(true);
+    try {
+      const API = process.env.REACT_APP_BACKEND_URL;
+      const token = localStorage.getItem("cb_coach_token");
+      const res = await fetch(`${API}/api/coach/board/export-pdf`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Export failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `courtbound-board-${new Date().toISOString().slice(0, 10)}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      alert("Failed to generate PDF — please try again");
+    }
+    setExportingPDF(false);
   };
 
   const handleAddList = async name => {
@@ -837,9 +861,9 @@ export default function CoachBoardPage() {
               </button>
             )}
             {saved.length > 0 && (
-              <button onClick={() => window.print()} data-testid="print-board-btn"
-                className="no-print flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold px-3 py-2 rounded-lg border border-slate-700 transition-colors">
-                <Printer className="w-3.5 h-3.5" /> PDF
+              <button onClick={handleExportPDF} disabled={exportingPDF} data-testid="export-pdf-btn"
+                className="no-print flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-60 text-slate-300 text-xs font-bold px-3 py-2 rounded-lg border border-slate-700 transition-colors">
+                <Printer className="w-3.5 h-3.5" /> {exportingPDF ? "Generating..." : "PDF"}
               </button>
             )}
             <button onClick={() => navigate("/coach/players")}
