@@ -320,7 +320,7 @@ async def unsave_player(user_id: str, coach=Depends(require_verified_coach)):
 
 @router.patch("/players/{user_id}/save")
 async def update_saved_player(user_id: str, body: dict, coach=Depends(require_verified_coach)):
-    updates = {k: v for k, v in body.items() if k in ("list_name", "notes", "color_label")}
+    updates = {k: v for k, v in body.items() if k in ("list_name", "notes", "color_label", "sort_order")}
     await run_in_threadpool(
         lambda: supa.table("coach_saved_players")
         .update(updates)
@@ -331,6 +331,27 @@ async def update_saved_player(user_id: str, body: dict, coach=Depends(require_ve
     return {"message": "Updated"}
 
 
+@router.patch("/board/reorder")
+async def reorder_board(body: dict, coach=Depends(require_verified_coach)):
+    """Bulk-update sort_order for cards after within-column or cross-column drag."""
+    items = body.get("items", [])  # [{id: str, sort_order: int}]
+    if not items:
+        return {"message": "Nothing to update"}
+    for item in items:
+        item_id = item.get("id")
+        sort_order = item.get("sort_order", 0)
+        if item_id is None:
+            continue
+        await run_in_threadpool(
+            lambda _id=item_id, _ord=sort_order: supa.table("coach_saved_players")
+            .update({"sort_order": _ord})
+            .eq("id", _id)
+            .eq("coach_id", coach["id"])
+            .execute()
+        )
+    return {"message": "Reordered", "count": len(items)}
+
+
 # ── Saved Players Board ────────────────────────────────────────────────────────
 
 @router.get("/saved")
@@ -339,7 +360,7 @@ async def get_saved_players(coach=Depends(require_verified_coach)):
         lambda: supa.table("coach_saved_players")
         .select("*")
         .eq("coach_id", coach["id"])
-        .order("saved_at", desc=True)
+        .order("sort_order", desc=False)
         .execute()
     )
     saved = saved_res.data or []
