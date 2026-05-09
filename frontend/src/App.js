@@ -18,6 +18,7 @@ import CoachNotificationsPage from "./pages/coach/CoachNotificationsPage";
 import CoachMessagesPage from "./pages/coach/CoachMessagesPage";
 import CoachProgramPage from "./pages/coach/CoachProgramPage";
 import PlayerMessagesPage from "./pages/PlayerMessagesPage";
+import ProgrammesPage from "./pages/ProgrammesPage";
 import Dashboard from "./pages/Dashboard";
 import CollegesPage from "./pages/CollegesPage";
 import CollegeDetailPage from "./pages/CollegeDetailPage";
@@ -40,12 +41,13 @@ import PricingPage from "./pages/PricingPage";
 import SupabaseAuthCallback from "./pages/SupabaseAuthCallback";
 import LegalPage from "./pages/LegalPage";
 import HelpWidget from "./components/HelpWidget";
-import { Trophy, Home, BookOpen, Mail, Wand2, Lightbulb, Menu, X, ShieldCheck, UserCircle, MessageSquare, LogOut, ChevronDown, Sparkles, Bell, CreditCard, Inbox } from "lucide-react";
+import { Trophy, Home, BookOpen, Mail, Wand2, Lightbulb, Menu, X, ShieldCheck, UserCircle, MessageSquare, LogOut, ChevronDown, Sparkles, Bell, CreditCard, Inbox, School } from "lucide-react";
 
 const NAV_ITEMS = [
   { path: "/dashboard", label: "Dashboard", icon: Home },
   { path: "/profile", label: "Profile", icon: UserCircle },
   { path: "/colleges", label: "Colleges", icon: BookOpen },
+  { path: "/programmes", label: "Programmes", icon: School },
   { path: "/messages", label: "Messages", icon: Inbox },
   { path: "/communications", label: "Emails", icon: Mail },
   { path: "/responses", label: "Responses", icon: MessageSquare },
@@ -388,6 +390,7 @@ function AppRouter() {
         <Route path="/coach/messages" element={<CoachProtectedRoute><CoachMessagesPage /></CoachProtectedRoute>} />
         <Route path="/coach/notifications" element={<CoachProtectedRoute><CoachNotificationsPage /></CoachProtectedRoute>} />
         <Route path="/coach/program/:slug" element={<CoachProgramPage />} />
+        <Route path="/programmes" element={<ProgrammesPage />} />
         <Route path="/coach/auth/callback" element={<CoachAuthCallback />} />
       </Routes>
       <HelpWidget />
