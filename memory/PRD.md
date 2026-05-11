@@ -269,6 +269,25 @@ Build "CourtBound," a web app to track USA and UK college basketball scholarship
   - Rename inline (pencil icon), delete with confirmation (moves players to Watch List)
   - Up to 10 custom lists; validation blocks default list names and duplicates
 
+### Phase F — Coach Outreach Hub (Added Feb 2026)
+
+#### Part C — Coach Outreach Hub in Admin Panel (DONE ✅)
+- [x] `supabase_migration_v25_outreach_hub.sql` — creates `admin_campaigns`, `admin_campaign_recipients`, `admin_unsubscribes` tables (user ran ✅)
+- [x] Backend endpoints in `admin.py`:
+  - `GET /api/admin/coach-outreach/contacts` — coach contact DB with division/state/verified/registered/unsubscribed filters
+  - `POST /api/admin/coach-outreach/ai-draft` — Claude AI subject + HTML body generation
+  - `POST /api/admin/coach-outreach/campaigns` — create + immediately send or schedule campaign
+  - `GET /api/admin/coach-outreach/campaigns` — list all campaigns
+  - `GET /api/admin/coach-outreach/campaigns/{id}` — per-recipient detail
+  - `GET /api/unsubscribe?rid=` — public unsubscribe link (HTML response)
+- [x] `AdminCoachOutreach.js` — self-contained React component, 3 sub-tabs:
+  - **Contacts**: filterable/searchable table (283 coaches), checkboxes, toggle filters (verified/registered/unsubscribed), "Compose to N selected" CTA
+  - **Compose**: AI draft generator (tone + focus → Claude), merge tag chips `[First Name]` `[Institution]` `[Division]`, HTML body textarea, preview toggle, schedule for later, send button with recipient count
+  - **Campaigns**: history table (name, status badge, recipients/sent/failed counts, date), expandable row → per-recipient status table
+- [x] New "Coach Outreach" tab added to AdminPage.js tab bar (between Coaches and Funnel)
+- Email sent from `graham@getcourtbound.com` via Resend (DKIM verified)
+- Unsubscribe link auto-appended to every email footer; global unsubscribe list respected on next campaign
+
 ### Phase E — UX Gaps (Added Feb 2026)
 
 #### Player Reply Flow (DONE ✅)
