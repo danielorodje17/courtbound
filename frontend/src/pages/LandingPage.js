@@ -153,7 +153,7 @@ export default function LandingPage() {
             CourtBound changes that.
           </p>
           <p className="text-base text-slate-400 max-w-xl mx-auto mb-10 leading-relaxed">
-            AI-personalised emails to every programme in our 1,700+ college database — drafted for you, sent from your own Gmail. No agency. No templates. No silence.
+            AI-personalised emails to every programme in our growing college database — drafted for you, sent from your own Gmail. No agency. No templates. No silence.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <button
@@ -439,5 +439,8 @@ export default function LandingPage() {
         }
       `}</style>
     </div>
+  );
+}
+
   );
 }
