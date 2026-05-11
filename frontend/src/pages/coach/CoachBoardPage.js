@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCoachAuth } from "../../context/CoachAuthContext";
 import { CoachNav } from "../../components/coach/CoachNav";
+import { toast } from "sonner";
 import {
   DndContext, DragOverlay, closestCenter,
   PointerSensor, TouchSensor, useSensor, useSensors,
@@ -429,135 +430,126 @@ function BulkMessageModal({ listName, players, onSend, onClose }) {
   const eligible = players.filter(item =>
     (item.player?.commitment_status || "uncommitted") !== "committed"
   );
-  const skipped = players.filter(item =>
+  const committedPlayers = players.filter(item =>
     (item.player?.commitment_status || "uncommitted") === "committed"
   );
 
   const [subject, setSubject] = useState("");
   const [msgBody, setMsgBody] = useState("");
   const [sending, setSending] = useState(false);
-  const [result, setResult] = useState(null);
 
   const handleSend = async () => {
     if (!msgBody.trim() || eligible.length === 0 || sending) return;
     setSending(true);
     const res = await onSend({ list_name: listName, subject: subject.trim() || undefined, body: msgBody.trim() });
     setSending(false);
-    if (res) setResult(res);
+    if (!res) return; // error already handled by onSend
+
+    // Close modal and show result as toast
+    const skippedNames = res.skipped_names || [];
+    const skippedMsg = res.skipped > 0
+      ? ` ${res.skipped} committed player${res.skipped !== 1 ? "s" : ""} skipped${skippedNames.length ? ` (${skippedNames.join(", ")})` : ""}.`
+      : "";
+    toast.success(
+      `${res.sent} message${res.sent !== 1 ? "s" : ""} sent to ${listName}.${skippedMsg}`,
+      { duration: 6000 }
+    );
+    onClose();
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
       <div className="w-full max-w-lg bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl">
-        {result ? (
-          /* ── Success state ── */
-          <div className="p-8 text-center">
-            <div className="w-14 h-14 rounded-full bg-green-900/40 border border-green-700/50 flex items-center justify-center mx-auto mb-4">
-              <Check className="w-7 h-7 text-green-400" />
+        {/* Header */}
+        <div className="flex items-start justify-between p-6 pb-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <Users className="w-4 h-4 text-blue-400" />
+              <h3 className="text-white font-black text-base" data-testid="bulk-msg-title">Message this list — {listName}</h3>
             </div>
-            <h3 className="text-white font-black text-lg mb-2">Messages Sent!</h3>
-            <p className="text-slate-400 text-sm leading-relaxed">
-              <strong className="text-green-400">{result.sent} message{result.sent !== 1 ? "s" : ""}</strong> sent to players in <strong className="text-white">{listName}</strong>.
-              {result.skipped > 0 && (
-                <> <span className="text-slate-500">{result.skipped} committed player{result.skipped !== 1 ? "s" : ""} skipped.</span></>
-              )}
+            <p className="text-slate-400 text-sm mt-1" data-testid="bulk-msg-confirmation">
+              Send to all{" "}
+              <strong className="text-blue-400">{eligible.length} player{eligible.length !== 1 ? "s" : ""}</strong>
+              {" "}on <strong className="text-white">{listName}</strong> who are not committed.
             </p>
-            <button onClick={onClose} data-testid="bulk-msg-done-btn"
-              className="mt-6 bg-blue-600 hover:bg-blue-500 text-white font-bold px-8 py-2.5 rounded-xl text-sm transition-colors">
-              Done
-            </button>
+            {committedPlayers.length > 0 && (
+              <p className="text-slate-500 text-xs mt-1" data-testid="bulk-msg-skipped-count">
+                {committedPlayers.length} committed player{committedPlayers.length !== 1 ? "s" : ""} will be skipped.
+              </p>
+            )}
+          </div>
+          <button onClick={onClose} className="text-slate-500 hover:text-white transition-colors flex-shrink-0">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Skipped names */}
+        {committedPlayers.length > 0 && (
+          <div className="mx-6 mb-4 bg-amber-950/30 border border-amber-700/40 rounded-lg px-3 py-2" data-testid="bulk-msg-skipped-info">
+            <p className="text-amber-400 text-xs font-bold mb-1">Skipping committed players:</p>
+            <p className="text-amber-300/70 text-xs">{committedPlayers.map(i => i.player?.full_name || "Unknown").join(", ")}</p>
+          </div>
+        )}
+
+        {eligible.length === 0 ? (
+          <div className="px-6 pb-6 text-center">
+            <p className="text-slate-400 text-sm">All players in this list are committed — no messages can be sent.</p>
+            <button onClick={onClose} className="mt-4 text-slate-400 hover:text-white text-sm font-bold underline">Close</button>
           </div>
         ) : (
-          <>
-            {/* Header */}
-            <div className="flex items-start justify-between p-6 pb-4">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <Users className="w-4 h-4 text-blue-400" />
-                  <h3 className="text-white font-black text-base">Message All — {listName}</h3>
-                </div>
-                <div className="flex flex-wrap items-center gap-3 text-sm mt-1">
-                  <span className="text-slate-300 font-semibold">
-                    <strong className="text-blue-400">{eligible.length}</strong> player{eligible.length !== 1 ? "s" : ""} will receive this
-                  </span>
-                  {skipped.length > 0 && (
-                    <span className="text-slate-500 text-xs" data-testid="bulk-msg-skipped-count">
-                      · {skipped.length} committed skipped
-                    </span>
-                  )}
-                </div>
-              </div>
-              <button onClick={onClose} className="text-slate-500 hover:text-white transition-colors">
-                <X className="w-5 h-5" />
-              </button>
+          <div className="px-6 pb-6 space-y-4">
+            {/* Subject */}
+            <div>
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
+                Subject <span className="text-slate-600 font-normal normal-case">(optional)</span>
+              </label>
+              <input
+                type="text"
+                value={subject}
+                onChange={e => setSubject(e.target.value)}
+                maxLength={150}
+                placeholder="e.g. Interest from our programme"
+                data-testid="bulk-msg-subject-input"
+                className="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+              />
             </div>
 
-            {/* Skipped player names (if any) */}
-            {skipped.length > 0 && (
-              <div className="mx-6 mb-4 bg-amber-950/30 border border-amber-700/40 rounded-lg px-3 py-2" data-testid="bulk-msg-skipped-info">
-                <p className="text-amber-400 text-xs font-bold mb-1">Skipping committed players:</p>
-                <p className="text-amber-300/70 text-xs">{skipped.map(i => i.player?.full_name || "Unknown").join(", ")}</p>
+            {/* Body */}
+            <div>
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">
+                Message <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={msgBody}
+                onChange={e => setMsgBody(e.target.value)}
+                rows={5}
+                maxLength={2000}
+                placeholder="Write your message here..."
+                data-testid="bulk-msg-body-textarea"
+                className="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 resize-none"
+              />
+              <div className="flex justify-between mt-1">
+                <p className="text-slate-600 text-xs">NCAA compliance rules apply to all messages.</p>
+                <span className="text-slate-600 text-xs">{msgBody.length}/2000</span>
               </div>
-            )}
+            </div>
 
-            {/* No eligible players guard */}
-            {eligible.length === 0 ? (
-              <div className="px-6 pb-6 text-center">
-                <p className="text-slate-400 text-sm">All players in this list are committed. No messages can be sent.</p>
-                <button onClick={onClose} className="mt-4 text-slate-400 hover:text-white text-sm font-bold underline">Close</button>
-              </div>
-            ) : (
-              <div className="px-6 pb-6 space-y-4">
-                {/* Subject */}
-                <div>
-                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Subject <span className="text-slate-600 font-normal normal-case">(optional)</span></label>
-                  <input
-                    type="text"
-                    value={subject}
-                    onChange={e => setSubject(e.target.value)}
-                    maxLength={150}
-                    placeholder="e.g. Interest from our programme"
-                    data-testid="bulk-msg-subject-input"
-                    className="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
-                  />
-                </div>
-
-                {/* Body */}
-                <div>
-                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Message <span className="text-red-500">*</span></label>
-                  <textarea
-                    value={msgBody}
-                    onChange={e => setMsgBody(e.target.value)}
-                    rows={5}
-                    maxLength={2000}
-                    placeholder="Write your message here..."
-                    data-testid="bulk-msg-body-textarea"
-                    className="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 resize-none"
-                  />
-                  <div className="flex justify-between mt-1">
-                    <p className="text-slate-600 text-xs">NCAA compliance rules apply to all messages.</p>
-                    <span className="text-slate-600 text-xs">{msgBody.length}/2000</span>
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex gap-3 pt-1">
-                  <button onClick={onClose} data-testid="bulk-msg-cancel-btn"
-                    className="flex-1 py-2.5 text-sm font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 rounded-xl transition-colors">
-                    Cancel
-                  </button>
-                  <button onClick={handleSend} disabled={!msgBody.trim() || sending} data-testid="bulk-msg-send-btn"
-                    className="flex-1 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition-colors flex items-center justify-center gap-2">
-                    {sending ? (
-                      <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Sending...</>
-                    ) : (
-                      <><Send className="w-4 h-4" />Send to {eligible.length}</>
-                    )}
-                  </button>
-                </div>
-              </div>
-            )}
-          </>
+            {/* Actions */}
+            <div className="flex gap-3 pt-1">
+              <button onClick={onClose} data-testid="bulk-msg-cancel-btn"
+                className="flex-1 py-2.5 text-sm font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 rounded-xl transition-colors">
+                Cancel
+              </button>
+              <button onClick={handleSend} disabled={!msgBody.trim() || sending} data-testid="bulk-msg-send-btn"
+                className="flex-1 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition-colors flex items-center justify-center gap-2">
+                {sending ? (
+                  <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Sending...</>
+                ) : (
+                  <><Send className="w-4 h-4" />Send to {eligible.length} player{eligible.length !== 1 ? "s" : ""}</>
+                )}
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </div>
@@ -658,7 +650,7 @@ export default function CoachBoardPage() {
       const r = await coachReq("post", "/messages/bulk", data);
       return r.data;
     } catch (e) {
-      alert(e?.response?.data?.detail || "Failed to send messages");
+      toast.error(e?.response?.data?.detail || "Failed to send messages");
       return null;
     }
   };
@@ -806,11 +798,12 @@ export default function CoachBoardPage() {
               {listName !== "Committed" && items.length > 0 && (
                 <button
                   onClick={() => setBulkTarget(listName)}
-                  data-testid={`message-all-btn-${listName}`}
-                  title="Message all players in this column"
-                  className="p-1 text-slate-600 hover:text-blue-400 transition-colors"
+                  data-testid={`message-list-btn-${listName}`}
+                  title={`Message all players in ${listName}`}
+                  className="no-print flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-blue-400 hover:bg-slate-800/60 px-2 py-1 rounded-lg transition-all"
                 >
-                  <Send className="w-3.5 h-3.5" />
+                  <Send className="w-3 h-3" />
+                  Message list
                 </button>
               )}
             </div>
