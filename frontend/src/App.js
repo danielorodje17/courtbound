@@ -4,6 +4,7 @@ import { Toaster } from "./components/ui/sonner";
 import { AuthProvider, useAuth, apiRequest } from "./context/AuthContext";
 import { ThemeProvider, useTheme, DIVISION_THEME } from "./context/ThemeContext";
 import { CoachAuthProvider, useCoachAuth } from "./context/CoachAuthContext";
+import VideoIntro from "./components/VideoIntro";
 import CoachVerificationPage from "./pages/admin/CoachVerificationPage";
 import CoachAuthCallback from "./pages/coach/CoachAuthCallback";
 import CoachLandingPage from "./pages/coach/CoachLandingPage";
@@ -323,6 +324,20 @@ function CoachProtectedRoute({ children }) {
   return children;
 }
 
+function LandingPageWithIntro() {
+  const SESSION_KEY = "cb_intro_seen";
+  const videoExists = true; // set false to disable intro globally
+  const [showIntro, setShowIntro] = useState(
+    videoExists && !sessionStorage.getItem(SESSION_KEY)
+  );
+  return (
+    <>
+      {showIntro && <VideoIntro onComplete={() => setShowIntro(false)} />}
+      <LandingPage />
+    </>
+  );
+}
+
 function AppRouter() {
   const { user, loading } = useAuth();
   const location = useLocation();
@@ -351,7 +366,7 @@ function AppRouter() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/" element={
           loading ? null :
-          user ? <Navigate to="/dashboard" replace /> : <LandingPage />
+          user ? <Navigate to="/dashboard" replace /> : <LandingPageWithIntro />
         } />
         <Route path="/onboarding" element={
           <ProtectedRoute>
