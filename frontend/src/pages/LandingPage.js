@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, Trophy, CheckCircle2, X, TrendingUp, Mail, RefreshCw, BarChart2, Zap, Lock } from "lucide-react";
+import { ArrowRight, Trophy, CheckCircle2, X, TrendingUp, Mail, RefreshCw, BarChart2, Zap, Lock, Users } from "lucide-react";
 
 function CountUp({ value, duration = 1600 }) {
-  const match = value.match(/^(\d+)(.*)$/);
+  const stripped = value.replace(/,/g, "");
+  const match = stripped.match(/^(\d+)(.*)$/);
   const target = match ? parseInt(match[1], 10) : 0;
   const suffix = match ? match[2] : value;
   const [count, setCount] = useState(0);
@@ -34,7 +35,7 @@ function CountUp({ value, duration = 1600 }) {
     requestAnimationFrame(step);
   }, [started, target, duration]);
 
-  return <span ref={ref}>{count}{suffix}</span>;
+  return <span ref={ref}>{count >= 1000 ? count.toLocaleString() : count}{suffix}</span>;
 }
 
 const HERO_IMG = "https://images.unsplash.com/photo-1677617586882-2b494292ebbe?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzR8MHwxfHNlYXJjaHwyfHxlbXB0eSUyMGluZG9vciUyMGJhc2tldGJhbGwlMjBjb3VydCUyMGRhcmt8ZW58MHx8fHwxNzc2MzcwMTc4fDA&ixlib=rb-4.1.0&q=85";
@@ -42,7 +43,7 @@ const HERO_IMG = "https://images.unsplash.com/photo-1677617586882-2b494292ebbe?c
 const PROCESS_STEPS = [
   { label: "Build Profile",    sub: "Stats, tape, academic" },
   { label: "AI Matching",      sub: "Right colleges, right fit" },
-  { label: "Send Outreach",    sub: "AI-personalised emails" },
+  { label: "Send Outreach",    sub: "Via Gmail or in-app" },
   { label: "Get Replies",      sub: "Track every response" },
   { label: "Land Offers",      sub: "Scholarship secured" },
 ];
@@ -58,12 +59,12 @@ const FEATURES = [
   {
     icon: Mail,
     title: "Emails coaches actually reply to",
-    body: "AI generates personalised emails tailored to each college — referencing their programme, playing style, and recruiting needs. No templates. No copy-paste. Every email reads like you wrote it yourself.",
+    body: "AI generates a personalised email for each college — referencing their programme, your stats, and your position fit. One click sends it straight to your Gmail, ready to send from your own address. No templates. No copy-paste. Coaches see a real person, not a platform.",
   },
   {
     icon: TrendingUp,
     title: "Targets the right colleges",
-    body: "Our AI matches your profile against over 300 US programmes and shows your best-fit schools, your likelihood of interest, and exactly what to say to each coach.",
+    body: "Our AI matches your profile against over 1,700 US programmes and shows your best-fit schools, your likelihood of interest, and exactly what to say to each coach.",
   },
   {
     icon: RefreshCw,
@@ -74,6 +75,11 @@ const FEATURES = [
     icon: BarChart2,
     title: "Tells you what to do next",
     body: "No confusion. No guessing. You'll always know who to contact, what to say, and where your best opportunities are — with AI-powered next steps after every reply.",
+  },
+  {
+    icon: Users,
+    title: "Two ways to reach every coach",
+    body: "For coaches in our database who haven't joined CourtBound yet, we draft a personalised email that goes straight to your Gmail — you send it from your own address. For coaches who are registered on CourtBound, you get direct two-way messaging inside the app. Either way, no coach is out of reach.",
   },
 ];
 
@@ -143,8 +149,11 @@ export default function LandingPage() {
           <p className="text-xl text-slate-300 max-w-2xl mx-auto mb-4 leading-relaxed">
             Most UK players send 100+ emails… and hear nothing back.
           </p>
-          <p className="text-xl font-bold text-white mb-10">
+          <p className="text-xl font-bold text-white mb-4">
             CourtBound changes that.
+          </p>
+          <p className="text-base text-slate-400 max-w-xl mx-auto mb-10 leading-relaxed">
+            AI-personalised emails to every programme in our 1,700+ college database — drafted for you, sent from your own Gmail. No agency. No templates. No silence.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <button
@@ -248,8 +257,8 @@ export default function LandingPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               {[
-                { n: "300+", label: "Colleges in our Database" },
-                { n: "50+",  label: "UK-Friendly Programs" },
+                { n: "1,700+", label: "US Programmes" },
+                { n: "300+",   label: "Colleges in our Database" },
                 { n: "7",   label: "AI Email Types" },
                 { n: "5min", label: "To Your First Match" },
               ].map(({ n, label }) => (
@@ -367,7 +376,7 @@ export default function LandingPage() {
             This Isn't Theory
           </h2>
           <p className="text-base text-slate-400 leading-relaxed max-w-xl mx-auto mb-6">
-            CourtBound was built by a UK parent going through this exact process — solving the problems you're facing right now. Every feature exists because we hit that wall ourselves.
+            CourtBound was built by a UK parent going through this exact process with his son — who went from sending 100+ unanswered emails manually to getting multiple responses within a week using the platform. Every feature exists because we hit that wall ourselves.
           </p>
           <p className="text-base text-slate-300 font-semibold leading-relaxed max-w-xl mx-auto">
             Whether you're just starting or already emailing coaches, CourtBound gives you a clear, structured path to getting recruited.

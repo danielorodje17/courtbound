@@ -9,12 +9,13 @@ const FEATURES = [
   { icon: Zap,       title: "AI Player Summaries",       desc: "Instant one-line AI scouting notes for every player profile. Built with Claude." },
   { icon: Award,     title: "Free for Coaches",          desc: "The CourtBound Coach Portal is completely free for verified US college coaches. No subscription, no catch." },
   { icon: Shield,    title: "NCAA Compliant",            desc: "Built-in recruiting calendar, compliance banners, and division-specific contact period reminders." },
+  { icon: Globe,     title: "Players are already reaching out", desc: "UK players on CourtBound are actively emailing US coaches using AI-personalised emails sent from their own Gmail. Register on CourtBound to get direct in-app contact from matched players — so you can respond, evaluate, and recruit faster than coaches still working from their inbox." },
 ];
 
 const STEPS = [
   { n: "01", title: "Create Your Account",       desc: "Sign up with your institutional email. Most .edu domains are auto-verified instantly — no waiting." },
   { n: "02", title: "Set Recruiting Preferences", desc: "Tell us the positions, grad years, height ranges and academic minimums. We handle the targeting." },
-  { n: "03", title: "Discover UK Recruits",       desc: "Browse your personalised match feed of UK basketball prospects, sorted by fit score." },
+  { n: "03", title: "Connect Directly",       desc: "Message matched players in-app. No inbox noise. And players who contacted you via Gmail can be linked to their CourtBound profile with one click." },
 ];
 
 const STATIC_STATS = [
@@ -108,8 +109,7 @@ export default function CoachLandingPage() {
           </h1>
 
           <p className="text-slate-400 text-lg max-w-2xl mb-6 leading-relaxed">
-            The only platform built for US college coaches to discover, evaluate, and contact elite UK basketball prospects.
-            English-speaking, NCAA-eligible, and actively seeking US programmes.
+            UK basketball players are already emailing US college coaches using CourtBound — AI-personalised, sent from their own Gmail. The coaches who are registered on CourtBound get two-way messaging, a profile dashboard, and first access to the players before anyone else sees them.
           </p>
 
           {/* Live hero counter — fades in when data loads */}
