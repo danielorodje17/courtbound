@@ -1088,7 +1088,7 @@ def _apply_merge_tags(text: str, name: str, institution: str, division: str, uns
 
 
 def _build_html_email(body_html: str, unsub_url: str) -> str:
-    """Wrap body in a clean email template with unsubscribe footer."""
+    """Wrap body in a clean email template with sender signature and unsubscribe footer."""
     return f"""<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -1096,9 +1096,17 @@ def _build_html_email(body_html: str, unsub_url: str) -> str:
   <div style="margin-bottom:32px;">
     {body_html}
   </div>
+  <div style="margin-top:32px;padding-top:20px;border-top:2px solid #f97316;">
+    <p style="margin:0 0 2px 0;font-weight:700;font-size:15px;color:#1e293b;">Graham Orodje</p>
+    <p style="margin:0 0 6px 0;font-size:13px;color:#64748b;">Founder, CourtBound</p>
+    <p style="margin:0;font-size:13px;color:#64748b;line-height:1.6;">
+      <a href="mailto:graham@getcourtbound.com" style="color:#f97316;text-decoration:none;">graham@getcourtbound.com</a><br>
+      <a href="https://getcourtbound.com" style="color:#f97316;text-decoration:none;">getcourtbound.com</a><br>
+      +44 7508-429-480
+    </p>
+  </div>
   <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;">
   <p style="color:#94a3b8;font-size:12px;margin:0;">
-    CourtBound &mdash; <a href="https://getcourtbound.com" style="color:#94a3b8;">getcourtbound.com</a><br>
     <a href="{unsub_url}" style="color:#94a3b8;text-decoration:underline;">Unsubscribe from these emails</a>
   </p>
 </body>
