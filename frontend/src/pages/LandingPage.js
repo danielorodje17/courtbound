@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, Trophy, CheckCircle2, X, TrendingUp, Mail, RefreshCw, BarChart2, Zap, Lock, Users } from "lucide-react";
+import { ArrowRight, Trophy, CheckCircle2, X, TrendingUp, Mail, RefreshCw, BarChart2, Zap, Lock, Users, Globe } from "lucide-react";
 
 function CountUp({ value, duration = 1600 }) {
   const stripped = value.replace(/,/g, "");
@@ -59,27 +59,27 @@ const FEATURES = [
   {
     icon: Mail,
     title: "Emails coaches actually reply to",
-    body: "AI generates a personalised email for each college — referencing their programme, your stats, and your position fit. One click sends it straight to your Gmail, ready to send from your own address. No templates. No copy-paste. Coaches see a real person, not a platform.",
+    body: "AI generates a personalised email for each college — referencing their programme, your stats, and your position fit. One click transfers the draft to your Gmail so it comes from you personally, not a platform. Coaches see a real person reaching out. No templates. No copy-paste.",
   },
   {
     icon: TrendingUp,
-    title: "Targets the right colleges",
-    body: "Our AI matches your profile against over 1,700 US programmes and shows your best-fit schools, your likelihood of interest, and exactly what to say to each coach.",
+    title: "Every programme. Not just the obvious ones.",
+    body: "Our database covers 1,700+ US college programmes across D1, D2, D3, NAIA, and JUCO. Our AI matches your profile against all of them and surfaces your best-fit schools — the ones most likely to reply — with your match score and exactly what to say to each coach.",
   },
   {
     icon: RefreshCw,
     title: "Handles follow-ups for you",
-    body: "Most players lose opportunities by not following up. CourtBound tracks every message, tells you exactly when to follow up, and writes the follow-up email for you.",
+    body: "Most players lose opportunities by not following up. CourtBound tracks every message, tells you exactly when to follow up, and writes the follow-up email for you — personalised to where the conversation left off.",
   },
   {
     icon: BarChart2,
     title: "Tells you what to do next",
-    body: "No confusion. No guessing. You'll always know who to contact, what to say, and where your best opportunities are — with AI-powered next steps after every reply.",
+    body: "No confusion. No guessing. After every reply — or every silence — CourtBound gives you AI-powered next steps. You always know who to contact, what to say, and where your best opportunities are right now.",
   },
   {
-    icon: Users,
+    icon: Globe,
     title: "Two ways to reach every coach",
-    body: "For coaches in our database who haven't joined CourtBound yet, we draft a personalised email that goes straight to your Gmail — you send it from your own address. For coaches who are registered on CourtBound, you get direct two-way messaging inside the app. Either way, no coach is out of reach.",
+    body: "For coaches in our database who haven't joined CourtBound yet, we draft a personalised email that goes straight to your Gmail — you send it from your own address. For coaches registered on CourtBound directly, you get instant two-way in-app messaging. Either way, no coach is out of reach.",
   },
 ];
 
