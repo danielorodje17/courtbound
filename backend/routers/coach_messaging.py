@@ -489,6 +489,35 @@ async def player_reply_message(message_id: str, body: dict, current_user=Depends
     return {"message": "Reply sent"}
 
 
+@player_router.get("/contacted-institutions")
+async def get_contacted_institutions(current_user=Depends(get_current_user)):
+    """
+    Return two sets of institution names based on the player's reply status:
+    - replied: player has sent a reply to a coach at that institution
+    - not_replied: coach messaged but player hasn't replied yet
+    """
+    user_id = str(current_user.user_id)
+    res = await run_in_threadpool(
+        lambda: supa.table("coach_messages")
+        .select("coach_institution, player_reply")
+        .eq("player_user_id", user_id)
+        .eq("status", "sent")
+        .execute()
+    )
+    replied, not_replied = set(), set()
+    for row in (res.data or []):
+        inst = (row.get("coach_institution") or "").strip()
+        if not inst:
+            continue
+        if row.get("player_reply"):
+            replied.add(inst)
+        else:
+            not_replied.add(inst)
+    # A college is "not replied" only if the player hasn't replied to ANY of its messages
+    not_replied -= replied
+    return {"replied": list(replied), "not_replied": list(not_replied)}
+
+
 @player_router.get("/messages/unread-count")
 async def player_unread_count(current_user=Depends(get_current_user)):
     user_id = str(current_user.user_id)
