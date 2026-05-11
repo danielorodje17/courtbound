@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import AdminCoachOutreach from "./AdminCoachOutreach";
 import { toast } from "sonner";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -961,11 +962,12 @@ export default function AdminPage() {
       {/* Tabs */}
       <div className="flex gap-1 mb-6 bg-white border border-slate-200 rounded-xl p-1 w-fit flex-wrap">
         {[
-          { id: "overview",  label: "Overview" },
-          { id: "users",     label: `Users (${users.length})` },
-          { id: "coaches",   label: "Coaches" },
-          { id: "funnel",    label: "Funnel" },
-          { id: "outreach",  label: "Outreach" },
+          { id: "overview",       label: "Overview" },
+          { id: "users",          label: `Users (${users.length})` },
+          { id: "coaches",        label: "Coaches" },
+          { id: "coach-outreach", label: "Coach Outreach" },
+          { id: "funnel",         label: "Funnel" },
+          { id: "outreach",       label: "Outreach" },
           { id: "activity",  label: "Activity" },
           { id: "reports",   label: `Reports${reports.filter(r => r.status === "pending").length > 0 ? ` (${reports.filter(r => r.status === "pending").length})` : ""}` },
           { id: "colleges",  label: "Colleges" },
@@ -2157,6 +2159,9 @@ export default function AdminPage() {
           </>)}
         </div>
       )}
+
+      {/* ── COACH OUTREACH TAB ─────────────────────────────────── */}
+      {activeTab === "coach-outreach" && <AdminCoachOutreach />}
 
       {/* ── OUTREACH TAB ───────────────────────────────────────── */}
       {activeTab === "outreach" && (
