@@ -2,10 +2,11 @@ import os
 import io
 import csv
 import uuid
+import asyncio
 import logging
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Cookie, Header
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, HTMLResponse
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 from collections import defaultdict
@@ -1063,3 +1064,435 @@ async def admin_delete_coach_account(coach_id: str, _=Depends(require_admin_toke
         lambda: supa.table("coach_accounts").delete().eq("id", coach_id).execute()
     )
     return {"message": "Coach account deleted"}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# COACH OUTREACH HUB
+# ═══════════════════════════════════════════════════════════════════════════════
+
+OUTREACH_SENDER = os.environ.get("OUTREACH_SENDER_EMAIL", "graham@getcourtbound.com")
+BATCH_SIZE = 8          # emails per second batch (Resend free: ~2/s; paid: more)
+BATCH_PAUSE = 1.2       # seconds between batches
+
+
+def _apply_merge_tags(text: str, name: str, institution: str, division: str, unsub_link: str) -> str:
+    """Replace [First Name], [Institution], [Division], [Unsubscribe Link] merge tags."""
+    first_name = (name or "Coach").split()[0]
+    return (
+        text
+        .replace("[First Name]", first_name)
+        .replace("[Institution]", institution or "your institution")
+        .replace("[Division]", division or "")
+        .replace("[Unsubscribe Link]", unsub_link)
+    )
+
+
+def _build_html_email(body_html: str, unsub_url: str) -> str:
+    """Wrap body in a clean email template with unsubscribe footer."""
+    return f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;color:#1e293b;background:#fff;">
+  <div style="margin-bottom:32px;">
+    {body_html}
+  </div>
+  <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;">
+  <p style="color:#94a3b8;font-size:12px;margin:0;">
+    CourtBound &mdash; <a href="https://getcourtbound.com" style="color:#94a3b8;">getcourtbound.com</a><br>
+    <a href="{unsub_url}" style="color:#94a3b8;text-decoration:underline;">Unsubscribe from these emails</a>
+  </p>
+</body>
+</html>"""
+
+
+async def _dispatch_campaign(campaign_id: str):
+    """Background task: send emails to all pending recipients in a campaign."""
+    try:
+        import resend as _resend
+        _resend.api_key = os.environ["RESEND_API_KEY"]
+
+        camp_res = await run_in_threadpool(
+            lambda: supa.table("admin_campaigns").select("*").eq("id", campaign_id).limit(1).execute()
+        )
+        camp = camp_res.data[0] if camp_res.data else None
+        if not camp:
+            return
+
+        await run_in_threadpool(
+            lambda: supa.table("admin_campaigns").update({"status": "sending"}).eq("id", campaign_id).execute()
+        )
+
+        recip_res = await run_in_threadpool(
+            lambda: supa.table("admin_campaign_recipients")
+            .select("*").eq("campaign_id", campaign_id).eq("status", "pending").execute()
+        )
+        recipients = recip_res.data or []
+
+        sent_count = 0
+        failed_count = 0
+
+        for i, recip in enumerate(recipients):
+            try:
+                unsub_url = (
+                    f"https://getcourtbound.com/api/unsubscribe?rid={recip['id']}"
+                )
+                personalised_body = _apply_merge_tags(
+                    camp["body_html"],
+                    recip.get("contact_name", ""),
+                    recip.get("contact_institution", ""),
+                    recip.get("contact_division", ""),
+                    unsub_url,
+                )
+                personalised_subject = _apply_merge_tags(
+                    camp["subject"],
+                    recip.get("contact_name", ""),
+                    recip.get("contact_institution", ""),
+                    recip.get("contact_division", ""),
+                    unsub_url,
+                )
+                full_html = _build_html_email(personalised_body, unsub_url)
+
+                result = await run_in_threadpool(
+                    lambda r=recip, h=full_html, s=personalised_subject: _resend.Emails.send({
+                        "from": f"Graham | CourtBound <{OUTREACH_SENDER}>",
+                        "to": [r["contact_email"]],
+                        "subject": s,
+                        "html": h,
+                    })
+                )
+                msg_id = result.get("id") if isinstance(result, dict) else str(result)
+                await run_in_threadpool(
+                    lambda rid=recip["id"], mid=msg_id: supa.table("admin_campaign_recipients").update({
+                        "status": "sent",
+                        "sent_at": datetime.now(timezone.utc).isoformat(),
+                        "resend_message_id": mid,
+                    }).eq("id", rid).execute()
+                )
+                sent_count += 1
+            except Exception as exc:
+                logger.warning("Outreach send failed for %s: %s", recip.get("contact_email"), exc)
+                await run_in_threadpool(
+                    lambda rid=recip["id"]: supa.table("admin_campaign_recipients").update({
+                        "status": "failed",
+                    }).eq("id", rid).execute()
+                )
+                failed_count += 1
+
+            # Batch pause
+            if (i + 1) % BATCH_SIZE == 0:
+                await asyncio.sleep(BATCH_PAUSE)
+
+        await run_in_threadpool(
+            lambda: supa.table("admin_campaigns").update({
+                "status": "sent",
+                "sent_at": datetime.now(timezone.utc).isoformat(),
+                "sent_count": sent_count,
+                "failed_count": failed_count,
+            }).eq("id", campaign_id).execute()
+        )
+        logger.info("Campaign %s complete — sent=%d failed=%d", campaign_id, sent_count, failed_count)
+    except Exception as exc:
+        logger.error("Campaign dispatch failed: %s", exc)
+        await run_in_threadpool(
+            lambda: supa.table("admin_campaigns").update({"status": "failed"}).eq("id", campaign_id).execute()
+        )
+
+
+# ── Contacts ──────────────────────────────────────────────────────────────────
+
+@router.get("/coach-outreach/contacts")
+async def outreach_contacts(
+    _=Depends(require_admin_token),
+    division: str = None,
+    state: str = None,
+    verified_only: bool = False,
+    hide_registered: bool = False,
+    hide_unsubscribed: bool = False,
+):
+    """Fetch the coach contact DB enriched with registration + unsubscribe status."""
+    query = supa.table("colleges").select("id,name,division,conference,location,state,coaches(*)")
+    if division:
+        query = query.eq("division", division)
+    result = await run_in_threadpool(lambda: query.order("name").execute())
+    colleges = result.data or []
+
+    # Build registered institutions set (coach_accounts)
+    reg_res = await run_in_threadpool(
+        lambda: supa.table("coach_accounts").select("institution_name,verification_status").execute()
+    )
+    registered_institutions = {
+        (r.get("institution_name") or "").strip().lower()
+        for r in (reg_res.data or [])
+        if r.get("verification_status") in ("verified", "pending")
+    }
+
+    # Build unsubscribed emails set
+    unsub_res = await run_in_threadpool(
+        lambda: supa.table("admin_unsubscribes").select("email").execute()
+    )
+    unsubscribed_emails = {(r["email"] or "").strip().lower() for r in (unsub_res.data or [])}
+
+    rows = []
+    for college in colleges:
+        coaches = college.get("coaches") or []
+        is_reg = (college.get("name") or "").strip().lower() in registered_institutions
+        if not coaches:
+            continue  # Only include rows with an email to contact
+        for coach in coaches:
+            email = (coach.get("email") or "").strip()
+            if not email:
+                continue
+            if verified_only and not coach.get("last_verified"):
+                continue
+            if state and state.lower() not in (college.get("state") or "").lower():
+                continue
+            is_unsub = email.lower() in unsubscribed_emails
+            rows.append({
+                "coach_id": coach.get("id"),
+                "college_id": college["id"],
+                "college_name": college.get("name", ""),
+                "division": college.get("division"),
+                "conference": college.get("conference"),
+                "location": college.get("location"),
+                "state": college.get("state"),
+                "coach_name": coach.get("name", ""),
+                "email": email,
+                "title": coach.get("title", ""),
+                "last_verified": coach.get("last_verified"),
+                "is_registered": is_reg,
+                "is_unsubscribed": is_unsub,
+            })
+
+    if hide_registered:
+        rows = [r for r in rows if not r["is_registered"]]
+    if hide_unsubscribed:
+        rows = [r for r in rows if not r["is_unsubscribed"]]
+
+    return {"contacts": rows, "total": len(rows)}
+
+
+# ── AI Draft ─────────────────────────────────────────────────────────────────
+
+@router.post("/coach-outreach/ai-draft")
+async def outreach_ai_draft(body: dict, _=Depends(require_admin_token)):
+    """Generate an AI draft subject + body for a coach outreach email."""
+    tone = body.get("tone", "professional")
+    focus = body.get("focus", "general invitation")
+    count = body.get("recipient_count", 0)
+
+    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    api_key = os.environ.get("EMERGENT_LLM_KEY")
+    if not api_key:
+        raise HTTPException(status_code=503, detail="AI service not configured")
+
+    chat = LlmChat(
+        api_key=api_key,
+        session_id=f"outreach-draft-{uuid.uuid4()}",
+        system_message=(
+            "You are an expert at writing cold outreach emails for sports technology platforms. "
+            "Write compelling, concise emails that respect the recipient's time. "
+            "Always use proper merge tag placeholders: [First Name], [Institution], [Division]. "
+            "Keep the subject line under 60 characters. Keep the email body under 200 words. "
+            "Return ONLY a JSON object with keys 'subject' and 'body_html'. "
+            "body_html should use basic HTML paragraph tags only (<p>, <strong>). No markdown."
+        ),
+    ).with_model("claude", "claude-sonnet-4-5")
+
+    prompt = (
+        f"Write a {tone} outreach email to a US college basketball coach inviting them to join CourtBound "
+        f"(a recruiting platform connecting US college coaches with international players, primarily from the UK). "
+        f"Focus: {focus}. "
+        f"The email will be sent to {count} coaches. "
+        "Use [First Name] to personalise. Mention CourtBound's value: access to verified UK players, "
+        "streamlined messaging, NCAA-compliant contact period tools, and a free trial. "
+        "Call to action: sign up at getcourtbound.com/coach/register. "
+        "Return JSON only."
+    )
+
+    response = await run_in_threadpool(
+        lambda: chat.chat(UserMessage(content=prompt))
+    )
+
+    import json as _json
+    import re as _re
+    try:
+        raw = response.strip()
+        json_match = _re.search(r'\{.*\}', raw, _re.DOTALL)
+        if json_match:
+            draft = _json.loads(json_match.group())
+        else:
+            draft = _json.loads(raw)
+        return {"subject": draft.get("subject", ""), "body_html": draft.get("body_html", "")}
+    except Exception:
+        return {"subject": "", "body_html": response, "parse_error": True}
+
+
+# ── Campaigns ────────────────────────────────────────────────────────────────
+
+@router.post("/coach-outreach/campaigns")
+async def create_campaign(body: dict, _=Depends(require_admin_token)):
+    """Create a campaign and optionally dispatch immediately or schedule."""
+    name = (body.get("name") or "").strip()
+    subject = (body.get("subject") or "").strip()
+    body_html = (body.get("body_html") or "").strip()
+    recipient_emails: list = body.get("recipient_emails") or []
+    scheduled_at = body.get("scheduled_at")  # ISO string or null
+
+    if not subject:
+        raise HTTPException(status_code=400, detail="Subject is required")
+    if not body_html:
+        raise HTTPException(status_code=400, detail="Email body is required")
+    if not recipient_emails:
+        raise HTTPException(status_code=400, detail="At least one recipient is required")
+    if not name:
+        name = f"Campaign {datetime.now(timezone.utc).strftime('%d %b %Y %H:%M')}"
+
+    campaign_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc).isoformat()
+
+    campaign_row = {
+        "id": campaign_id,
+        "name": name,
+        "subject": subject,
+        "body_html": body_html,
+        "sender_email": OUTREACH_SENDER,
+        "status": "scheduled" if scheduled_at else "pending",
+        "scheduled_at": scheduled_at,
+        "recipient_count": len(recipient_emails),
+        "sent_count": 0,
+        "failed_count": 0,
+        "created_at": now,
+    }
+    await run_in_threadpool(
+        lambda: supa.table("admin_campaigns").insert(campaign_row).execute()
+    )
+
+    # Fetch contact details to populate recipient rows
+    contact_map: dict = {}
+    all_cont_res = await run_in_threadpool(
+        lambda: supa.table("coaches").select("email,name,college_id").execute()
+    )
+    college_ids = {c.get("college_id") for c in (all_cont_res.data or [])}
+    colleges_res = await run_in_threadpool(
+        lambda: supa.table("colleges").select("id,name,division").in_("id", list(college_ids) if college_ids else ["none"]).execute()
+    )
+    college_map = {c["id"]: c for c in (colleges_res.data or [])}
+    for c in (all_cont_res.data or []):
+        if c.get("email"):
+            college = college_map.get(c.get("college_id"), {})
+            contact_map[c["email"].strip().lower()] = {
+                "contact_name": c.get("name", ""),
+                "contact_institution": college.get("name", ""),
+                "contact_division": college.get("division", ""),
+            }
+
+    # Fetch unsubscribes to skip them
+    unsub_res = await run_in_threadpool(
+        lambda: supa.table("admin_unsubscribes").select("email").execute()
+    )
+    unsubbed = {r["email"].strip().lower() for r in (unsub_res.data or [])}
+
+    recipient_rows = []
+    skipped_unsub = []
+    for email in recipient_emails:
+        email_lower = email.strip().lower()
+        if email_lower in unsubbed:
+            skipped_unsub.append(email)
+            continue
+        info = contact_map.get(email_lower, {})
+        recipient_rows.append({
+            "campaign_id": campaign_id,
+            "contact_email": email.strip(),
+            "contact_name": info.get("contact_name", ""),
+            "contact_institution": info.get("contact_institution", ""),
+            "contact_division": info.get("contact_division", ""),
+            "status": "pending",
+            "created_at": now,
+        })
+
+    if recipient_rows:
+        await run_in_threadpool(
+            lambda: supa.table("admin_campaign_recipients").insert(recipient_rows).execute()
+        )
+
+    # Update actual recipient count (after filtering unsubscribes)
+    await run_in_threadpool(
+        lambda: supa.table("admin_campaigns").update({"recipient_count": len(recipient_rows)}).eq("id", campaign_id).execute()
+    )
+
+    # Dispatch immediately if not scheduled
+    if not scheduled_at:
+        asyncio.ensure_future(_dispatch_campaign(campaign_id))
+
+    return {
+        "campaign_id": campaign_id,
+        "recipient_count": len(recipient_rows),
+        "skipped_unsubscribed": len(skipped_unsub),
+        "scheduled": bool(scheduled_at),
+    }
+
+
+@router.get("/coach-outreach/campaigns")
+async def list_campaigns(_=Depends(require_admin_token)):
+    result = await run_in_threadpool(
+        lambda: supa.table("admin_campaigns").select("*").order("created_at", desc=True).limit(100).execute()
+    )
+    return {"campaigns": result.data or []}
+
+
+@router.get("/coach-outreach/campaigns/{campaign_id}")
+async def get_campaign(campaign_id: str, _=Depends(require_admin_token)):
+    camp_res = await run_in_threadpool(
+        lambda: supa.table("admin_campaigns").select("*").eq("id", campaign_id).limit(1).execute()
+    )
+    if not camp_res.data:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    recip_res = await run_in_threadpool(
+        lambda: supa.table("admin_campaign_recipients")
+        .select("*").eq("campaign_id", campaign_id).order("created_at").execute()
+    )
+    return {"campaign": camp_res.data[0], "recipients": recip_res.data or []}
+
+
+# ── Public Unsubscribe ────────────────────────────────────────────────────────
+# Registered on api_router without /admin prefix (see server.py)
+
+unsubscribe_router = APIRouter(tags=["public"])
+
+
+@unsubscribe_router.get("/unsubscribe")
+async def unsubscribe(rid: str = None):
+    """Public unsubscribe endpoint — linked from every outreach email footer."""
+    success_html = """<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Unsubscribed</title>
+<style>body{font-family:Arial,sans-serif;max-width:500px;margin:80px auto;text-align:center;color:#1e293b;}
+h2{color:#16a34a;}p{color:#64748b;}</style></head>
+<body>
+  <h2>You've been unsubscribed</h2>
+  <p>You will no longer receive outreach emails from CourtBound.</p>
+  <p><a href="https://getcourtbound.com" style="color:#f97316;">Return to CourtBound</a></p>
+</body></html>"""
+
+    if not rid:
+        return HTMLResponse(content=success_html, status_code=200)
+
+    try:
+        recip_res = await run_in_threadpool(
+            lambda: supa.table("admin_campaign_recipients").select("contact_email").eq("id", rid).limit(1).execute()
+        )
+        if recip_res.data:
+            email = recip_res.data[0]["contact_email"]
+            # Upsert into unsubscribes (safe to call multiple times)
+            await run_in_threadpool(
+                lambda: supa.table("admin_unsubscribes").upsert(
+                    {"email": email, "unsubscribed_at": datetime.now(timezone.utc).isoformat(), "source": "email_link"},
+                    on_conflict="email"
+                ).execute()
+            )
+            await run_in_threadpool(
+                lambda: supa.table("admin_campaign_recipients").update({"status": "unsubscribed"}).eq("id", rid).execute()
+            )
+    except Exception as exc:
+        logger.warning("Unsubscribe error for rid=%s: %s", rid, exc)
+
+    return HTMLResponse(content=success_html, status_code=200)
